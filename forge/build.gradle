@@ -2,52 +2,34 @@ plugins {
     id "com.github.johnrengelman.shadow" version "8.1.1"
 }
 
-architectury {
-    platformSetupLoomIde()
-    forge()
-}
-
-loom {
-    accessWidenerPath = project(":common").loom.accessWidenerPath
-
-    forge {
-        convertAccessWideners = true
-        extraAccessWideners.add loom.accessWidenerPath.get().asFile.name
-
-        mixinConfig "figura-common.mixins.json"
-        mixinConfig "figura.mixins.json"
-    }
-}
+archivesBaseName = "${rootProject.archives_base_name}-${version}-forge-mc"
 
 configurations {
-    common
-    shadowCommon // Don't use shadow from the shadow plugin since it *excludes* files.
-    compileClasspath.extendsFrom common
-    runtimeClasspath.extendsFrom common
-    developmentForge.extendsFrom common
+    shade
+    implementation.extendsFrom shade
 }
 
+
 dependencies {
-    mappings loom.layered {
-        mappings(file("$rootProject.projectDir/mappings/gecko-mojmap-fix.tiny"))
-        officialMojangMappings()
-        parchment("org.parchmentmc.data:parchment-1.16.5:2022.03.06@zip")
-    }
-
     // Libraries
-    shadowCommon(forgeRuntimeLibrary("com.github.FiguraMC.LuaJ:luaj-core:$luaj-figura"))
-    shadowCommon(forgeRuntimeLibrary("com.github.FiguraMC.LuaJ:luaj-jse:$luaj-figura"))
-    shadowCommon(forgeRuntimeLibrary("com.neovisionaries:nv-websocket-client:$nv_websocket"))
-
-    forge "net.minecraftforge:forge:${rootProject.forge_version}"
+    shade("com.github.FiguraMC.LuaJ:luaj-core:$luaj-figura")
+    shade("com.github.FiguraMC.LuaJ:luaj-jse:$luaj-figura")
+    shade("com.neovisionaries:nv-websocket-client:$nv_websocket")
 
     if (rootProject.run_with_geckolib == "true") {
-        modImplementation("software.bernie.geckolib:geckolib-forge-$geckolib_version_forge")
+      //  modImplementation("software.bernie.geckolib:geckolib-forge-$geckolib_version_forge")
     } else {
-        modCompileOnly("software.bernie.geckolib:geckolib-forge-$geckolib_version_forge")
+        //modCompileOnly("software.bernie.geckolib:geckolib-forge-$geckolib_version_forge")
     }
-    common(project(path: ":common", configuration: "namedElements")) { transitive false }
-    shadowCommon(project(path: ":common", configuration: "transformProductionForge")) { transitive = false }
+
+    implementation project(":common")
+}
+
+unimined.minecraft {
+    minecraftForge {
+        loader forge_version
+        mixinConfig("${archives_base_name}-common.mixins.json", "${archives_base_name}.mixins.json")
+    }
 }
 
 processResources {
@@ -64,52 +46,26 @@ processResources {
     }
 }
 
+compileTestJava.enabled = false
+
+tasks.withType(JavaCompile).configureEach {
+    source(project(":common").sourceSets.main.allSource)
+}
+
 shadowJar {
-    exclude "fabric.mod.json"
-    exclude "architectury.common.json"
-
-    configurations = [project.configurations.shadowCommon]
-    archiveClassifier.set "dev-shadow"
-    relocate 'org.apache.bcel', "${project.group}.org.apache.bcel"
-    relocate 'org.apache.commons.lang3', "${project.group}.org.apache.commons.lang3"
-    relocate 'com.neovisionaries', "${project.group}.com.neovisionaries"
+    archiveClassifier = ''
+    configurations = [project.configurations.shade]
+    finalizedBy 'reobfShadowJar'
 }
 
-remapJar {
-    input.set shadowJar.archiveFile
-    dependsOn shadowJar
-    archiveClassifier.set "forge-mc"
-}
-
-jar {
-    archiveClassifier.set "dev"
-}
-
-sourcesJar {
-    def commonSources = project(":common").sourcesJar
-    dependsOn commonSources
-    from commonSources.archiveFile.map { zipTree(it) }
-}
-
-components.java {
-    withVariantsFromConfiguration(project.configurations.shadowRuntimeElements) {
-        skip()
-    }
-}
+assemble.dependsOn shadowJar
 
 publishing {
     publications {
-        maven(MavenPublication) {
+        mavenJava(MavenPublication) {
             artifactId = "${project.archivesBaseName}-${project.name}"
             version = project.version
-            artifact(remapJar) {
-                builtBy remapJar
-                classifier ''
-            }
-            artifact(sourcesJar) {
-                builtBy sourcesJar
-                classifier 'sources'
-            }
+            from components.java
         }
     }
     setupRepositories(repositories)

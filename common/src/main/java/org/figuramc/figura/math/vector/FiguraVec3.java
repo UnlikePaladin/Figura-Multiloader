@@ -1,17 +1,17 @@
 package org.figuramc.figura.math.vector;
 
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Vec3d;
 import org.figuramc.figura.lua.LuaNotNil;
 import org.figuramc.figura.lua.LuaWhitelist;
 import org.figuramc.figura.lua.docs.*;
 import org.figuramc.figura.math.matrix.FiguraMat3;
 import org.figuramc.figura.utils.LuaUtils;
 import org.figuramc.figura.utils.MathUtils;
-import com.mojang.math.Vector3f;
 import org.luaj.vm2.LuaError;
 import org.luaj.vm2.LuaFunction;
 import org.luaj.vm2.LuaValue;
+import org.lwjgl.util.vector.Vector3f;
 
 @LuaWhitelist
 @LuaTypeDoc(
@@ -529,10 +529,10 @@ public class FiguraVec3 extends FiguraVector<FiguraVec3, FiguraMat3> {
         return of(pos.getX(), pos.getY(), pos.getZ());
     }
 
-    public Vec3 asVec3() {
-        return new Vec3(x, y, z);
+    public Vec3d asVec3() {
+        return new Vec3d(x, y, z);
     }
-    public static FiguraVec3 fromVec3(Vec3 vec) {
+    public static FiguraVec3 fromVec3(Vec3d vec) {
         return of(vec.x, vec.y, vec.z);
     }
 
@@ -540,7 +540,7 @@ public class FiguraVec3 extends FiguraVector<FiguraVec3, FiguraMat3> {
         return new Vector3f((float) x, (float) y, (float) z);
     }
     public static FiguraVec3 fromVec3f(Vector3f vec) {
-        return of(vec.x(), vec.y(), vec.z());
+        return of(vec.x, vec.y, vec.z);
     }
 
     public boolean notNaN() {

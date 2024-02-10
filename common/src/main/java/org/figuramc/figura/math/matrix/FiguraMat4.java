@@ -1,8 +1,7 @@
 package org.figuramc.figura.math.matrix;
 
-import com.mojang.math.Matrix4f;
-import net.minecraft.world.phys.Vec3;
-import org.figuramc.figura.ducks.extensions.Matrix4fExtension;
+import net.minecraft.client.renderer.Matrix4f;
+import net.minecraft.util.math.Vec3d;
 import org.figuramc.figura.lua.LuaNotNil;
 import org.figuramc.figura.lua.LuaWhitelist;
 import org.figuramc.figura.lua.docs.LuaMethodDoc;
@@ -37,13 +36,13 @@ public class FiguraMat4 extends FiguraMatrix<FiguraMat4, FiguraVec4> {
     public Matrix4f toMatrix4f() {
         writeToBuffer();
         Matrix4f result = new Matrix4f();
-        ((Matrix4fExtension)(Object)result).figura$load(copyingBuffer);
+        result.load(copyingBuffer);
         return result;
     }
 
     public void copyDataTo(Matrix4f vanillaMatrix) {
         writeToBuffer();
-        ((Matrix4fExtension)(Object)vanillaMatrix).figura$load(copyingBuffer);
+        vanillaMatrix.load(copyingBuffer);
     }
 
     private void writeToBuffer() {
@@ -575,7 +574,7 @@ public class FiguraMat4 extends FiguraMatrix<FiguraMat4, FiguraVec4> {
         return translate(amount.x, amount.y, amount.z);
     }
 
-    public FiguraMat4 translate(Vec3 amount) {
+    public FiguraMat4 translate(Vec3d amount) {
         return translate(amount.x, amount.y, amount.z);
     }
 

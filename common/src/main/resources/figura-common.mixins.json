@@ -4,6 +4,8 @@
   "package": "org.figuramc.figura.mixin",
   "compatibilityLevel": "JAVA_8",
   "mixins": [
+    "math.QuaternionMixin",
+    "math.Vector3fMixin"
   ],
   "client": [
     "AABBInvoker",
@@ -24,12 +26,16 @@
     "ParticleMixin",
     "ReloadableResourceManagerMixin",
     "SkullBlockEntityAccessor",
+    "SNIHelperMixin",
     "compat.SimpleVCMixin",
     "font.BakedGlyphMixin",
     "font.BitmapGlyphMixin",
     "font.FontAccessor",
     "font.FontMixin",
+    "font.FontSetAccessor",
     "font.FontSetMixin",
+    "font.StringRenderOutputAccessor",
+    "font.StringRenderOutputMixin",
     "font.StyleAccessor",
     "gui.ChatComponentAccessor",
     "gui.ChatComponentMixin",
@@ -62,6 +68,8 @@
     "particle.ParticleAccessor",
     "particle.ParticleEngineMixin",
     "particle.SingleQuadParticleMixin",
+    "render.ActiveRenderInfoAccessor",
+    "render.ActiveRenderInfoMixin",
     "render.CameraMixin",
     "render.EntityRenderDispatcherMixin",
     "render.GameRendererAccessor",
@@ -97,11 +105,7 @@
     "sound.ChannelMixin",
     "sound.SoundEngineMixin",
     "sound.SoundManagerAccessor",
-    "sound.SubtitleOverlayMixin",
-    "SNIHelperMixin",
-    "font.FontSetAccessor",
-    "font.StringRenderOutputAccessor",
-    "font.StringRenderOutputMixin"
+    "sound.SubtitleOverlayMixin"
   ],
   "server": [
   ],

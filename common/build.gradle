@@ -1,11 +1,3 @@
-architectury {
-    common(rootProject.enabled_platforms.split(","))
-}
-
-loom {
-    accessWidenerPath = file("src/main/resources/figura.accesswidener")
-}
-
 repositories {
     flatDir {
         dirs "$rootProject.projectDir/libs"
@@ -13,37 +5,30 @@ repositories {
 }
 
 dependencies {
-    mappings loom.layered {
-        officialMojangMappings()
-        parchment("org.parchmentmc.data:parchment-1.16.5:2022.03.06@zip")
-    }
-
     // Libraries
     implementation("com.github.FiguraMC.LuaJ:luaj-core:$luaj-figura")
     implementation("com.github.FiguraMC.LuaJ:luaj-jse:$luaj-figura")
     implementation("com.neovisionaries:nv-websocket-client:$nv_websocket")
 
-    // We depend on fabric loader here to use the fabric @Environment annotations and get the mixin dependencies
-    // Do NOT use other classes from fabric loader
-    modImplementation "net.fabricmc:fabric-loader:${rootProject.fabric_loader_version}"
-
     // Test compile only is used to mount sources on an IDE without overriding vanilla classes with Optifine's
     testCompileOnly fileTree(dir: "$rootProject.projectDir/libs", include: '*.jar')
 }
 
+unimined.minecraft {
+    legacyFabric {
+        loader fabric_loader_version
+    }
+
+    defaultRemapJar = false
+}
+
+
 publishing {
     publications {
-        maven(MavenPublication) {
+        mavenJava(MavenPublication) {
             artifactId = "${project.archivesBaseName}-common-intermediary"
             version = project.version
-            artifact(remapJar) {
-                builtBy remapJar
-                classifier ''
-            }
-            artifact(sourcesJar) {
-                builtBy sourcesJar
-                classifier 'sources'
-            }
+            from components.java
         }
     }
     setupRepositories(repositories)
@@ -62,3 +47,10 @@ void setupRepositories(RepositoryHandler repositories) {
     }
 }
 
+processResources {
+    def buildProps = project.properties.clone()
+
+    filesMatching(['pack.mcmeta']) {
+        expand buildProps
+    }
+}

@@ -1,11 +1,13 @@
 package org.figuramc.figura.utils;
 
-import com.mojang.math.*;
-import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.client.renderer.ActiveRenderInfo;
+import net.minecraft.client.renderer.Matrix4f;
+import net.minecraft.util.math.Vec3d;
 import org.figuramc.figura.config.Configs;
 import org.figuramc.figura.ducks.GameRendererAccessor;
+import org.figuramc.figura.ducks.extensions.Vector3fExtension;
+import org.figuramc.figura.ducks.extensions.Vector4fExtension;
 import org.figuramc.figura.math.matrix.FiguraMat2;
 import org.figuramc.figura.math.matrix.FiguraMat3;
 import org.figuramc.figura.math.matrix.FiguraMat4;
@@ -15,12 +17,18 @@ import org.figuramc.figura.math.vector.FiguraVec3;
 import org.figuramc.figura.math.vector.FiguraVec4;
 import org.figuramc.figura.math.vector.FiguraVector;
 import org.figuramc.figura.config.Configs;
+import org.figuramc.figura.mixin.render.ActiveRenderInfoAccessor;
+import org.lwjgl.util.vector.Matrix3f;
+import org.lwjgl.util.vector.Quaternion;
+import org.lwjgl.util.vector.Vector3f;
+import org.lwjgl.util.vector.Vector4f;
 
 import java.lang.Math;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.Locale;
+import java.util.function.IntPredicate;
 
 public class MathUtils {
 
@@ -69,21 +77,21 @@ public class MathUtils {
     public static FiguraVec3 rotateAroundAxis(FiguraVec3 vec, FiguraVec3 axis, double degrees) {
         FiguraVec3 normalizedAxis = axis.normalized();
         Quaternion vectorQuat = new Quaternion((float) vec.x, (float) vec.y, (float) vec.z, 0);
-        Quaternion rotatorQuat = new Quaternion(new Vector3f((float) normalizedAxis.x, (float) normalizedAxis.y, (float) normalizedAxis.z), (float) degrees, true);
+        Quaternion rotatorQuat = new Quaternion((float) normalizedAxis.x, (float) normalizedAxis.y, (float) normalizedAxis.z, (float) degrees);
         Quaternion rotatorQuatConj = new Quaternion(rotatorQuat);
-        rotatorQuatConj.conj();
+        rotatorQuatConj.negate();
 
-        rotatorQuat.mul(vectorQuat);
-        rotatorQuat.mul(rotatorQuatConj);
+        Quaternion.mul(rotatorQuat, vectorQuat, rotatorQuat);
+        Quaternion.mul(rotatorQuat, rotatorQuatConj, rotatorQuat);
 
-        return FiguraVec3.of(rotatorQuat.i(), rotatorQuat.j(), rotatorQuat.k());
+        return FiguraVec3.of(rotatorQuat.getX(), rotatorQuat.getY(), rotatorQuat.getZ());
     }
 
     public static FiguraVec3 toCameraSpace(FiguraVec3 vec) {
-        Camera camera = Minecraft.getInstance().gameRenderer.getMainCamera();
+        ActiveRenderInfo camera = Minecraft.getMinecraft().renderGlobal.getMainCamera();
 
         FiguraMat3 transformMatrix = FiguraMat3.of().set(new Matrix3f(camera.rotation()));
-        Vec3 pos = camera.getPosition();
+        Vec3d pos = ActiveRenderInfoAccessor.getPos();
         transformMatrix.invert();
 
         FiguraVec3 ret = vec.copy();
@@ -95,22 +103,23 @@ public class MathUtils {
     }
 
     public static FiguraVec4 worldToScreenSpace(FiguraVec3 worldSpace) {
-        Minecraft minecraft = Minecraft.getInstance();
-        Camera camera = minecraft.gameRenderer.getMainCamera();
+        Minecraft minecraft = Minecraft.getMinecraft();
+        ActiveRenderInfo camera = minecraft.gameRenderer.getMainCamera();
         Matrix3f transformMatrix = new Matrix3f(camera.rotation());
         transformMatrix.invert();
 
-        Vec3 camPos = camera.getPosition();
+        Vec3d camPos = ActiveRenderInfoAccessor.getPos();
         FiguraVec3 posDiff = worldSpace.copy().subtract(camPos.x, camPos.y, camPos.z);
         Vector3f camSpace = posDiff.asVec3f();
-        camSpace.transform(transformMatrix);
+        ((Vector3fExtension)camSpace).figura$transform(transformMatrix);
 
-        Vector4f projectiveCamSpace = new Vector4f(camSpace);
-        Matrix4f projMat = minecraft.gameRenderer.getProjectionMatrix(camera, minecraft.getFrameTime(), true);
-        projectiveCamSpace.transform(projMat);
-        float w = projectiveCamSpace.w();
+        Vector4f projectiveCamSpace = new Vector4f(camSpace.x, camSpace.y, camSpace.z, 0);
+        Matrix4f projMat = new Matrix4f();
+        projMat.load(ActiveRenderInfoAccessor.getProjectionBuf());
+        ((Vector4fExtension)projectiveCamSpace).figura$transform(projMat);
+        float w = projectiveCamSpace.w;
 
-        return FiguraVec4.of(projectiveCamSpace.x() / w, projectiveCamSpace.y() / w, projectiveCamSpace.z() / w, Math.sqrt(posDiff.dot(posDiff)));
+        return FiguraVec4.of(projectiveCamSpace.x / w, projectiveCamSpace.y / w, projectiveCamSpace.z / w, Math.sqrt(posDiff.dot(posDiff)));
     }
 
     private static final String[] SIZE_UNITS = {"b", "kb", "mb", "gb"};
@@ -211,10 +220,10 @@ public class MathUtils {
     //same as minecraft too, but with doubles and fixing the NaN in the Math.asin
     public static FiguraVec3 quaternionToYXZ(Quaternion quaternion) {
         double r, i, j, k;
-        r = quaternion.r();
-        i = quaternion.i();
-        j = quaternion.j();
-        k = quaternion.k();
+        r = quaternion.getZ();
+        i = quaternion.getX();
+        j = quaternion.getY();
+        k = quaternion.getZ();
 
         double f = r * r;
         double g = i * i;
@@ -226,5 +235,34 @@ public class MathUtils {
         return Math.abs(o) > 0.999d * n ?
                 FiguraVec3.of(l, 2 * Math.atan2(j, r), 0) :
                 FiguraVec3.of(l, Math.atan2(2 * i * k + 2 * j * r, f - g - h + m), Math.atan2(2 * i * j + 2 * r * k, f - g + h - m));
+    }
+
+    public static int binarySearch(int start, int end, IntPredicate leftPredicate) {
+        int i = end - start;
+        while (i > 0) {
+            int j = i / 2;
+            int k = start + j;
+            if (leftPredicate.test(k)) {
+                i = j;
+                continue;
+            }
+            start = k + 1;
+            i -= j + 1;
+        }
+        return start;
+    }
+
+    public static Quaternion Quaternion(Vector3f vector3f, float f, boolean isDegrees) {
+        Quaternion newQ = new Quaternion();
+        if (isDegrees) {
+            f *= 0.017453292F;
+        }
+
+        float g = (float) Math.sin(f / 2.0F);
+        newQ.x = vector3f.x * g;
+        newQ.y = vector3f.y * g;
+        newQ.z = vector3f.z * g;
+        newQ.w = (float) Math.cos(f / 2.0F);
+        return newQ;
     }
 }

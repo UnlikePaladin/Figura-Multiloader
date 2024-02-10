@@ -1,7 +1,6 @@
 package org.figuramc.figura.math.matrix;
 
-import com.mojang.math.Matrix3f;
-import org.figuramc.figura.ducks.extensions.Matrix3fExtension;
+import org.lwjgl.util.vector.Matrix3f;
 import org.figuramc.figura.lua.LuaNotNil;
 import org.figuramc.figura.lua.LuaWhitelist;
 import org.figuramc.figura.lua.docs.LuaMethodDoc;
@@ -26,7 +25,7 @@ public class FiguraMat3 extends FiguraMatrix<FiguraMat3, FiguraVec3> {
 
     public FiguraMat3 set(Matrix3f mat) {
         copyingBuffer.clear();
-        ((Matrix3fExtension)(Object)mat).figura$store(copyingBuffer);
+        mat.store(copyingBuffer);
         return set(copyingBuffer.get(), copyingBuffer.get(), copyingBuffer.get(),
                 copyingBuffer.get(), copyingBuffer.get(), copyingBuffer.get(),
                 copyingBuffer.get(), copyingBuffer.get(), copyingBuffer.get());
@@ -35,13 +34,13 @@ public class FiguraMat3 extends FiguraMatrix<FiguraMat3, FiguraVec3> {
     public Matrix3f toMatrix3f() {
         writeToBuffer();
         Matrix3f result = new Matrix3f();
-        ((Matrix3fExtension)(Object)result).figura$load(copyingBuffer);
+        result.load(copyingBuffer);
         return result;
     }
 
     public void copyDataTo(Matrix3f vanillaMatrix) {
         writeToBuffer();
-        ((Matrix3fExtension)(Object)vanillaMatrix).figura$load(copyingBuffer);
+        vanillaMatrix.load(copyingBuffer);
     }
 
     private void writeToBuffer() {

@@ -1,20 +1,26 @@
 plugins {
-	id "architectury-plugin" version "3.4-SNAPSHOT"
-	id "dev.architectury.loom" version "1.4-SNAPSHOT" apply false
-}
-
-architectury {
-	minecraft = rootProject.minecraft_version
+	id 'java'
+	id "xyz.wagyourtail.unimined" version "1.1.0-SNAPSHOT" apply false
 }
 
 subprojects {
-	apply plugin: "dev.architectury.loom"
+	apply plugin: "xyz.wagyourtail.unimined"
+	apply plugin: "java"
+	apply plugin: "maven-publish"
 
-	loom {
-		silentMojangMappingsLicense()
+
+	java_version = rootProject.java_version
+	archivesBaseName = rootProject.archives_base_name
+	version = rootProject.mod_version + "+" + rootProject.minecraft_version
+	group = rootProject.maven_group
+	if (project.hasProperty("release")) {
+		jarVersion = version
+	} else {
+		jarVersion = version + "-" + 'git rev-parse --short HEAD'.execute().getText().trim()
 	}
 
 	repositories {
+		maven { url 'https://jitpack.io' }
 		maven { url 'https://maven.terraformersmc.com/releases/' }
 		maven { url 'https://api.modrinth.com/maven' }
 		maven { url 'https://maven.quiltmc.org/repository/release/' }
@@ -30,39 +36,16 @@ subprojects {
 			name = 'ParchmentMC'
 			url = 'https://maven.parchmentmc.org'
 		}
+		maven {
+			name = "sponge"
+			url = "https://repo.spongepowered.org/maven"
+		}
 	}
 
 	dependencies {
-		minecraft "com.mojang:minecraft:${rootProject.minecraft_version}"
+		//minecraft "com.mojang:minecraft:${rootProject.minecraft_version}"
 		// The following line declares the mojmap mappings, you may use other mappings as well
 
-		// Mods
-		modCompileOnly "maven.modrinth:iris:$iris"
-	}
-}
-
-allprojects {
-	apply plugin: "java"
-	apply plugin: "architectury-plugin"
-	apply plugin: "maven-publish"
-
-	java_version = rootProject.java_version
-	archivesBaseName = rootProject.archives_base_name
-	version = rootProject.mod_version + "+" + rootProject.minecraft_version
-	group = rootProject.maven_group
-	if (project.hasProperty("release")) {
-		jarVersion = version
-	} else {
-		jarVersion = version + "-" + 'git rev-parse --short HEAD'.execute().getText().trim()
-	}
-
-	repositories {
-		// Add repositories to retrieve artifacts from in here.
-		// You should only use this when depending on other mods because
-		// Loom adds the essential maven repositories to download Minecraft and libraries from automatically.
-		// See https://docs.gradle.org/current/userguide/declaring_repositories.html
-		// for more information about repositories.
-		maven { url 'https://jitpack.io' }
 	}
 
 	tasks.withType(JavaCompile) {
@@ -70,9 +53,68 @@ allprojects {
 		options.release = Integer.valueOf(java_version)
 	}
 
-	java {
-		sourceCompatibility = JavaVersion.VERSION_1_8
-		targetCompatibility = JavaVersion.VERSION_1_8
-		withSourcesJar()
+	sourceCompatibility = JavaVersion.VERSION_1_8
+	targetCompatibility = JavaVersion.VERSION_1_8
+
+	jar {
+		manifest {
+			attributes([
+					'Specification-Title'     : project.archivesBaseName,
+					'Specification-Vendor'    : "figuraMC",
+					'Specification-Version'   : project.version,
+					'Implementation-Title'    : project.name,
+					'Implementation-Version'  : project.version,
+					'Implementation-Vendor'   : "figuraMC",
+					'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
+					'Timestamp'               : System.currentTimeMillis(),
+					'Built-On-Java'           : "${System.getProperty('java.vm.version')} (${System.getProperty('java.vm.vendor')})",
+					'Built-On-Minecraft'      : minecraft_version
+			])
+		}
+	}
+
+	unimined.minecraft(sourceSets.main, true) {
+		version minecraft_version
+
+		mappings {
+			searge()
+			mcp(project.mcp_channel, project.mcp_version)
+		}
+
+		minecraftRemapper.config {
+			// most mcp mappings (except older format) dont include field desc
+			ignoreFieldDesc(true)
+			ignoreConflicts(true)
+		}
+	}
+
+	tasks.withType(GenerateModuleMetadata) {
+		enabled = false
+	}
+
+	clean {
+		delete "$rootDir/artifacts"
+	}
+
+	if (project.name !== 'common') {
+		tasks.register('delDevJar') {
+			doLast {
+				def tree = fileTree('build/libs')
+				tree.include '**/*-dev-shadow.jar'
+				tree.include '**/*-dev.jar'
+				tree.include '**/*-all.jar'
+				tree.include '**/*-slim.jar'
+				tree.each { it.delete() }
+			}
+		}
+		build.finalizedBy delDevJar
+
+		tasks.register('copyAllArtifacts', Copy) {
+			from "$buildDir/libs"
+			into "$rootDir/artifacts"
+			include("*.jar")
+		}
+
+		build.finalizedBy(copyAllArtifacts)
 	}
 }

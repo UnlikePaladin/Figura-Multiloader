@@ -1,9 +1,10 @@
 package org.figuramc.figura.animation;
 
-import net.minecraft.util.Mth;
+import net.minecraft.util.math.MathHelper;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.math.vector.FiguraVec3;
 import org.figuramc.figura.model.FiguraModelPart;
+import org.figuramc.figura.utils.MathUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -46,7 +47,7 @@ public class AnimationPlayer {
                     return limit;
                 }
 
-                int currentIndex = Math.max(0, Mth.binarySearch(0, keyframes.length, index -> anim.frameTime <= keyframes[index].getTime()) - 1);
+                int currentIndex = Math.max(0, MathUtils.binarySearch(0, keyframes.length, index -> anim.frameTime <= keyframes[index].getTime()) - 1);
                 int nextIndex = Math.min(keyframes.length - 1, currentIndex + 1);
 
                 Keyframe current = keyframes[currentIndex];
