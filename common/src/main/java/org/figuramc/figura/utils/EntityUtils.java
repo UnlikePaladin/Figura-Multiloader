@@ -5,7 +5,8 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.PlayerInfo;
-import net.minecraft.world.entity.Entity;
+import net.minecraft.entity.Entity;
+import net.minecraft.world.World;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.player.PlayerModelPart;
@@ -16,7 +17,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.Vec3;
-import org.figuramc.figura.mixin.ClientLevelInvoker;
+import org.figuramc.figura.mixin.ClientWorldInvoker;
 import org.figuramc.figura.mixin.EntityAccessor;
 import org.figuramc.figura.mixin.gui.PlayerTabOverlayAccessor;
 
@@ -25,22 +26,22 @@ import java.util.*;
 public class EntityUtils {
 
     protected static Map<UUID, Integer> uuidToNetworkID = new HashMap<>();
-    private static Level level;
+    private static World level;
     public static Entity getEntityByUUID(UUID uuid) {
-        if (Minecraft.getInstance().level == null)
+        if (Minecraft.getMinecraft().world == null)
             return null;
         // Invalidate if the level has changed
         if (level == null)
-            level = Minecraft.getInstance().level;
-        if (level != Minecraft.getInstance().level)
+            level = Minecraft.getMinecraft().world;
+        if (level != Minecraft.getMinecraft().world)
             uuidToNetworkID.clear();
 
         if (uuidToNetworkID.containsKey(uuid))
-            return Minecraft.getInstance().level.getEntity(uuidToNetworkID.get(uuid));
+            return Minecraft.getMinecraft().world.getEntityByID(uuidToNetworkID.get(uuid));
 
-        for (Entity entity : ((ClientLevelInvoker) Minecraft.getInstance().level).getEntityIds().values())
-            if (uuid.equals(entity.getUUID())) {
-                uuidToNetworkID.put(uuid, entity.getId());
+        for (Entity entity : ((ClientWorldInvoker) Minecraft.getMinecraft().world).getEntityList())
+            if (uuid.equals(entity.getUniqueID())) {
+                uuidToNetworkID.put(uuid, entity.getEntityId());
                 return entity;
             }
 
@@ -48,10 +49,10 @@ public class EntityUtils {
     }
 
     public static Entity getViewedEntity(float distance) {
-        Entity entity = Minecraft.getInstance().getCameraEntity();
+        Entity entity = Minecraft.getMinecraft().getRenderViewEntity();
         if (entity == null) return null;
 
-        float tickDelta = Minecraft.getInstance().getFrameTime();
+        float tickDelta = Minecraft.getMinecraft().getFrameTime();
         Vec3 entityEye = entity.getEyePosition(tickDelta);
         Vec3 viewVec = entity.getViewVector(tickDelta).scale(distance);
         AABB box = entity.getBoundingBox().expandTowards(viewVec).inflate(1f, 1f, 1f);

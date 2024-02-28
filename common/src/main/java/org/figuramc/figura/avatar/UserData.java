@@ -2,6 +2,7 @@ package org.figuramc.figura.avatar;
 
 import com.mojang.datafixers.util.Pair;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NBTTagCompound;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.local.CacheAvatarLoader;
 import org.figuramc.figura.backend2.NetworkStuff;
@@ -33,7 +34,7 @@ public class UserData {
         }
     }
 
-    public void loadAvatar(CompoundTag nbt) {
+    public void loadAvatar(NBTTagCompound nbt) {
         Avatar avatar = new Avatar(id);
         this.avatars.add(avatar);
         avatar.load(nbt);

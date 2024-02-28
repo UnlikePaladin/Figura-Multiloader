@@ -31,17 +31,17 @@ public class AvatarMetadataParser {
     }
 
     static JsonParser parser = new JsonParser();
-    public static CompoundTag parse(String json, String filename) {
+    public static NBTTagCompound parse(String json, String filename) {
         // parse json -> object
         Metadata metadata = read(json);
 
         // nbt
-        CompoundTag nbt = new CompoundTag();
+        NBTTagCompound nbt = new NBTTagCompound();
         JsonElement jsonElement = parser.parse(json);
         if (jsonElement != null && !jsonElement.isJsonNull() && !jsonElement.getAsJsonObject().entrySet().isEmpty()) {
             for (Map.Entry<String, JsonElement> jsonElementEntry : jsonElement.getAsJsonObject().entrySet()) {
                 if (jsonElementEntry.getKey() != null && !jsonElementEntry.getKey().trim().isEmpty() && jsonElementEntry.getKey().contains("badge_color_")) {
-                    nbt.putString(jsonElementEntry.getKey(), jsonElementEntry.getValue().getAsString());
+                    nbt.setString(jsonElementEntry.getKey(), jsonElementEntry.getValue().getAsString());
                 }
             }
         }
@@ -51,11 +51,11 @@ public class AvatarMetadataParser {
         if (version.invalid)
             version = FiguraMod.VERSION;
 
-        nbt.putString("name", metadata.name == null || metadata.name.trim().isEmpty() ? filename : metadata.name);
-        nbt.putString("ver", version.toString());
-        if (metadata.color != null) nbt.putString("color", metadata.color);
-        if (metadata.background != null) nbt.putString("bg", metadata.background);
-        if (metadata.id != null) nbt.putString("id", metadata.id);
+        nbt.setString("name", metadata.name == null || metadata.name.trim().isEmpty() ? filename : metadata.name);
+        nbt.setString("ver", version.toString());
+        if (metadata.color != null) nbt.setString("color", metadata.color);
+        if (metadata.background != null) nbt.setString("bg", metadata.background);
+        if (metadata.id != null) nbt.setString("id", metadata.id);
 
         if (metadata.authors != null) {
             StringBuilder authors = new StringBuilder();
@@ -68,42 +68,42 @@ public class AvatarMetadataParser {
                     authors.append("\n");
             }
 
-            nbt.putString("authors", authors.toString());
+            nbt.setString("authors", authors.toString());
         } else {
-            nbt.putString("authors", metadata.author == null ? "?" : metadata.author);
+            nbt.setString("authors", metadata.author == null ? "?" : metadata.author);
         }
 
         if (metadata.autoScripts != null) {
-            ListTag autoScripts = new ListTag();
+            NBTTagList autoScripts = new NBTTagList();
             for (String name : metadata.autoScripts) {
-                autoScripts.add(StringTag.valueOf(PathUtils.computeSafeString(name.replaceAll("\\.lua$", ""))));
+                autoScripts.appendTag(new NBTTagString(PathUtils.computeSafeString(name.replaceAll("\\.lua$", ""))));
             }
-            nbt.put("autoScripts", autoScripts);
+            nbt.setTag("autoScripts", autoScripts);
         }
 
         if (Configs.FORMAT_SCRIPT.value >= 2)
-            nbt.putBoolean("minify", true);
+            nbt.setBoolean("minify", true);
 
         if (metadata.autoAnims != null) {
-            ListTag autoAnims = new ListTag();
+            NBTTagList autoAnims = new NBTTagList();
             for (String name : metadata.autoAnims)
-                autoAnims.add(StringTag.valueOf(name));
-            nbt.put("autoAnims", autoAnims);
+                autoAnims.appendTag(new NBTTagString(name));
+            nbt.setTag("autoAnims", autoAnims);
         }
 
         if (metadata.resources != null) {
-            ListTag resourcesPaths = new ListTag();
+            NBTTagList resourcesPaths = new NBTTagList();
             for (String resource :
                     metadata.resources) {
-                resourcesPaths.add(StringTag.valueOf(resource));
+                resourcesPaths.appendTag(new NBTTagString(resource));
             }
-            nbt.put("resources_paths", resourcesPaths);
+            nbt.setTag("resources_paths", resourcesPaths);
         }
 
         return nbt;
     }
 
-    public static void injectToModels(String json, CompoundTag models) throws IOException {
+    public static void injectToModels(String json, NBTTagCompound models) throws IOException {
         PARTS_TO_MOVE.clear();
 
         Metadata metadata = GSON.fromJson(json, Metadata.class);
@@ -113,18 +113,18 @@ public class AvatarMetadataParser {
         }
 
         for (Map.Entry<String, String> entry : PARTS_TO_MOVE.entrySet()) {
-            CompoundTag modelPart = getTag(models, entry.getKey(), true);
-            CompoundTag targetPart = getTag(models, entry.getValue(), false);
+            NBTTagCompound modelPart = getTag(models, entry.getKey(), true);
+            NBTTagCompound targetPart = getTag(models, entry.getValue(), false);
 
-            ListTag list = !targetPart.contains("chld") ? new ListTag() : targetPart.getList("chld", NbtType.COMPOUND.getValue());
-            list.add(modelPart);
-            targetPart.put("chld", list);
+            NBTTagList list = !targetPart.hasKey("chld") ? new NBTTagList() : targetPart.getTagList("chld", NbtType.COMPOUND.getValue());
+            list.appendTag(modelPart);
+            targetPart.setTag("chld", list);
         }
     }
 
-    private static void injectCustomization(String path, Customization customization, CompoundTag models) throws IOException {
+    private static void injectCustomization(String path, Customization customization, NBTTagCompound models) throws IOException {
         boolean remove = customization.remove != null && customization.remove;
-        CompoundTag modelPart = getTag(models, path, remove);
+        NBTTagCompound modelPart = getTag(models, path, remove);
 
         // Add more of these later
         if (remove) {
@@ -132,14 +132,14 @@ public class AvatarMetadataParser {
         }
         if (customization.primaryRenderType != null) {
             try {
-                modelPart.putString("primary", RenderTypes.valueOf(customization.primaryRenderType.toUpperCase()).name());
+                modelPart.setString("primary", RenderTypes.valueOf(customization.primaryRenderType.toUpperCase()).name());
             } catch (Exception ignored) {
                 throw new IOException("Invalid render type \"" + customization.primaryRenderType + "\"!");
             }
         }
         if (customization.secondaryRenderType != null) {
             try {
-                modelPart.putString("secondary", RenderTypes.valueOf(customization.secondaryRenderType.toUpperCase()).name());
+                modelPart.setString("secondary", RenderTypes.valueOf(customization.secondaryRenderType.toUpperCase()).name());
             } catch (Exception ignored) {
                 throw new IOException("Invalid render type \"" + customization.secondaryRenderType + "\"!");
             }
@@ -148,71 +148,71 @@ public class AvatarMetadataParser {
             ParentType type = ParentType.get(customization.parentType);
 
             if (type == ParentType.None)
-                modelPart.remove("pt");
+                modelPart.removeTag("pt");
             else
-                modelPart.putString("pt", type.name());
+                modelPart.setString("pt", type.name());
         }
         if (customization.moveTo != null) {
             PARTS_TO_MOVE.put(path, customization.moveTo);
         }
         if (customization.visible != null) {
             if (customization.visible) {
-                modelPart.remove("vsb");
+                modelPart.removeTag("vsb");
             } else {
-                modelPart.putBoolean("vsb", false);
+                modelPart.setBoolean("vsb", false);
             }
         }
         if (customization.smooth != null) {
-            modelPart.putBoolean("smo", customization.smooth);
+            modelPart.setBoolean("smo", customization.smooth);
         }
     }
 
-    private static CompoundTag getTag(CompoundTag models, String path, boolean remove) throws IOException {
+    private static NBTTagCompound getTag(NBTTagCompound models, String path, boolean remove) throws IOException {
         String[] keys = path.replaceFirst("^models", "").split("\\.", 0);
-        CompoundTag current = models;
+        NBTTagCompound current = models;
 
         for (int i = 0; i < keys.length; i++) {
             if (keys[i].isEmpty())
                 continue;
 
-            if (!current.contains("chld"))
+            if (!current.hasKey("chld"))
                 throw new IOException("Invalid part path: \"" + path + "\"");
 
-            ListTag children = current.getList("chld", NbtType.COMPOUND.getValue());
+            NBTTagList children = current.getTagList("chld", NbtType.COMPOUND.getValue());
             int j = 0;
-            for (; j < children.size(); j++) {
-                CompoundTag child = children.getCompound(j);
+            for (; j < children.tagCount(); j++) {
+                NBTTagCompound child = children.getCompoundTagAt(j);
 
                 if (child.getString("name").equals(keys[i])) {
                     current = child;
                     break;
                 }
 
-                if (j == children.size() - 1)
+                if (j == children.tagCount() - 1)
                     throw new IOException("Invalid part path: \"" + path + "\"");
             }
 
             if (remove && i == keys.length - 1)
-                children.remove(j);
+                children.removeTag(j);
         }
 
         return current;
     }
 
-    public static void injectToTextures(String json, CompoundTag textures) {
+    public static void injectToTextures(String json, NBTTagCompound textures) {
         Metadata metadata = GSON.fromJson(json, Metadata.class);
         if (metadata == null || metadata.ignoredTextures == null)
             return;
 
-        CompoundTag src = textures.getCompound("src");
+        NBTTagCompound src = textures.getCompoundTag("src");
 
         for (String texture : metadata.ignoredTextures) {
             byte[] bytes = src.getByteArray(texture);
             int[] size = BlockbenchModelParser.getTextureSize(bytes);
-            ListTag list = new ListTag();
-            list.add(IntTag.valueOf(size[0]));
-            list.add(IntTag.valueOf(size[1]));
-            src.put(texture, list);
+            NBTTagList list = new NBTTagList();
+            list.appendTag(new NBTTagInt(size[0]));
+            list.appendTag(new NBTTagInt(size[1]));
+            src.setTag(texture, list);
         }
     }
 

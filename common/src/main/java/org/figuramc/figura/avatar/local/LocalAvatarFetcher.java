@@ -1,9 +1,8 @@
 package org.figuramc.figura.avatar.local;
 
-import net.minecraft.Util;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
+import net.minecraft.nbt.NBTBase;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.config.Configs;
 import org.figuramc.figura.gui.cards.CardBackground;
@@ -114,9 +113,9 @@ public class LocalAvatarFetcher {
     public static void load() {
         IOUtils.readCacheFile("avatars", nbt -> {
             // loading
-            ListTag list = nbt.getList("properties", NbtType.COMPOUND.getValue());
-            for (Tag tag : list) {
-                CompoundTag compound = (CompoundTag) tag;
+            NBTTagList list = nbt.getTagList("properties", NbtType.COMPOUND.getValue());
+            for (int i = 0; i < list.tagCount(); i++) {
+                NBTTagCompound compound = list.getCompoundTagAt(i);
 
                 String path = compound.getString("path");
                 Properties properties = new Properties();
@@ -133,24 +132,24 @@ public class LocalAvatarFetcher {
      */
     public static void save() {
         IOUtils.saveCacheFile("avatars", nbt -> {
-            ListTag properties = new ListTag();
+            NBTTagList properties = new NBTTagList();
 
             for (Map.Entry<String, Properties> entry : SAVED_DATA.entrySet()) {
-                CompoundTag compound = new CompoundTag();
+                NBTTagCompound compound = new NBTTagCompound();
 
                 Properties prop = entry.getValue();
                 if (!prop.expanded)
-                    compound.putBoolean("expanded", false);
+                    compound.setBoolean("expanded", false);
                 if (prop.favourite)
-                    compound.putBoolean("favourite", true);
+                    compound.setBoolean("favourite", true);
 
-                if (!compound.isEmpty()) {
-                    compound.putString("path", entry.getKey());
-                    properties.add(compound);
+                if (!compound.hasNoTags()) {
+                    compound.setString("path", entry.getKey());
+                    properties.appendTag(compound);
                 }
             }
 
-            nbt.put("properties", properties);
+            nbt.setTag("properties", properties);
         });
     }
 
@@ -179,7 +178,9 @@ public class LocalAvatarFetcher {
             Path dest = getLocalAvatarDirectory();
             try (Stream<Path> stream = Files.walk(path)) {
                 for (Path p : stream.collect(Collectors.toList())) {
-                    Util.copyBetweenDirs(path.getParent(), dest, p);
+                    Path ph = path.getParent().relativize(p);
+                    Path path2 = dest.resolve(ph);
+                    Files.copy(p, path2);
                 }
             }
         }
@@ -386,7 +387,7 @@ public class LocalAvatarFetcher {
                     }
                 } else if (IOUtils.getFileNameOrEmpty(path).endsWith(".zip")) {
                     try {
-                        FileSystem opened = FileSystems.newFileSystem(path, null);
+                        FileSystem opened = FileSystems.newFileSystem(path, (ClassLoader) null);
                         if ("jar".equalsIgnoreCase(opened.provider().getScheme())) {
                             Path newPath = opened.getPath("/");
                             if (isAvatar(newPath)) {

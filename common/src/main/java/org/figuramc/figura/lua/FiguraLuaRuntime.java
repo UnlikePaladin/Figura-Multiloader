@@ -1,8 +1,8 @@
 package org.figuramc.figura.lua;
 
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
-import net.minecraft.world.entity.Entity;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraft.nbt.NBTBase;
+import net.minecraft.entity.Entity;
 import org.apache.commons.io.IOUtils;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.Avatar;
@@ -378,7 +378,7 @@ public class FiguraLuaRuntime {
         return value;
     };
 
-    public boolean init(ListTag autoScripts) {
+    public boolean init(NBTTagList autoScripts) {
         if (scripts.isEmpty())
             return false;
 
@@ -389,8 +389,9 @@ public class FiguraLuaRuntime {
                 for (String name : scripts.keySet())
                     initializeScript(name);
             } else {
-                for (Tag name : autoScripts)
-                    initializeScript(name.getAsString());
+                for (int i = 0; i < autoScripts.tagCount(); i++) {
+                    initializeScript(autoScripts.get(i).getAsString());
+                }
             }
         } catch (Exception | StackOverflowError e) {
             error(e);

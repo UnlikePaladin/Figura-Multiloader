@@ -1,7 +1,7 @@
 package org.figuramc.figura.utils;
 
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtIo;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.CompressedStreamTools;
 import org.figuramc.figura.FiguraMod;
 
 import java.io.IOException;
@@ -75,7 +75,7 @@ public class IOUtils {
         }
     }
 
-    public static void readCacheFile(String name, Consumer<CompoundTag> consumer) {
+    public static void readCacheFile(String name, Consumer<NBTTagCompound> consumer) {
         try {
             // get file
             Path path = FiguraMod.getCacheDirectory().resolve(name + ".nbt");
@@ -85,7 +85,7 @@ public class IOUtils {
 
             // read file
             InputStream fis = Files.newInputStream(path);
-            CompoundTag nbt = NbtIo.readCompressed(fis);
+            NBTTagCompound nbt = CompressedStreamTools.readCompressed(fis);
             consumer.accept(nbt);
             fis.close();
         } catch (Exception e) {
@@ -93,10 +93,10 @@ public class IOUtils {
         }
     }
 
-    public static void saveCacheFile(String name, Consumer<CompoundTag> consumer) {
+    public static void saveCacheFile(String name, Consumer<NBTTagCompound> consumer) {
         try {
             // get nbt
-            CompoundTag nbt = new CompoundTag();
+            NBTTagCompound nbt = new NBTTagCompound();
             consumer.accept(nbt);
 
             // create file
@@ -107,7 +107,7 @@ public class IOUtils {
 
             // write file
             OutputStream fs = Files.newOutputStream(path);
-            NbtIo.writeCompressed(nbt, fs);
+            CompressedStreamTools.writeCompressed(nbt, fs);
             fs.close();
         } catch (Exception e) {
             FiguraMod.LOGGER.error("", e);

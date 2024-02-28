@@ -2,20 +2,22 @@ package org.figuramc.figura.lua.api.sound;
 
 import com.mojang.blaze3d.audio.SoundBuffer;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.audio.Sound;
+import net.minecraft.client.audio.SoundEventAccessor;
+import net.minecraft.client.audio.SoundHandler;
 import net.minecraft.client.resources.sounds.Sound;
 import net.minecraft.client.sounds.SoundManager;
 import net.minecraft.client.sounds.WeighedSoundEvents;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.ResourceLocation;
 import org.figuramc.figura.avatar.Avatar;
-import org.figuramc.figura.ducks.SoundEngineAccessor;
+import org.figuramc.figura.ducks.SoundManagerAccessor;
 import org.figuramc.figura.lua.LuaNotNil;
 import org.figuramc.figura.lua.LuaWhitelist;
-import org.figuramc.figura.lua.api.world.WorldAPI;
 import org.figuramc.figura.lua.docs.LuaMethodDoc;
 import org.figuramc.figura.lua.docs.LuaMethodOverload;
 import org.figuramc.figura.lua.docs.LuaTypeDoc;
 import org.figuramc.figura.math.vector.FiguraVec3;
-import org.figuramc.figura.mixin.sound.SoundManagerAccessor;
 import org.figuramc.figura.permissions.Permissions;
 import org.figuramc.figura.utils.LuaUtils;
 import org.luaj.vm2.LuaError;
@@ -37,8 +39,8 @@ public class SoundAPI {
         this.owner = owner;
     }
 
-    public static SoundEngineAccessor getSoundEngine() {
-        return (SoundEngineAccessor) ((SoundManagerAccessor) Minecraft.getInstance().getSoundManager()).getSoundEngine();
+    public static SoundManagerAccessor getSoundEngine() {
+        return (SoundManagerAccessor) ((org.figuramc.figura.mixin.sound.SoundManagerAccessor) Minecraft.getMinecraft().getSoundHandler()).getSoundEngine();
     }
 
     @LuaWhitelist
@@ -165,7 +167,7 @@ public class SoundAPI {
         if (owner.customSounds.get(id) != null)
             return true;
         try {
-            return Minecraft.getInstance().getSoundManager().getSoundEvent(new ResourceLocation(id)) != null;
+            return Minecraft.getMinecraft().getSoundHandler().getAccessor(new ResourceLocation(id)) != null;
         } catch (Exception ignored) {
             return false;
         }
@@ -189,10 +191,10 @@ public class SoundAPI {
         }
 
         try {
-            WeighedSoundEvents events = Minecraft.getInstance().getSoundManager().getSoundEvent(new ResourceLocation(id));
+            SoundEventAccessor events = Minecraft.getMinecraft().getSoundHandler().getAccessor(new ResourceLocation(id));
             if (events != null) {
-                Sound sound = events.getSound();
-                if (sound != SoundManager.EMPTY_SOUND) {
+                Sound sound = events.cloneEntry();
+                if (sound != SoundHandler.MISSING_SOUND) {
                     owner.noPermissions.remove(Permissions.CUSTOM_SOUNDS);
                     return new LuaSound(sound, id, events.getSubtitle(), owner);
                 }

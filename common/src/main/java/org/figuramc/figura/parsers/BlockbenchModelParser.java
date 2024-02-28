@@ -28,8 +28,8 @@ public class BlockbenchModelParser {
     private int animationOffset = 0;
 
     //used during the parser
-    private final HashMap<String, CompoundTag> elementMap = new HashMap<>();
-    private final HashMap<String, ListTag> animationMap = new HashMap<>();
+    private final HashMap<String, NBTTagCompound> elementMap = new HashMap<>();
+    private final HashMap<String, NBTTagList> animationMap = new HashMap<>();
     private final HashMap<String, TextureData> textureMap = new HashMap<>();
     private final HashMap<Integer, String> textureIdMap = new HashMap<>();
 
@@ -45,12 +45,12 @@ public class BlockbenchModelParser {
             throw new Exception("Model \"" + modelName + "\" was created using a version too old (" + model.meta.format_version + ") of Blockbench. Minimum compatible version is 4.0");
 
         //return lists
-        CompoundTag textures = new CompoundTag();
-        List<CompoundTag> animationList = new ArrayList<>();
+        NBTTagCompound textures = new NBTTagCompound();
+        List<NBTTagCompound> animationList = new ArrayList<>();
 
         //object -> nbt
-        CompoundTag nbt = new CompoundTag();
-        nbt.putString("name", modelName);
+        NBTTagCompound nbt = new NBTTagCompound();
+        nbt.setString("name", modelName);
         parseParent(modelName, nbt);
 
         //parse textures first
@@ -69,7 +69,7 @@ public class BlockbenchModelParser {
         parseAnimations(animationList, model.animations, modelName, folders);
 
         //add and parse the outliner
-        nbt.put("chld", parseOutliner(model.outliner, true));
+        nbt.setTag("chld", parseOutliner(model.outliner, true));
 
         //clear variables used by the parser
         elementMap.clear();
@@ -81,29 +81,29 @@ public class BlockbenchModelParser {
         return new ModelData(textures, animationList, nbt);
     }
 
-    public static void parseParent(String name, CompoundTag nbt) {
+    public static void parseParent(String name, NBTTagCompound nbt) {
         ParentType parentType = ParentType.get(name);
         if (parentType != ParentType.None)
-            nbt.putString("pt", parentType.name());
+            nbt.setString("pt", parentType.name());
     }
 
     // -- internal functions -- //
 
-    private void parseTextures(Path avatar, Path sourceFile, String folders, String modelName, CompoundTag texturesNbt, BlockbenchModel.Texture[] textures, BlockbenchModel.Resolution resolution) throws Exception {
+    private void parseTextures(Path avatar, Path sourceFile, String folders, String modelName, NBTTagCompound texturesNbt, BlockbenchModel.Texture[] textures, BlockbenchModel.Resolution resolution) throws Exception {
         if (textures == null)
             return;
 
         //temp lists
 
         //used for retrieving texture data by name, so we can expand the same data
-        LinkedHashMap<String, CompoundTag> texturesTemp = new LinkedHashMap<>();
+        LinkedHashMap<String, NBTTagCompound> texturesTemp = new LinkedHashMap<>();
 
         //used for storing the index of the specific texture name
         List<String> textureIndex = new ArrayList<>();
 
         //nbt stuff
-        CompoundTag src = new CompoundTag();
-        ListTag data = new ListTag();
+        NBTTagCompound src = new NBTTagCompound();
+        NBTTagList data = new NBTTagList();
 
         //read textures
         for (int i = 0; i < textures.length; i++) {
@@ -167,7 +167,7 @@ public class BlockbenchModelParser {
             }
 
             //add source nbt
-            src.putByteArray(path, source);
+            src.setByteArray(path, source);
 
             //fix texture name
             if (!textureType.equals("d"))
@@ -175,14 +175,14 @@ public class BlockbenchModelParser {
 
             //add textures nbt
             if (texturesTemp.containsKey(name)) {
-                CompoundTag textureContainer = texturesTemp.get(name);
-                if (textureContainer.contains(textureType))
+                NBTTagCompound textureContainer = texturesTemp.get(name);
+                if (textureContainer.hasKey(textureType))
                     throw new Exception("Model \"" + modelName + "\" contains texture with duplicate name \"" + name + "\"");
-                textureContainer.putString(textureType, path);
+                textureContainer.setString(textureType, path);
             } else {
                 //create nbt
-                CompoundTag compound = new CompoundTag();
-                compound.putString(textureType, path);
+                NBTTagCompound compound = new NBTTagCompound();
+                compound.setString(textureType, path);
 
                 //add to temp lists
                 texturesTemp.put(name, compound);
@@ -212,12 +212,12 @@ public class BlockbenchModelParser {
             }
         }
 
-        for (Map.Entry<String, CompoundTag> entry : texturesTemp.entrySet())
-            data.add(entry.getValue());
+        for (Map.Entry<String, NBTTagCompound> entry : texturesTemp.entrySet())
+            data.appendTag(entry.getValue());
 
-        textureOffset += data.size();
-        texturesNbt.put("src", src);
-        texturesNbt.put("data", data);
+        textureOffset += data.tagCount();
+        texturesNbt.setTag("src", src);
+        texturesNbt.setTag("data", data);
     }
 
     private void parseElements(BlockbenchModel.Element[] elements) {
@@ -231,33 +231,33 @@ public class BlockbenchModelParser {
 
             //temp variables
             String id = element.uuid;
-            CompoundTag nbt = new CompoundTag();
+            NBTTagCompound nbt = new NBTTagCompound();
 
             //parse fields
-            nbt.putString("name", element.name);
+            nbt.setString("name", element.name);
 
             //parse transform data
             if (notZero(element.from))
-                nbt.put("f", toNbtList(element.from));
+                nbt.setTag("f", toNbtList(element.from));
             if (notZero(element.to))
-                nbt.put("t", toNbtList(element.to));
+                nbt.setTag("t", toNbtList(element.to));
             if (notZero(element.rotation))
-                nbt.put("rot", toNbtList(element.rotation));
+                nbt.setTag("rot", toNbtList(element.rotation));
             if (notZero(element.origin))
-                nbt.put("piv", toNbtList(element.origin));
+                nbt.setTag("piv", toNbtList(element.origin));
             if (element.inflate != 0f)
-                nbt.putFloat("inf", element.inflate);
+                nbt.setFloat("inf", element.inflate);
 
-            nbt.putBoolean("vsb", element.visibility == null || element.visibility);
+            nbt.setBoolean("vsb", element.visibility == null || element.visibility);
 
             //parse faces
-            CompoundTag data;
+            NBTTagCompound data;
             if (element.type.equalsIgnoreCase("cube")) {
                 data = parseCubeFaces(element.faces);
-                nbt.put("cube_data", data);
+                nbt.setTag("cube_data", data);
             } else {
                 data = parseMesh(element.faces, element.vertices, element.origin);
-                nbt.put("mesh_data", data);
+                nbt.setTag("mesh_data", data);
             }
 
 
@@ -265,8 +265,8 @@ public class BlockbenchModelParser {
         }
     }
 
-    private CompoundTag parseCubeFaces(JsonObject faces) {
-        CompoundTag nbt = new CompoundTag();
+    private NBTTagCompound parseCubeFaces(JsonObject faces) {
+        NBTTagCompound nbt = new NBTTagCompound();
 
         for (String cubeFace : BlockbenchModel.CubeFace.FACES) {
             if (!faces.has(cubeFace))
@@ -284,49 +284,49 @@ public class BlockbenchModelParser {
             if (texture == null)
                 continue;
 
-            CompoundTag faceNbt = new CompoundTag();
-            faceNbt.putInt("tex", texture.id);
+            NBTTagCompound faceNbt = new NBTTagCompound();
+            faceNbt.setInteger("tex", texture.id);
 
             //parse face
             if (face.rotation != 0f)
-                faceNbt.putFloat("rot", face.rotation);
+                faceNbt.setFloat("rot", face.rotation);
 
             //parse uv
             if (notZero(face.uv)) {
                 float[] uv = {face.uv[0] * texture.fixedSize[0], face.uv[1] * texture.fixedSize[1], face.uv[2] * texture.fixedSize[0], face.uv[3] * texture.fixedSize[1]};
-                faceNbt.put("uv", toNbtList(uv));
+                faceNbt.setTag("uv", toNbtList(uv));
             }
 
-            nbt.put(String.valueOf(cubeFace.charAt(0)), faceNbt);
+            nbt.setTag(String.valueOf(cubeFace.charAt(0)), faceNbt);
         }
 
         return nbt;
     }
 
-    private CompoundTag parseMesh(JsonObject faces, JsonObject vertices, float[] offset) {
-        CompoundTag nbt = new CompoundTag();
+    private NBTTagCompound parseMesh(JsonObject faces, JsonObject vertices, float[] offset) {
+        NBTTagCompound nbt = new NBTTagCompound();
 
         //parse vertices first, as the faces will reference it later
         //we are going to save them in a String -> Integer map
         //the map will be preserved since it is very common to meshes share the same vertices,
         //so we can reduce even more file size
         HashMap<String, Integer> verticesMap = new HashMap<>();
-        ListTag verticesList = new ListTag();
+        NBTTagList verticesList = new NBTTagList();
 
         int index = 0;
         for (Map.Entry<String, JsonElement> entry : vertices.entrySet()) {
             verticesMap.put(entry.getKey(), index);
             float[] arr = jsonToFloat(entry.getValue().getAsJsonArray());
-            verticesList.add(FloatTag.valueOf(arr[0] + offset[0]));
-            verticesList.add(FloatTag.valueOf(arr[1] + offset[1]));
-            verticesList.add(FloatTag.valueOf(arr[2] + offset[2]));
+            verticesList.appendTag(new NBTTagFloat(arr[0] + offset[0]));
+            verticesList.appendTag(new NBTTagFloat(arr[1] + offset[1]));
+            verticesList.appendTag(new NBTTagFloat(arr[2] + offset[2]));
             index++;
         }
 
         //parse faces
-        ListTag texesList = new ListTag();
-        ListTag uvsList = new ListTag();
-        ListTag facesList = new ListTag();
+        NBTTagList texesList = new NBTTagList();
+        NBTTagList uvsList = new NBTTagList();
+        NBTTagList facesList = new NBTTagList();
 
         int bestType = 0; //byte
         if (index > 255) bestType = 1; //short
@@ -348,42 +348,42 @@ public class BlockbenchModelParser {
             //To get the texture id, shift right 4, to get the vertex count, bitmask with 0xf
             //This just stores both pieces of info in one number, to hopefully save some file size
             short k = (short) ((texture.id << 4) + face.vertices.length);
-            texesList.add(ShortTag.valueOf(k));
+            texesList.appendTag(new NBTTagShort(k));
 
             if (face.vertices.length > 3)
                 reorderVertices(face.vertices, verticesMap, verticesList);
 
             for (String vertex : face.vertices) {
                 //Face indices
-                Tag bestVal;
+                NBTBase bestVal;
                 switch (bestType) {
                     case 0:
-                        bestVal = ByteTag.valueOf(verticesMap.get(vertex).byteValue());
+                        bestVal = new NBTTagByte(verticesMap.get(vertex).byteValue());
                         break;
                     case 1:
-                        bestVal = ShortTag.valueOf(verticesMap.get(vertex).shortValue());
+                        bestVal = new NBTTagShort(verticesMap.get(vertex).shortValue());
                         break;
                     case 2:
-                        bestVal = IntTag.valueOf(verticesMap.get(vertex));
+                        bestVal = new NBTTagInt(verticesMap.get(vertex));
                         break;
                     default:
                         throw new IllegalStateException("Unexpected value: " + bestType);
                 }
-                facesList.add(bestVal);
+                facesList.appendTag(bestVal);
 
                 //UVs
                 float[] uv = jsonToFloat(face.uv.getAsJsonArray(vertex));
                 float u = uv[0] * texture.fixedSize[0];
                 float v = uv[1] * texture.fixedSize[1];
-                uvsList.add(FloatTag.valueOf(u));
-                uvsList.add(FloatTag.valueOf(v));
+                uvsList.appendTag(new NBTTagFloat(u));
+                uvsList.appendTag(new NBTTagFloat(v));
             }
         }
 
-        nbt.put("vtx", verticesList);
-        nbt.put("tex", texesList);
-        nbt.put("fac", facesList);
-        nbt.put("uvs", uvsList);
+        nbt.setTag("vtx", verticesList);
+        nbt.setTag("tex", texesList);
+        nbt.setTag("fac", facesList);
+        nbt.setTag("uvs", uvsList);
         return nbt;
     }
 
@@ -393,7 +393,7 @@ public class BlockbenchModelParser {
             v3 = FiguraVec3.of(),
             v4 = FiguraVec3.of();
 
-    private static void reorderVertices(String[] vertexNames, Map<String, Integer> nameToIndex, ListTag vertices) {
+    private static void reorderVertices(String[] vertexNames, Map<String, Integer> nameToIndex, NBTTagList vertices) {
         //Fill in v1, v2, v3, v4 from the given vertices
         readVectors(vertexNames, nameToIndex, vertices);
 
@@ -410,15 +410,15 @@ public class BlockbenchModelParser {
 
     }
 
-    private static void readVectors(String[] vertexNames, Map<String, Integer> nameToIndex, ListTag vertices) {
+    private static void readVectors(String[] vertexNames, Map<String, Integer> nameToIndex, NBTTagList vertices) {
         int i = nameToIndex.get(vertexNames[0]);
-        v1.set(vertices.getFloat(3*i), vertices.getFloat(3*i+1), vertices.getFloat(3*i+2));
+        v1.set(vertices.getFloatAt(3*i), vertices.getFloatAt(3*i+1), vertices.getFloatAt(3*i+2));
         i = nameToIndex.get(vertexNames[1]);
-        v2.set(vertices.getFloat(3*i), vertices.getFloat(3*i+1), vertices.getFloat(3*i+2));
+        v2.set(vertices.getFloatAt(3*i), vertices.getFloatAt(3*i+1), vertices.getFloatAt(3*i+2));
         i = nameToIndex.get(vertexNames[2]);
-        v3.set(vertices.getFloat(3*i), vertices.getFloat(3*i+1), vertices.getFloat(3*i+2));
+        v3.set(vertices.getFloatAt(3*i), vertices.getFloatAt(3*i+1), vertices.getFloatAt(3*i+2));
         i = nameToIndex.get(vertexNames[3]);
-        v4.set(vertices.getFloat(3 * i), vertices.getFloat(3 * i + 1), vertices.getFloat(3 * i + 2));
+        v4.set(vertices.getFloatAt(3 * i), vertices.getFloatAt(3 * i + 1), vertices.getFloatAt(3 * i + 2));
     }
 
     private static final FiguraVec3
@@ -446,39 +446,39 @@ public class BlockbenchModelParser {
         return t1.dot(t2) < 0;
     }
 
-    private void parseAnimations(List<CompoundTag> list, BlockbenchModel.Animation[] animations, String modelName, String folders) {
+    private void parseAnimations(List<NBTTagCompound> list, BlockbenchModel.Animation[] animations, String modelName, String folders) {
         if (animations == null)
             return;
 
         int i = 0;
         for (BlockbenchModel.Animation animation : animations) {
-            CompoundTag animNbt = new CompoundTag();
+            NBTTagCompound animNbt = new NBTTagCompound();
 
             //animation metadata
-            animNbt.putString("mdl", folders.trim().isEmpty() ? modelName : folders + modelName);
-            animNbt.putString("name", animation.name);
+            animNbt.setString("mdl", folders.trim().isEmpty() ? modelName : folders + modelName);
+            animNbt.setString("name", animation.name);
             if (!animation.loop.equals("once"))
-                animNbt.putString("loop", animation.loop);
+                animNbt.setString("loop", animation.loop);
             if (animation.override != null && animation.override)
-                animNbt.putBoolean("ovr", true);
+                animNbt.setBoolean("ovr", true);
             if (animation.length != 0f)
-                animNbt.putFloat("len", animation.length);
+                animNbt.setFloat("len", animation.length);
 
             float offset = toFloat(animation.anim_time_update, 0f);
             if (offset != 0f)
-                animNbt.putFloat("off", offset);
+                animNbt.setFloat("off", offset);
 
             float blend = toFloat(animation.blend_weight, 1f);
             if (blend != 1f)
-                animNbt.putFloat("bld", blend);
+                animNbt.setFloat("bld", blend);
 
             float startDelay = toFloat(animation.start_delay, 0f);
             if (startDelay != 0f)
-                animNbt.putFloat("sdel", startDelay);
+                animNbt.setFloat("sdel", startDelay);
 
             float loopDelay = toFloat(animation.loop_delay, 0f);
             if (loopDelay != 0f)
-                animNbt.putFloat("ldel", loopDelay);
+                animNbt.setFloat("ldel", loopDelay);
 
             //animation group data
 
@@ -490,57 +490,57 @@ public class BlockbenchModelParser {
                 String id = entry.getKey();
                 boolean effect = id.equalsIgnoreCase("effects");
 
-                ListTag effectData = new ListTag();
-                ListTag rotData = new ListTag();
-                ListTag posData = new ListTag();
-                ListTag scaleData = new ListTag();
+                NBTTagList effectData = new NBTTagList();
+                NBTTagList rotData = new NBTTagList();
+                NBTTagList posData = new NBTTagList();
+                NBTTagList scaleData = new NBTTagList();
 
                 //parse keyframes
                 JsonObject animationData = entry.getValue().getAsJsonObject();
                 for (JsonElement keyframeJson : animationData.get("keyframes").getAsJsonArray()) {
                     BlockbenchModel.KeyFrame keyFrame = GSON.fromJson(keyframeJson, BlockbenchModel.KeyFrame.class);
 
-                    CompoundTag keyframeNbt = new CompoundTag();
-                    keyframeNbt.putFloat("time", keyFrame.time);
+                    NBTTagCompound keyframeNbt = new NBTTagCompound();
+                    keyframeNbt.setFloat("time", keyFrame.time);
 
                     if (effect) {
                         if (!keyFrame.channel.equalsIgnoreCase("timeline"))
                             continue;
 
-                        keyframeNbt.putString("src", keyFrame.data_points.get(0).getAsJsonObject().get("script").getAsString());
-                        effectData.add(keyframeNbt);
+                        keyframeNbt.setString("src", keyFrame.data_points.get(0).getAsJsonObject().get("script").getAsString());
+                        effectData.appendTag(keyframeNbt);
                     } else {
-                        keyframeNbt.putString("int", keyFrame.interpolation);
+                        keyframeNbt.setString("int", keyFrame.interpolation);
 
                         //pre
                         JsonObject dataPoints = keyFrame.data_points.get(0).getAsJsonObject();
-                        keyframeNbt.put("pre", parseKeyFrameData(dataPoints, keyFrame.channel));
+                        keyframeNbt.setTag("pre", parseKeyFrameData(dataPoints, keyFrame.channel));
 
                         //end
                         if (keyFrame.data_points.size() > 1) {
                             JsonObject endDataPoints = keyFrame.data_points.get(1).getAsJsonObject();
-                            keyframeNbt.put("end", parseKeyFrameData(endDataPoints, keyFrame.channel));
+                            keyframeNbt.setTag("end", parseKeyFrameData(endDataPoints, keyFrame.channel));
                         }
 
                         //bezier stuff
                         if (notZero(keyFrame.bezier_left_value))
-                            keyframeNbt.put("bl", toNbtList(keyFrame.bezier_left_value));
+                            keyframeNbt.setTag("bl", toNbtList(keyFrame.bezier_left_value));
                         if (notZero(keyFrame.bezier_right_value))
-                            keyframeNbt.put("br", toNbtList(keyFrame.bezier_right_value));
+                            keyframeNbt.setTag("br", toNbtList(keyFrame.bezier_right_value));
                         if (isDifferent(keyFrame.bezier_left_time, -0.1f))
-                            keyframeNbt.put("blt", toNbtList(keyFrame.bezier_left_time));
+                            keyframeNbt.setTag("blt", toNbtList(keyFrame.bezier_left_time));
                         if (isDifferent(keyFrame.bezier_right_time, 0.1f))
-                            keyframeNbt.put("brt", toNbtList(keyFrame.bezier_right_time));
+                            keyframeNbt.setTag("brt", toNbtList(keyFrame.bezier_right_time));
 
                         switch (keyFrame.channel) {
                             case "position":
-                                posData.add(keyframeNbt);
+                                posData.appendTag(keyframeNbt);
                                 break;
                             case "rotation":
-                                rotData.add(keyframeNbt);
+                                rotData.appendTag(keyframeNbt);
                                 break;
                             case "scale":
-                                scaleData.add(keyframeNbt);
+                                scaleData.appendTag(keyframeNbt);
                                 break;
                         }
                     }
@@ -548,32 +548,32 @@ public class BlockbenchModelParser {
 
                 //add to nbt
                 if (effect) {
-                    animNbt.put("code", effectData);
+                    animNbt.setTag("code", effectData);
                 } else {
-                    ListTag partAnimations = animationMap.containsKey(id) ? animationMap.get(id) : new ListTag();
-                    CompoundTag nbt = new CompoundTag();
-                    CompoundTag channels = new CompoundTag();
+                    NBTTagList partAnimations = animationMap.containsKey(id) ? animationMap.get(id) : new NBTTagList();
+                    NBTTagCompound nbt = new NBTTagCompound();
+                    NBTTagCompound channels = new NBTTagCompound();
 
-                    if (!rotData.isEmpty()) {
+                    if (!rotData.hasNoTags()) {
                         JsonElement globalRotJson = animationData.get("rotation_global");
                         if (globalRotJson != null && globalRotJson.getAsBoolean())
-                            channels.put("grot", rotData);
+                            channels.setTag("grot", rotData);
                         else
-                            channels.put("rot", rotData);
+                            channels.setTag("rot", rotData);
                     }
-                    if (!posData.isEmpty())
-                        channels.put("pos", posData);
-                    if (!scaleData.isEmpty())
-                        channels.put("scl", scaleData);
+                    if (!posData.hasNoTags())
+                        channels.setTag("pos", posData);
+                    if (!scaleData.hasNoTags())
+                        channels.setTag("scl", scaleData);
 
-                    if (!channels.isEmpty()) {
-                        nbt.putInt("id", i + animationOffset);
-                        nbt.put("data", channels);
+                    if (!channels.hasNoTags()) {
+                        nbt.setInteger("id", i + animationOffset);
+                        nbt.setTag("data", channels);
                     }
-                    if (!nbt.isEmpty())
-                        partAnimations.add(nbt);
+                    if (!nbt.hasNoTags())
+                        partAnimations.appendTag(nbt);
 
-                    if (!partAnimations.isEmpty())
+                    if (!partAnimations.hasNoTags())
                         animationMap.put(id, partAnimations);
                 }
             }
@@ -585,7 +585,7 @@ public class BlockbenchModelParser {
         animationOffset += list.size();
     }
 
-    private ListTag parseKeyFrameData(JsonObject object, String channel) {
+    private NBTTagList parseKeyFrameData(JsonObject object, String channel) {
         BlockbenchModel.KeyFrameData frameData = GSON.fromJson(object, BlockbenchModel.KeyFrameData.class);
 
         float fallback = channel.equals("scale") ? 1f : 0f;
@@ -593,25 +593,25 @@ public class BlockbenchModelParser {
         Object y = keyFrameData(frameData.y, fallback);
         Object z = keyFrameData(frameData.z, fallback);
 
-        ListTag nbt = new ListTag();
+        NBTTagList nbt = new NBTTagList();
         if (x instanceof Float && y instanceof Float && z instanceof Float) {
             Float zz = (Float) z;
             Float yy = (Float) y;
             Float xx = (Float) x;
-            nbt.add(FloatTag.valueOf(xx));
-            nbt.add(FloatTag.valueOf(yy));
-            nbt.add(FloatTag.valueOf(zz));
+            nbt.appendTag(new NBTTagFloat(xx));
+            nbt.appendTag(new NBTTagFloat(yy));
+            nbt.appendTag(new NBTTagFloat(zz));
         } else {
-            nbt.add(StringTag.valueOf(String.valueOf(x)));
-            nbt.add(StringTag.valueOf(String.valueOf(y)));
-            nbt.add(StringTag.valueOf(String.valueOf(z)));
+            nbt.appendTag(new NBTTagString(String.valueOf(x)));
+            nbt.appendTag(new NBTTagString(String.valueOf(y)));
+            nbt.appendTag(new NBTTagString(String.valueOf(z)));
         }
 
         return nbt;
     }
 
-    private ListTag parseOutliner(JsonArray outliner, boolean parentVsb) {
-        ListTag children = new ListTag();
+    private NBTTagList parseOutliner(JsonArray outliner, boolean parentVsb) {
+        NBTTagList children = new NBTTagList();
 
         if (outliner == null)
             return children;
@@ -621,18 +621,18 @@ public class BlockbenchModelParser {
             if (element instanceof JsonPrimitive) {
                 String key = element.getAsString();
                 if (elementMap.containsKey(key)) {
-                    CompoundTag elementNbt = elementMap.get(key);
+                    NBTTagCompound elementNbt = elementMap.get(key);
                     //fix children visibility (very jank)
-                    if (elementNbt.contains("vsb") && elementNbt.getBoolean("vsb") == parentVsb)
-                        elementNbt.remove("vsb");
-                    children.add(elementNbt);
+                    if (elementNbt.hasKey("vsb") && elementNbt.getBoolean("vsb") == parentVsb)
+                        elementNbt.removeTag("vsb");
+                    children.appendTag(elementNbt);
                 }
 
                 continue;
             }
 
             //then parse as GroupElement (outliner)
-            CompoundTag groupNbt = new CompoundTag();
+            NBTTagCompound groupNbt = new NBTTagCompound();
             BlockbenchModel.GroupElement group = GSON.fromJson(element, BlockbenchModel.GroupElement.class);
 
             //skip not exported groups
@@ -640,31 +640,31 @@ public class BlockbenchModelParser {
                 continue;
 
             //parse fields
-            groupNbt.putString("name", group.name);
+            groupNbt.setString("name", group.name);
 
             //visibility
             boolean thisVisibility = group.visibility == null || group.visibility;
             if (thisVisibility != parentVsb)
-                groupNbt.putBoolean("vsb", thisVisibility);
+                groupNbt.setBoolean("vsb", thisVisibility);
 
             //parse transforms
             if (notZero(group.origin))
-                groupNbt.put("piv", toNbtList(group.origin));
+                groupNbt.setTag("piv", toNbtList(group.origin));
             if (notZero(group.rotation))
-                groupNbt.put("rot", toNbtList(group.rotation));
+                groupNbt.setTag("rot", toNbtList(group.rotation));
 
             //parent type
             parseParent(group.name, groupNbt);
 
             //parse children
             if (!(group.children == null || group.children.size() == 0))
-                groupNbt.put("chld", parseOutliner(group.children, thisVisibility));
+                groupNbt.setTag("chld", parseOutliner(group.children, thisVisibility));
 
             //add animations
             if (animationMap.containsKey(group.uuid))
-                groupNbt.put("anim", animationMap.get(group.uuid));
+                groupNbt.setTag("anim", animationMap.get(group.uuid));
 
-            children.add(groupNbt);
+            children.appendTag(groupNbt);
         }
 
         return children;
@@ -673,8 +673,8 @@ public class BlockbenchModelParser {
     // -- helper functions -- //
 
     //converts a float array into a nbt list
-    public static ListTag toNbtList(float[] floats) {
-        ListTag list = new ListTag();
+    public static NBTTagList toNbtList(float[] floats) {
+        NBTTagList list = new NBTTagList();
 
         int bestType = 0; //byte
         for (float f : floats) {
@@ -694,13 +694,13 @@ public class BlockbenchModelParser {
         for (float f : floats) {
             switch (bestType) {
                 case 0:
-                    list.add(ByteTag.valueOf((byte) f));
+                    list.appendTag(new NBTTagByte((byte) f));
                     break;
                 case 1:
-                    list.add(ShortTag.valueOf((short) f));
+                    list.appendTag(new NBTTagShort((short) f));
                     break;
                 case 2:
-                    list.add(FloatTag.valueOf(f));
+                    list.appendTag(new NBTTagFloat(f));
                     break;
             }
         }
@@ -811,25 +811,25 @@ public class BlockbenchModelParser {
     //dummy class containing the return object of the parser
 
     public class ModelData {
-        private final CompoundTag textures;
-        private final List<CompoundTag> animationList;
-        private final CompoundTag modelNbt;
+        private final NBTTagCompound textures;
+        private final List<NBTTagCompound> animationList;
+        private final NBTTagCompound modelNbt;
 
-        public ModelData(CompoundTag textures, List<CompoundTag> animationList, CompoundTag modelNbt) {
+        public ModelData(NBTTagCompound textures, List<NBTTagCompound> animationList, NBTTagCompound modelNbt) {
             this.textures = textures;
             this.animationList = new ArrayList<>(animationList);
             this.modelNbt = modelNbt;
         }
 
-        public CompoundTag textures() {
+        public NBTTagCompound textures() {
             return textures;
         }
 
-        public List<CompoundTag> animationList() {
+        public List<NBTTagCompound> animationList() {
             return animationList;
         }
 
-        public CompoundTag modelNbt() {
+        public NBTTagCompound modelNbt() {
             return modelNbt;
         }
 

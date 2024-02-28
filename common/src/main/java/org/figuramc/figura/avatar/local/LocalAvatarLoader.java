@@ -1,9 +1,8 @@
 package org.figuramc.figura.avatar.local;
 
-import net.minecraft.Util;
+import net.minecraft.util.Util;
 import net.minecraft.nbt.*;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.packs.resources.Resource;
+import net.minecraft.util.ResourceLocation;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.AvatarManager;
 import org.figuramc.figura.avatar.UserData;
@@ -32,7 +31,7 @@ import java.util.zip.GZIPOutputStream;
  */
 public class LocalAvatarLoader {
 
-    public static final boolean IS_WINDOWS = Util.getPlatform() == Util.OS.WINDOWS;
+    public static final boolean IS_WINDOWS = Util.getOSType() == Util.EnumOS.WINDOWS;
     private static final HashMap<Path, WatchKey> KEYS = new HashMap<>();
 
     private static CompletableFuture<Void> tasks;
@@ -42,35 +41,43 @@ public class LocalAvatarLoader {
 
     private static WatchService watcher;
 
-    public static final HashMap<ResourceLocation, CompoundTag> CEM_AVATARS = new HashMap<>();
+    public static final HashMap<ResourceLocation, NBTTagCompound> CEM_AVATARS = new HashMap<>();
     public static final FiguraResourceListener AVATAR_LISTENER = FiguraResourceListener.createResourceListener("cem", manager -> {
         CEM_AVATARS.clear();
         AvatarManager.clearCEMAvatars();
-
-        for (ResourceLocation resource : manager.listResources("cem", location -> location.endsWith(".moon"))) {
-            // id
-            String[] split = resource.getPath().split("/");
-            if (split.length <= 1)
-                continue;
-
-            String namespace = split[split.length - 2];
-            String path = split[split.length - 1];
-            ResourceLocation id = new ResourceLocation(namespace, path.substring(0, path.length() - 5));
-
-            // nbt
-            CompoundTag nbt;
+        for (String space : manager.getResourceDomains()) {
             try {
-                nbt = NbtIo.readCompressed(manager.getResource(resource).getInputStream());
-            } catch (Exception e) {
-                FiguraMod.LOGGER.error("Failed to load " + id + " avatar", e);
+                manager.getAllResources(new ResourceLocation(space,"cem")).forEach(location -> {
+                ResourceLocation resource = location.getResourceLocation();
+                if (resource.getResourcePath().endsWith(".moon")) {
+                    // id
+                    String[] split = resource.getResourcePath().split("/");
+                    if (!(split.length <= 1)) {
+
+                        String namespace = split[split.length - 2];
+                        String path = split[split.length - 1];
+                        ResourceLocation id = new ResourceLocation(namespace, path.substring(0, path.length() - 5));
+
+                        // nbt
+                        NBTTagCompound nbt;
+                        try {
+                            nbt = CompressedStreamTools.readCompressed(manager.getResource(resource).getInputStream());
+
+                            // insert
+                            FiguraMod.LOGGER.info("Loaded CEM model for " + id);
+                            CEM_AVATARS.put(id, nbt);
+                        } catch (Exception e) {
+                            FiguraMod.LOGGER.error("Failed to load " + id + " avatar", e);
+                        }
+                    }
+                }
+            });
+            } catch (IOException e) {
+                FiguraMod.LOGGER.error("Failed to load in CEM avatars from {}, stacktrace {}", space, e.getMessage());
                 continue;
             }
-
-            // insert
-            FiguraMod.LOGGER.info("Loaded CEM model for " + id);
-            CEM_AVATARS.put(id, nbt);
-        }
-    });
+            }
+        });
 
     static {
         try {
@@ -112,7 +119,7 @@ public class LocalAvatarLoader {
         async(() -> {
             try {
                 // load as folder
-                CompoundTag nbt = new CompoundTag();
+                NBTTagCompound nbt = new NBTTagCompound();
 
                 // scripts
                 loadState = LoadState.SCRIPTS;
@@ -123,32 +130,32 @@ public class LocalAvatarLoader {
                 loadSounds(finalPath, nbt);
 
                 // models
-                CompoundTag textures = new CompoundTag();
-                ListTag animations = new ListTag();
+                NBTTagCompound textures = new NBTTagCompound();
+                NBTTagList animations = new NBTTagList();
                 BlockbenchModelParser modelParser = new BlockbenchModelParser();
 
                 loadState = LoadState.MODELS;
-                CompoundTag models = loadModels(finalPath, finalPath, modelParser, textures, animations, "");
-                models.putString("name", "models");
+                NBTTagCompound models = loadModels(finalPath, finalPath, modelParser, textures, animations, "");
+                models.setString("name", "models");
 
                 // metadata
                 loadState = LoadState.METADATA;
                 String metadata = IOUtils.readFile(finalPath.resolve("avatar.json"));
-                nbt.put("metadata", AvatarMetadataParser.parse(metadata, IOUtils.getFileNameOrEmpty(finalPath)));
+                nbt.setTag("metadata", AvatarMetadataParser.parse(metadata, IOUtils.getFileNameOrEmpty(finalPath)));
                 AvatarMetadataParser.injectToModels(metadata, models);
                 AvatarMetadataParser.injectToTextures(metadata, textures);
 
                 // return :3
-                if (!models.isEmpty())
-                    nbt.put("models", models);
-                if (!textures.isEmpty())
-                    nbt.put("textures", textures);
-                if (!animations.isEmpty())
-                    nbt.put("animations", animations);
-                CompoundTag metadataTag = nbt.getCompound("metadata");
-                if (metadataTag.contains("resources_paths")) {
-                    loadResources(nbt, metadataTag.getList("resources_paths", NbtType.STRING.getValue()), finalPath);
-                    metadataTag.remove("resource_paths");
+                if (!models.hasNoTags())
+                    nbt.setTag("models", models);
+                if (!textures.hasNoTags())
+                    nbt.setTag("textures", textures);
+                if (!animations.hasNoTags())
+                    nbt.setTag("animations", animations);
+                NBTTagCompound metadataTag = nbt.getCompoundTag("metadata");
+                if (metadataTag.hasKey("resources_paths")) {
+                    loadResources(nbt, metadataTag.getTagList("resources_paths", NbtType.STRING.getValue()), finalPath);
+                    metadataTag.removeTag("resource_paths");
                 }
 
                 // load
@@ -160,15 +167,15 @@ public class LocalAvatarLoader {
             }
         });
     }
-    private static void loadResources(CompoundTag nbt, ListTag pathsTag, Path parentPath) {
+    private static void loadResources(NBTTagCompound nbt, NBTTagList pathsTag, Path parentPath) {
         ArrayList<PathMatcher> pathMatchers = new ArrayList<>();
         FileSystem fs = FileSystems.getDefault();
-        for (int i = 0; i < pathsTag.size(); i++) {
-            pathMatchers.add(fs.getPathMatcher("glob:".concat(pathsTag.getString(i))));
+        for (int i = 0; i < pathsTag.tagCount(); i++) {
+            pathMatchers.add(fs.getPathMatcher("glob:".concat(pathsTag.getStringTagAt(i))));
         }
         Map<String, Path> pathMap = new HashMap<>();
         matchPathsRecursive(pathMap, parentPath, parentPath, pathMatchers);
-        CompoundTag resourcesTag = new CompoundTag();
+        NBTTagCompound resourcesTag = new NBTTagCompound();
         for (String p:
                 pathMap.keySet()) {
             try (FileInputStream fis = new FileInputStream(pathMap.get(p).toFile())) {
@@ -179,14 +186,14 @@ public class LocalAvatarLoader {
                     gos.write(i);
                 }
                 gos.close();
-                resourcesTag.put(unixifyPath(p), new ByteArrayTag(baos.toByteArray()));
+                resourcesTag.setTag(unixifyPath(p), new NBTTagByteArray(baos.toByteArray()));
                 baos.close();
             }
             catch (IOException e) {
                 throw new RuntimeException(e);
             }
         }
-        nbt.put("resources", resourcesTag);
+        nbt.setTag("resources", resourcesTag);
     }
 
     private static String unixifyPath(String original) {
@@ -218,75 +225,76 @@ public class LocalAvatarLoader {
         }
     }
 
-    private static void loadScripts(Path path, CompoundTag nbt) throws IOException {
+    private static void loadScripts(Path path, NBTTagCompound nbt) throws IOException {
         List<Path> scripts = IOUtils.getFilesByExtension(path, ".lua");
         if (scripts.size() > 0) {
-            CompoundTag scriptsNbt = new CompoundTag();
+            NBTTagCompound scriptsNbt = new NBTTagCompound();
             String pathRegex = path.toString().isEmpty() ? "\\Q\\E" : Pattern.quote(path + path.getFileSystem().getSeparator());
             for (Path script : scripts) {
                 String name = script.toString()
                         .replaceFirst(pathRegex, "")
                         .replaceAll("[/\\\\]", ".");
                 name = name.substring(0, name.length() - 4);
-                scriptsNbt.put(name, LuaScriptParser.parseScript(name, IOUtils.readFile(script)));
+                scriptsNbt.setTag(name, LuaScriptParser.parseScript(name, IOUtils.readFile(script)));
             }
-            nbt.put("scripts", scriptsNbt);
+            nbt.setTag("scripts", scriptsNbt);
         }
     }
 
-    private static void loadSounds(Path path, CompoundTag nbt) throws IOException {
+    private static void loadSounds(Path path, NBTTagCompound nbt) throws IOException {
         List<Path> sounds = IOUtils.getFilesByExtension(path, ".ogg");
         if (sounds.size() > 0) {
-            CompoundTag soundsNbt = new CompoundTag();
+            NBTTagCompound soundsNbt = new NBTTagCompound();
             String pathRegex = Pattern.quote(path.toString().isEmpty() ? path.toString() : path + path.getFileSystem().getSeparator());
             for (Path sound : sounds) {
                 String name = sound.toString()
                         .replaceFirst(pathRegex, "")
                         .replaceAll("[/\\\\]", ".");
                 name = name.substring(0, name.length() - 4);
-                soundsNbt.putByteArray(name, IOUtils.readFileBytes(sound));
+                soundsNbt.setByteArray(name, IOUtils.readFileBytes(sound));
             }
-            nbt.put("sounds", soundsNbt);
+            nbt.setTag("sounds", soundsNbt);
         }
     }
 
-    private static CompoundTag loadModels(Path avatarFolder, Path currentFile, BlockbenchModelParser parser, CompoundTag textures, ListTag animations, String folders) throws Exception {
-        CompoundTag result = new CompoundTag();
+    private static NBTTagCompound loadModels(Path avatarFolder, Path currentFile, BlockbenchModelParser parser, NBTTagCompound textures, NBTTagList animations, String folders) throws Exception {
+        NBTTagCompound result = new NBTTagCompound();
         List<Path> subFiles = IOUtils.listPaths(currentFile);
-        ListTag children = new ListTag();
+        NBTTagList children = new NBTTagList();
         if (subFiles != null)
             for (Path file : subFiles) {
                 if (IOUtils.isHidden(file))
                     continue;
                 String name = IOUtils.getFileNameOrEmpty(file);
                 if (Files.isDirectory(file)) {
-                    CompoundTag subfolder = loadModels(avatarFolder, file, parser, textures, animations, folders + name + ".");
-                    if (!subfolder.isEmpty()) {
-                        subfolder.putString("name", name);
+                    NBTTagCompound subfolder = loadModels(avatarFolder, file, parser, textures, animations, folders + name + ".");
+                    if (!subfolder.hasNoTags()) {
+                        subfolder.setString("name", name);
                         BlockbenchModelParser.parseParent(name, subfolder);
-                        children.add(subfolder);
+                        children.appendTag(subfolder);
                     }
                 } else if (file.toString().toLowerCase().endsWith(".bbmodel")) {
                     BlockbenchModelParser.ModelData data = parser.parseModel(avatarFolder, file, IOUtils.readFile(file), name.substring(0, name.length() - 8), folders);
-                    children.add(data.modelNbt());
-                    animations.addAll(data.animationList());
+                    children.appendTag(data.modelNbt());
+                    data.animationList().forEach(animations::appendTag);
 
-                    CompoundTag dataTag = data.textures();
-                    if (dataTag.isEmpty())
+                    NBTTagCompound dataTag = data.textures();
+                    if (dataTag.hasNoTags())
                         continue;
 
-                    if (textures.isEmpty()) {
-                        textures.put("data", new ListTag());
-                        textures.put("src", new CompoundTag());
+                    if (textures.hasNoTags()) {
+                        textures.setTag("data", new NBTTagList());
+                        textures.setTag("src", new NBTTagCompound());
                     }
-
-                    textures.getList("data", NbtType.COMPOUND.getValue()).addAll(dataTag.getList("data", NbtType.COMPOUND.getValue()));
-                    textures.getCompound("src").merge(dataTag.getCompound("src"));
+                    for (int i = 0; i < dataTag.getTagList("data", NbtType.COMPOUND.getValue()).tagCount(); i++) {
+                        textures.getTagList("data", NbtType.COMPOUND.getValue()).appendTag(dataTag.getTagList("data", NbtType.COMPOUND.getValue()).getCompoundTagAt(i));
+                    }
+                    textures.getCompoundTag("src").merge(dataTag.getCompoundTag("src"));
                 }
             }
 
-        if (children.size() > 0)
-            result.put("chld", children);
+        if (children.tagCount() > 0)
+            result.setTag("chld", children);
 
         return result;
     }

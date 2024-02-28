@@ -1,6 +1,6 @@
 package org.figuramc.figura.parsers;
 
-import net.minecraft.nbt.ByteArrayTag;
+import net.minecraft.nbt.NBTTagByteArray;
 import org.apache.commons.lang3.StringUtils;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.config.Configs;
@@ -37,7 +37,7 @@ public class LuaScriptParser {
     // parsing data
     private static boolean error;
 
-    public static ByteArrayTag parseScript(String name, String script) {
+    public static NBTTagByteArray parseScript(String name, String script) {
         error = true;
         String minified;
         switch (Configs.FORMAT_SCRIPT.value) {
@@ -56,12 +56,12 @@ public class LuaScriptParser {
             default:
                 throw new IllegalStateException(String.format("Format_SCRIPT should not be %d, expecting 0 to %d", Configs.FORMAT_SCRIPT.value, Configs.FORMAT_SCRIPT.enumList.size() - 1));
         }
-        ByteArrayTag out;
+        NBTTagByteArray out;
         if (error) {
             FiguraMod.LOGGER.warn("Failed to minify the script, likely to be syntax error");
-            out = new ByteArrayTag(script.getBytes(StandardCharsets.UTF_8));
+            out = new NBTTagByteArray(script.getBytes(StandardCharsets.UTF_8));
         } else {
-            out = new ByteArrayTag(minified.getBytes(StandardCharsets.UTF_8));
+            out = new NBTTagByteArray(minified.getBytes(StandardCharsets.UTF_8));
         }
         return out;
     }

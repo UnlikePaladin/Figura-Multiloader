@@ -1,8 +1,8 @@
 package org.figuramc.figura.mixin.sound;
 
-import net.minecraft.client.gui.components.SubtitleOverlay;
-import net.minecraft.network.chat.Component;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.client.gui.GuiSubtitleOverlay;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.math.Vec3d;
 import org.figuramc.figura.ducks.SubtitleOverlayAccessor;
 import org.figuramc.figura.lua.api.sound.LuaSound;
 import org.spongepowered.asm.mixin.Final;
@@ -12,27 +12,27 @@ import org.spongepowered.asm.mixin.Unique;
 
 import java.util.List;
 
-@Mixin(SubtitleOverlay.class)
+@Mixin(GuiSubtitleOverlay.class)
 public class SubtitleOverlayMixin implements SubtitleOverlayAccessor {
 
-    @Shadow @Final private List<SubtitleOverlay.Subtitle> subtitles;
+    @Shadow @Final private List<GuiSubtitleOverlay.Subtitle> subtitles;
 
     @Unique
     @Override
     public void figura$PlaySound(LuaSound sound) {
-        Component text = sound.getSubtitleText();
+        ITextComponent text = sound.getSubtitleText();
         if (text == null)
             return;
 
-        Vec3 pos = sound.getPos().asVec3();
+        Vec3d pos = sound.getPos().asVec3();
 
-        for (SubtitleOverlay.Subtitle subtitle : this.subtitles) {
-            if (subtitle.getText().getString().equals(text.getString())) {
+        for (GuiSubtitleOverlay.Subtitle subtitle : this.subtitles) {
+            if (subtitle.getString().equals(text.getFormattedText())) {
                 subtitle.refresh(pos);
                 return;
             }
         }
-        SubtitleOverlay.Subtitle subtitle = ((SubtitleOverlay)(Object)this).new Subtitle(text, pos);
+        GuiSubtitleOverlay.Subtitle subtitle = ((GuiSubtitleOverlay)(Object)this).new Subtitle(text.getFormattedText(), pos);
         this.subtitles.add(subtitle);
     }
 }

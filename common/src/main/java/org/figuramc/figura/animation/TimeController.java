@@ -1,6 +1,5 @@
 package org.figuramc.figura.animation;
 
-import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 
 public class TimeController {
@@ -9,12 +8,12 @@ public class TimeController {
 
     public void init() {
         pauseTime = 0L;
-        lastTime = time = Util.getMillis();
+        lastTime = time = Minecraft.getSystemTime();
     }
 
     public void tick() {
         lastTime = time;
-        time = Util.getMillis();
+        time = Minecraft.getSystemTime();
     }
 
     public void reset() {
@@ -23,16 +22,16 @@ public class TimeController {
 
     public void pause() {
         lastTime = time;
-        pauseTime = Util.getMillis();
+        pauseTime = Minecraft.getSystemTime();
     }
 
     public void resume() {
-        long diff = Util.getMillis() - pauseTime;
+        long diff = Minecraft.getSystemTime() - pauseTime;
         lastTime += diff;
         time += diff;
     }
 
     public float getDiff() {
-        return Minecraft.getInstance().isPaused() ? 0 : (time - lastTime) / 1000f;
+        return Minecraft.getMinecraft().isGamePaused() ? 0 : (time - lastTime) / 1000f;
     }
 }

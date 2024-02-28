@@ -11,6 +11,7 @@ import com.mojang.math.Matrix3f;
 import com.mojang.math.Matrix4f;
 import com.mojang.math.Vector3f;
 import com.mojang.math.Quaternion;
+import com.mojang.realmsclient.util.Pair;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.EntityModel;
@@ -21,11 +22,15 @@ import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.client.renderer.entity.player.PlayerRenderer;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.Direction;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.text.ITextComponent;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.player.Player;
@@ -85,8 +90,8 @@ public class Avatar {
 
     // properties
     public final UUID owner;
-    public final EntityType<?> entityType;
-    public CompoundTag nbt;
+    public final Class<? extends Entity> entityType;
+    public NBTTagCompound nbt;
     public boolean loaded = true;
     public final boolean isHost;
 
@@ -117,7 +122,7 @@ public class Avatar {
 
     // runtime status
     public boolean hasTexture, scriptError;
-    public Component errorText;
+    public ITextComponent errorText;
     public Set<Permissions> noPermissions = new HashSet<>();
     public Set<Permissions> permissionsToTick = new HashSet<>();
     public int lastPlayingSound = 0;
@@ -128,11 +133,11 @@ public class Avatar {
     public final Instructions complexity;
     public final Instructions init, render, worldRender, tick, worldTick, animation;
     public final RefilledNumber particlesRemaining, soundsRemaining;
-    private Avatar(UUID owner, EntityType<?> type, String name) {
+    private Avatar(UUID owner, Class<? extends Entity> type, String name) {
         this.owner = owner;
         this.entityType = type;
-        this.isHost = type == EntityType.PLAYER && FiguraMod.isLocal(owner);
-        this.permissions = type == EntityType.PLAYER ? PermissionManager.get(owner) : PermissionManager.getMobPermissions(owner);
+        this.isHost = type == EntityPlayer.class && FiguraMod.isLocal(owner);
+        this.permissions = type == EntityPlayer.class ? PermissionManager.get(owner) : PermissionManager.getMobPermissions(owner);
         this.complexity = new Instructions(permissions.get(Permissions.COMPLEXITY));
         this.init = new Instructions(permissions.get(Permissions.INIT_INST));
         this.render = new Instructions(permissions.get(Permissions.RENDER_INST));
@@ -146,14 +151,14 @@ public class Avatar {
     }
 
     public Avatar(UUID owner) {
-        this(owner, EntityType.PLAYER, EntityUtils.getNameForUUID(owner));
+        this(owner, EntityPlayer.class, EntityUtils.getNameForUUID(owner));
     }
 
     public Avatar(Entity entity) {
-        this(entity.getUUID(), entity.getType(), entity.getName().getString());
+        this(entity.getUniqueID(), entity.getClass(), entity.getName());
     }
 
-    public void load(CompoundTag nbt) {
+    public void load(NBTTagCompound nbt) {
         Runnable toRun = () -> {
             this.nbt = nbt;
             loaded = false;
@@ -175,24 +180,24 @@ public class Avatar {
         tasks.thenRun(() -> {
             try {
                 // metadata
-                CompoundTag metadata = nbt.getCompound("metadata");
+                NBTTagCompound metadata = nbt.getCompoundTag("metadata");
                 name = metadata.getString("name");
                 authors = metadata.getString("authors");
                 version = new Version(metadata.getString("ver"));
-                if (metadata.contains("id"))
+                if (metadata.hasKey("id"))
                     id = metadata.getString("id");
-                if (metadata.contains("color"))
+                if (metadata.hasKey("color"))
                     color = metadata.getString("color");
-                if (metadata.contains("minify"))
+                if (metadata.hasKey("minify"))
                     minify = metadata.getBoolean("minify");
-                if (nbt.contains("resources")) {
-                    CompoundTag res = nbt.getCompound("resources");
+                if (nbt.hasKey("resources")) {
+                    NBTTagCompound res = nbt.getCompoundTag("resources");
                     for (String k :
-                            res.getAllKeys()) {
+                            res.getKeySet()) {
                         resources.put(k, res.getByteArray(k));
                     }
                 }
-                for (String key : metadata.getAllKeys()) {
+                for (String key : metadata.getKeySet()) {
                     if (key.contains("badge_color_")) {
                         badgeToColor.put(key.replace("badge_color_", ""), metadata.getString(key));
                     }

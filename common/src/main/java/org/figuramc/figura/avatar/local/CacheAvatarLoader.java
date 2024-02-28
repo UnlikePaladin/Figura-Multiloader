@@ -1,7 +1,7 @@
 package org.figuramc.figura.avatar.local;
 
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtIo;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.CompressedStreamTools;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.UserData;
 import org.figuramc.figura.utils.IOUtils;
@@ -59,7 +59,7 @@ public class CacheAvatarLoader {
         LocalAvatarLoader.async(() -> {
             Path path = getAvatarCacheDirectory().resolve(hash + ".moon");
             try {
-                target.loadAvatar(NbtIo.readCompressed(Files.newInputStream(path)));
+                target.loadAvatar(CompressedStreamTools.readCompressed(Files.newInputStream(path)));
                 FiguraMod.debug("Loaded avatar \"{}\" from cache to \"{}\"", hash, target.id);
             } catch (Exception e) {
                 FiguraMod.LOGGER.error("Failed to load cache avatar: " + hash, e);
@@ -67,11 +67,11 @@ public class CacheAvatarLoader {
         });
     }
 
-    public static void save(String hash, CompoundTag nbt) {
+    public static void save(String hash, NBTTagCompound nbt) {
         LocalAvatarLoader.async(() -> {
             Path file = getAvatarCacheDirectory().resolve(hash + ".moon");
             try {
-                NbtIo.writeCompressed(nbt, Files.newOutputStream(file));
+                CompressedStreamTools.writeCompressed(nbt, Files.newOutputStream(file));
                 FiguraMod.debug("Saved avatar \"{}\" on cache", hash);
             } catch (Exception e) {
                 FiguraMod.LOGGER.error("Failed to save avatar on cache: " + hash, e);
