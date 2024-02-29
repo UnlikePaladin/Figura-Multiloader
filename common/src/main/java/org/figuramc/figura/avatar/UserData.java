@@ -1,11 +1,10 @@
 package org.figuramc.figura.avatar;
 
-import com.mojang.datafixers.util.Pair;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NBTTagCompound;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.local.CacheAvatarLoader;
 import org.figuramc.figura.backend2.NetworkStuff;
+import org.figuramc.figura.utils.Pair;
 
 import java.util.ArrayList;
 import java.util.BitSet;

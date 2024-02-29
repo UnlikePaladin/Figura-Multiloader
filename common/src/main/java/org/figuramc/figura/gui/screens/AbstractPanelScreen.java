@@ -3,11 +3,16 @@ package org.figuramc.figura.gui.screens;
 import com.google.common.collect.Lists;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Gui;
+import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.components.Widget;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.text.ITextComponent;
 import org.figuramc.figura.config.Configs;
 import org.figuramc.figura.gui.widgets.*;
 import org.figuramc.figura.lua.api.ClientAPI;
@@ -17,8 +22,8 @@ import org.figuramc.figura.utils.ui.UIHelper;
 import java.util.Arrays;
 import java.util.List;
 
-public abstract class AbstractPanelScreen extends Screen {
-    private final List<Widget> renderables = Lists.newArrayList();
+public abstract class AbstractPanelScreen extends GuiScreen {
+    private final List<Gui> renderables = Lists.newArrayList();
     public static final List<ResourceLocation> BACKGROUNDS = Arrays.asList(
             new FiguraIdentifier("textures/gui/background/background_0.png"),
             new FiguraIdentifier("textures/gui/background/background_1.png"),
@@ -26,35 +31,35 @@ public abstract class AbstractPanelScreen extends Screen {
     );
 
     // variables
-    protected final Screen parentScreen;
+    protected final GuiScreen parentScreen;
     public PanelSelectorWidget panels;
 
     // overlays
     public ContextMenu contextMenu;
-    public Component tooltip;
+    public ITextComponent tooltip;
 
     // stuff :3
     private static final String EGG = "ĉĉĈĈćĆćĆBAā";
     private String egg = EGG;
 
-    protected AbstractPanelScreen(Screen parentScreen, Component title) {
-        super(title);
+    protected AbstractPanelScreen(GuiScreen parentScreen, ITextComponent title) {
+        super();
         this.parentScreen = parentScreen;
     }
 
     @Override
-    public void init(Minecraft minecraft, int width, int height) {
+    public void setWorldAndResolution(Minecraft minecraft, int width, int height) {
         this.renderables.clear();
-        super.init(minecraft, width, height);
+        super.setWorldAndResolution(minecraft, width, height);
     }
 
-    public Class<? extends Screen> getSelectedPanel() {
+    public Class<? extends GuiScreen> getSelectedPanel() {
         return this.getClass();
     };
 
     @Override
-    protected void init() {
-        super.init();
+    public void initGui() {
+        super.initGui();
 
         // add panel selector
         this.addRenderableWidget(panels = new PanelSelectorWidget(parentScreen, 0, 0, width, getSelectedPanel()));
@@ -65,6 +70,11 @@ public abstract class AbstractPanelScreen extends Screen {
     }
 
     @Override
+    public void updateScreen() {
+        super.updateScreen();
+        tick();
+    }
+
     public void tick() {
         for (Widget renderable : this.renderables()) {
             if (renderable instanceof FiguraTickable) {
@@ -75,20 +85,19 @@ public abstract class AbstractPanelScreen extends Screen {
 
         renderables().removeIf(r -> r instanceof FiguraRemovable && ((FiguraRemovable) r).isRemoved());
 
-        super.tick();
     }
 
-    public List<Widget> renderables() {
+    public List<Gui> renderables() {
         return renderables;
     }
 
     @Override
-    public void render(PoseStack stack, int mouseX, int mouseY, float delta) {
+    public void drawScreen(int mouseX, int mouseY, float delta) {
         // setup figura framebuffer
         // UIHelper.useFiguraGuiFramebuffer();
 
         // render background
-        this.renderBackground(stack, delta);
+        this.renderBackground(delta);
 
         // render contents
         super.render(stack, mouseX, mouseY, delta);
@@ -104,38 +113,38 @@ public abstract class AbstractPanelScreen extends Screen {
         // UIHelper.useVanillaFramebuffer();
     }
 
-    public void renderBackground(PoseStack stack, float delta) {
+    public void renderBackground(float delta) {
         // render
         float speed = Configs.BACKGROUND_SCROLL_SPEED.tempValue * 0.125f;
         for (ResourceLocation background : BACKGROUNDS) {
-            UIHelper.renderAnimatedBackground(stack, background, 0, 0, this.width, this.height, 64, 64, speed, delta);
+            UIHelper.renderAnimatedBackground(background, 0, 0, this.width, this.height, 64, 64, speed, delta);
             speed /= 0.5;
         }
     }
 
-    public void renderOverlays(PoseStack stack, int mouseX, int mouseY, float delta) {
+    public void renderOverlays(int mouseX, int mouseY, float delta) {
         if (Configs.GUI_FPS.value)
-            font.draw(stack, ClientAPI.getFPS() + " fps", 1, 1, 0xFFFFFF);
+            fontRenderer.drawString(ClientAPI.getFPS() + " fps", 1, 1, 0xFFFFFF);
 
         // render context
         if (contextMenu != null && contextMenu.isVisible()) {
             // translate the stack here because of nested contexts
-            stack.pushPose();
-            stack.translate(0f, 0f, 500f);
-            contextMenu.render(stack, mouseX, mouseY, delta);
-            stack.popPose();
+            GlStateManager.pushMatrix();
+            GlStateManager.translate(0f, 0f, 500f);
+            contextMenu.render(mouseX, mouseY, delta);
+            GlStateManager.popMatrix();
         }
 
         // render tooltip
         if (tooltip != null)
-            UIHelper.renderTooltip(stack, tooltip, mouseX, mouseY, true);
+            UIHelper.renderTooltip(tooltip, mouseX, mouseY, true);
 
         tooltip = null;
     }
 
     @Override
-    public void onClose() {
-        this.minecraft.setScreen(parentScreen);
+    public void onGuiClosed() {
+        this.mc.displayGuiScreen(parentScreen);
     }
 
     @Override
@@ -224,18 +233,18 @@ public abstract class AbstractPanelScreen extends Screen {
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
-    protected <T extends GuiEventListener & Widget> T addRenderableWidget(T widget) {
+    protected <T extends Gui> T addRenderableWidget(T widget) {
         this.renderables.add(widget);
-        return addWidget(widget);
+        return addButton(widget);
     }
 
-    protected void removeWidget(GuiEventListener child) {
-        if (child instanceof Widget)
+    protected void removeWidget(Gui child) {
+        if (child instanceof Gui)
             this.renderables.remove(child);
-        this.children.remove(child);
+        this.remove(child);
     }
 
-    protected <T extends Widget> T addRenderableOnly(T drawable) {
+    protected <T extends Gui> T addRenderableOnly(T drawable) {
         this.renderables.add(drawable);
         return drawable;
     }

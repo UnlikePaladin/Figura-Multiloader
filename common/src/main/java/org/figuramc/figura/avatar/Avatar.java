@@ -6,12 +6,10 @@ import com.mojang.blaze3d.platform.Lighting;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.datafixers.util.Pair;
 import com.mojang.math.Matrix3f;
 import com.mojang.math.Matrix4f;
 import com.mojang.math.Vector3f;
 import com.mojang.math.Quaternion;
-import com.mojang.realmsclient.util.Pair;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.EntityModel;
@@ -72,6 +70,7 @@ import org.luaj.vm2.LuaError;
 import org.luaj.vm2.LuaValue;
 import org.luaj.vm2.Varargs;
 
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
@@ -1094,7 +1093,7 @@ public class Avatar {
         }
     }
 
-    public FiguraTexture registerTexture(String name, NativeImage image, boolean ignoreSize) {
+    public FiguraTexture registerTexture(String name, BufferedImage image, boolean ignoreSize) {
         int max = permissions.get(Permissions.TEXTURE_SIZE);
         if (!ignoreSize && (image.getWidth() > max || image.getHeight() > max)) {
             noPermissions.add(Permissions.TEXTURE_SIZE);

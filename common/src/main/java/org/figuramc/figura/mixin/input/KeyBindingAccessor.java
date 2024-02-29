@@ -1,18 +1,18 @@
 package org.figuramc.figura.mixin.input;
 
-import net.minecraft.client.KeyMapping;
+import net.minecraft.client.settings.KeyBinding;
 import org.spongepowered.asm.mixin.Intrinsic;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
 import java.util.Map;
 
-@Mixin(KeyMapping.class)
-public interface KeyMappingAccessor {
+@Mixin(KeyBinding.class)
+public interface KeyBindingAccessor {
 
     @Intrinsic
-    @Accessor("ALL")
-    static Map<String, KeyMapping> getAll() {
+    @Accessor("KEYBIND_ARRAY")
+    static Map<String, KeyBinding> getAll() {
         throw new AssertionError();
     }
 }

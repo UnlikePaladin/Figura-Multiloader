@@ -3,7 +3,7 @@ package org.figuramc.figura.resources;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import net.minecraft.server.packs.FolderPackResources;
+import net.minecraft.client.resources.FolderResourcePack;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.backend2.NetworkStuff;
 import org.figuramc.figura.config.Configs;
@@ -21,7 +21,7 @@ import java.util.concurrent.CompletableFuture;
 public class FiguraRuntimeResources {
 
     public static final String ASSETS_VERSION = FiguraMod.METADATA.getCustomValueAsString("assets_version");
-    public static final FolderPackResources PACK = new FolderPackResources(getRootDirectory().toFile());
+    public static final FolderResourcePack PACK = new FolderResourcePack(getRootDirectory().toFile());
 
     public static Path getRootDirectory() {
         return IOUtils.getOrCreateDir(FiguraMod.getCacheDirectory(), "resources");

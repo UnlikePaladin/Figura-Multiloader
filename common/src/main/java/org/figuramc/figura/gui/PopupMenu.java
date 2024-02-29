@@ -7,16 +7,24 @@ import com.mojang.datafixers.util.Pair;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.ScaledResolution;
+import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.entity.Entity;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.TextComponent;
-import net.minecraft.world.entity.Entity;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.Style;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextFormatting;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.avatar.AvatarManager;
 import org.figuramc.figura.avatar.Badges;
 import org.figuramc.figura.config.Configs;
+import org.figuramc.figura.ducks.extensions.StyleExtension;
 import org.figuramc.figura.math.vector.FiguraVec3;
 import org.figuramc.figura.math.vector.FiguraVec4;
 import org.figuramc.figura.permissions.PermissionManager;
@@ -24,6 +32,7 @@ import org.figuramc.figura.permissions.PermissionPack;
 import org.figuramc.figura.utils.FiguraIdentifier;
 import org.figuramc.figura.utils.FiguraText;
 import org.figuramc.figura.utils.MathUtils;
+import org.figuramc.figura.utils.Pair;
 import org.figuramc.figura.utils.ui.UIHelper;
 
 import java.util.Arrays;
@@ -32,24 +41,24 @@ import java.util.UUID;
 import java.util.function.Consumer;
 
 public class PopupMenu {
-
+//TODO: implement font in style extension correctly
     private static final FiguraIdentifier BACKGROUND = new FiguraIdentifier("textures/gui/popup.png");
     private static final FiguraIdentifier ICONS = new FiguraIdentifier("textures/gui/popup_icons.png");
 
-    private static final MutableComponent VERSION_WARN = TextComponent.EMPTY.copy()
-            .append(Badges.System.WARNING.badge.copy().withStyle(Style.EMPTY.withFont(Badges.FONT)))
-            .append(" ")
-            .append(Badges.System.WARNING.desc.copy().withStyle(ChatFormatting.YELLOW));
-    private static final MutableComponent ERROR_WARN = TextComponent.EMPTY.copy()
-            .append(Badges.System.ERROR.badge.copy().withStyle(Style.EMPTY.withFont(Badges.FONT)))
-            .append(" ")
-            .append(Badges.System.ERROR.desc.copy().withStyle(ChatFormatting.RED));
-    private static final MutableComponent PERMISSION_WARN = TextComponent.EMPTY.copy()
-            .append(Badges.System.PERMISSIONS.badge.copy().withStyle(Style.EMPTY.withFont(Badges.FONT)))
-            .append(" ")
-            .append(Badges.System.PERMISSIONS.desc.copy().withStyle(ChatFormatting.BLUE));
+    private static final ITextComponent VERSION_WARN = new TextComponentString("")
+            .appendSibling(Badges.System.WARNING.badge.createCopy().setStyle(((StyleExtension)new Style()).setFont(Badges.FONT)))
+            .appendText(" ")
+            .appendSibling(Badges.System.WARNING.desc.createCopy().setStyle(new Style().setColor(TextFormatting.YELLOW)));
+    private static final ITextComponent ERROR_WARN = new TextComponentString("")
+            .appendSibling(Badges.System.ERROR.badge.createCopy().setStyle(((StyleExtension)new Style()).setFont(Badges.FONT)))
+            .appendText(" ")
+            .appendSibling(Badges.System.ERROR.desc.createCopy().setStyle(new Style().setColor(TextFormatting.RED)));
+    private static final ITextComponent PERMISSION_WARN = new TextComponentString("")
+            .appendSibling(Badges.System.PERMISSIONS.badge.createCopy().setStyle(((StyleExtension)new Style()).setFont(Badges.FONT)))
+            .appendText(" ")
+            .appendSibling(Badges.System.PERMISSIONS.desc.createCopy().setStyle(new Style().setColor(TextFormatting.RED)));
 
-    private static final List<Pair<Component, Consumer<UUID>>> BUTTONS = Arrays.asList(
+    private static final List<Pair<ITextComponent, Consumer<UUID>>> BUTTONS = Arrays.asList(
             Pair.of(new FiguraText("popup_menu.cancel"), id -> {}),
             Pair.of(new FiguraText("popup_menu.reload"), id -> {
                 AvatarManager.reloadAvatar(id);
@@ -82,31 +91,36 @@ public class PopupMenu {
             return;
         }
 
-        id = entity.getUUID();
-        Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.player == null || (entity.isInvisibleTo(minecraft.player) && entity != minecraft.player)) {
+        id = entity.getUniqueID();
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (minecraft.player == null || (entity.isInvisibleToPlayer(minecraft.player) && entity != minecraft.player)) {
             entity = null;
             id = null;
             return;
         }
 
-        RenderSystem.disableDepthTest();
-        stack.pushPose();
+        GlStateManager.disableDepth();
+        GlStateManager.pushMatrix();
 
         // world to screen space
-        FiguraVec3 worldPos = FiguraVec3.fromVec3(entity.getPosition(minecraft.getFrameTime()));
-        worldPos.add(0f, entity.getBbHeight() + 0.1f, 0f);
+        float partialTicks = minecraft.getRenderPartialTicks();
+        double d = MathUtils.lerp(partialTicks, entity.prevPosX, entity.posX);
+        double e = MathUtils.lerp(partialTicks, entity.prevPosY, entity.posY);
+        double f = MathUtils.lerp(partialTicks, entity.prevPosZ, entity.posZ);
+
+        FiguraVec3 worldPos = FiguraVec3.of(d,e,f);
+        worldPos.add(0f, (entity.getCollisionBoundingBox().maxY -  entity.getCollisionBoundingBox().minY )+ 0.1f, 0f);
 
         FiguraVec4 vec = MathUtils.worldToScreenSpace(worldPos);
         if (vec.z < 1) return; // too close
 
-        Window window = minecraft.getWindow();
-        double w = window.getGuiScaledWidth();
-        double h = window.getGuiScaledHeight();
-        double s = Configs.POPUP_SCALE.value * Math.max(Math.min(window.getHeight() * 0.035 / vec.w * (1 / window.getGuiScale()), Configs.POPUP_MAX_SIZE.value), Configs.POPUP_MIN_SIZE.value);
+        ScaledResolution window = new ScaledResolution(minecraft);
+        double w = window.getScaledWidth_double();
+        double h = window.getScaledHeight_double();
+        double s = Configs.POPUP_SCALE.value * Math.max(Math.min(minecraft.getFramebuffer().framebufferHeight * 0.035 / vec.w * ((double) 1 / window.getScaleFactor()), Configs.POPUP_MAX_SIZE.value), Configs.POPUP_MIN_SIZE.value);
 
-        stack.translate((vec.x + 1) / 2 * w, (vec.y + 1) / 2 * h, -100);
-        stack.scale((float) (s * 0.5), (float) (s * 0.5), 1);
+        GlStateManager.translate((vec.x + 1) / 2 * w, (vec.y + 1) / 2 * h, -100);
+        GlStateManager.scale((float) (s * 0.5), (float) (s * 0.5), 1);
 
         // background
         int width = LENGTH * 18;
@@ -116,7 +130,7 @@ public class PopupMenu {
         UIHelper.blit(stack, width / -2, -24, width, 26, 0, frame * 26, width, 26, width, 104);
 
         // icons
-        stack.translate(0f, 0f, -2f);
+        GlStateManager.translate(0f, 0f, -2f);
         UIHelper.setupTexture(ICONS);
         for (int i = 0; i < LENGTH; i++)
             UIHelper.blit(stack, width / -2 + (18 * i), -24, 18, 18, 18 * i, i == index ? 18 : 0, 18, 18, width, 36);

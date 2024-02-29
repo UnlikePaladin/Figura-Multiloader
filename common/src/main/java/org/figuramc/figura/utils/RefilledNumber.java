@@ -1,7 +1,5 @@
 package org.figuramc.figura.utils;
 
-import net.minecraft.SharedConstants;
-
 /**
  * class that represents a number that can be refilled
  * the "max" value is the limit the number can reach (rounded up)

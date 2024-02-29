@@ -1,6 +1,6 @@
 package org.figuramc.figura.lua.api.entity;
 
-import net.minecraft.world.entity.player.Player;
+import net.minecraft.entity.player.EntityPlayer;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.avatar.AvatarManager;
 import org.figuramc.figura.lua.LuaWhitelist;
@@ -19,7 +19,7 @@ import java.util.Map;
 )
 public class ViewerAPI extends PlayerAPI {
 
-    public ViewerAPI(Player entity) {
+    public ViewerAPI(EntityPlayer entity) {
         super(entity);
     }
 

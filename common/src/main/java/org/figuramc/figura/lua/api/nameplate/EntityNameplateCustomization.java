@@ -1,7 +1,5 @@
 package org.figuramc.figura.lua.api.nameplate;
 
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.LightTexture;
 import org.figuramc.figura.lua.LuaWhitelist;
 import org.figuramc.figura.lua.docs.LuaMethodDoc;
 import org.figuramc.figura.lua.docs.LuaMethodOverload;
@@ -140,7 +138,7 @@ public class EntityNameplateCustomization extends NameplateCustomization {
             value = "nameplate_entity.set_background_color"
     )
     public EntityNameplateCustomization setBackgroundColor(Object r, Double g, Double b, Double a) {
-        FiguraVec4 vec = LuaUtils.parseVec4("setBackgroundColor", r, g, b, a, 0, 0, 0,  Minecraft.getInstance().options.getBackgroundOpacity(0.25f));
+        FiguraVec4 vec = LuaUtils.parseVec4("setBackgroundColor", r, g, b, a, 0, 0, 0,  0.25f);
         this.background = ColorUtils.rgbaToInt(vec);
         return this;
     }
@@ -178,7 +176,7 @@ public class EntityNameplateCustomization extends NameplateCustomization {
     @LuaWhitelist
     @LuaMethodDoc("nameplate_entity.get_light")
     public FiguraVec2 getLight() {
-        return light == null ? null : FiguraVec2.of(LightTexture.block(light), LightTexture.sky(light));
+        return light == null ? null : FiguraVec2.of(light >> 4 & 0xFFFF, light >> 20 & 0xFFFF);
     }
 
     @LuaWhitelist
@@ -202,7 +200,7 @@ public class EntityNameplateCustomization extends NameplateCustomization {
         }
 
         FiguraVec2 lightVec = LuaUtils.parseVec2("setLight", light, skyLight);
-        this.light = LightTexture.pack((int) lightVec.x, (int) lightVec.y);
+        this.light = ((int)lightVec.x) << 4 | ((int)lightVec.y) << 20;
         return this;
     }
 

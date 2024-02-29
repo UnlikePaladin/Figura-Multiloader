@@ -1,6 +1,6 @@
 package org.figuramc.figura.lua.api.net;
 
-import net.minecraft.network.chat.TextComponent;
+import net.minecraft.util.text.TextComponentString;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.HttpClient;
@@ -8,18 +8,18 @@ import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.client.methods.RequestBuilder;
 import org.apache.http.entity.InputStreamEntity;
 import org.apache.http.impl.client.HttpClients;
-import org.figuramc.figura.lua.api.data.FiguraBuffer;
-import org.figuramc.figura.lua.docs.LuaMethodOverload;
-import org.luaj.vm2.LuaError;
-import org.luaj.vm2.LuaTable;
-import org.luaj.vm2.LuaValue;
 import org.figuramc.figura.lua.LuaNotNil;
 import org.figuramc.figura.lua.LuaWhitelist;
 import org.figuramc.figura.lua.ReadOnlyLuaTable;
+import org.figuramc.figura.lua.api.data.FiguraBuffer;
 import org.figuramc.figura.lua.api.data.FiguraFuture;
 import org.figuramc.figura.lua.api.data.FiguraInputStream;
 import org.figuramc.figura.lua.docs.LuaMethodDoc;
+import org.figuramc.figura.lua.docs.LuaMethodOverload;
 import org.figuramc.figura.lua.docs.LuaTypeDoc;
+import org.luaj.vm2.LuaError;
+import org.luaj.vm2.LuaTable;
+import org.luaj.vm2.LuaValue;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -283,10 +283,10 @@ public class HttpRequestsAPI {
             try {
                 parent.parent.securityCheck(uri);
             } catch (NetworkingAPI.LinkNotAllowedException e) {
-                parent.parent.error(NetworkingAPI.LogSource.HTTP, new TextComponent(String.format("Tried to send %s request to not allowed link %s", method, uri)));
+                parent.parent.error(NetworkingAPI.LogSource.HTTP, new TextComponentString(String.format("Tried to send %s request to not allowed link %s", method, uri)));
                 throw e.luaError;
             }
-            parent.parent.log(NetworkingAPI.LogSource.HTTP, new TextComponent(String.format("Sent %s request to %s", method, uri)));
+            parent.parent.log(NetworkingAPI.LogSource.HTTP, new TextComponentString(String.format("Sent %s request to %s", method, uri)));
             HttpUriRequest req = this.getRequest();
             FiguraFuture<HttpResponse> future = new FiguraFuture<>();
             CompletableFuture<org.apache.http.HttpResponse> asyncResponse = sendAsyncRequest(req);
@@ -297,7 +297,7 @@ public class HttpRequestsAPI {
                         future.complete(new HttpResponse(new FiguraInputStream(response.getEntity().getContent()),
                                 response.getStatusLine().getStatusCode(), convertHeaders(response.getAllHeaders())));
                     } catch (IOException e) {
-                        parent.parent.log(NetworkingAPI.LogSource.HTTP, new TextComponent("Error while trying to read input from stream"));
+                        parent.parent.log(NetworkingAPI.LogSource.HTTP, new TextComponentString("Error while trying to read input from stream"));
                     }
                 }
             });

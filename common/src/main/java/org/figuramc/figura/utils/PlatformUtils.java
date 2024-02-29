@@ -2,11 +2,13 @@ package org.figuramc.figura.utils;
 
 import dev.architectury.injectables.annotations.ExpectPlatform;
 import net.minecraft.SharedConstants;
+import org.figuramc.figura.FiguraMod;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.function.Consumer;
 
@@ -86,4 +88,14 @@ public class PlatformUtils {
         return 0;
     }
 
+    public static void openWebLink(URI url) {
+        try {
+            Class<?> oclass = Class.forName("java.awt.Desktop");
+            Object object = oclass.getMethod("getDesktop").invoke(null);
+            oclass.getMethod("browse", URI.class).invoke(object, url);
+        } catch (Throwable var4) {
+            Throwable throwable = var4.getCause();
+            FiguraMod.LOGGER.error("Couldn't open link: {}", throwable == null ? "<UNKNOWN>" : throwable.getMessage());
+        }
+    }
 }

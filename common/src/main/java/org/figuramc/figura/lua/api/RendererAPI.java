@@ -1,9 +1,9 @@
 package org.figuramc.figura.lua.api;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.Mth;
-import net.minecraft.world.entity.Entity;
+import net.minecraft.entity.Entity;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.math.MathHelper;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.lua.LuaNotNil;
 import org.figuramc.figura.lua.LuaWhitelist;
@@ -68,8 +68,8 @@ public class RendererAPI {
     }
 
     private static boolean checkCameraOwner(UUID entity) {
-        Entity e = Minecraft.getInstance().getCameraEntity();
-        return e != null && e.getUUID().equals(entity);
+        Entity e = Minecraft.getMinecraft().getRenderViewEntity();
+        return e != null && e.getUniqueID().equals(entity);
     }
 
     @LuaWhitelist
@@ -193,7 +193,7 @@ public class RendererAPI {
             value = "renderer.set_shadow_radius"
     )
     public RendererAPI setShadowRadius(Float shadowRadius) {
-        this.shadowRadius = shadowRadius == null ? null : Mth.clamp(shadowRadius, 0f, 12f);
+        this.shadowRadius = shadowRadius == null ? null : MathHelper.clamp(shadowRadius, 0f, 12f);
         return this;
     }
 
@@ -211,13 +211,13 @@ public class RendererAPI {
     @LuaWhitelist
     @LuaMethodDoc("renderer.is_first_person")
     public boolean isFirstPerson() {
-        return checkCameraOwner(this.owner) && Minecraft.getInstance().options.getCameraType().isFirstPerson();
+        return checkCameraOwner(this.owner) && Minecraft.getMinecraft().gameSettings.thirdPersonView == 0;
     }
 
     @LuaWhitelist
     @LuaMethodDoc("renderer.is_camera_backwards")
     public boolean isCameraBackwards() {
-        return checkCameraOwner(this.owner) && Minecraft.getInstance().options.getCameraType().isMirrored();
+        return checkCameraOwner(this.owner) && Minecraft.getMinecraft().gameSettings.thirdPersonView == 2;
     }
 
     @LuaWhitelist
@@ -554,8 +554,8 @@ public class RendererAPI {
         }
 
         fireLayer1 = LuaUtils.parsePath(id);
-        if (fireLayer1.getPath().startsWith("textures/"))
-            fireLayer1 = new ResourceLocation(fireLayer1.getNamespace(), fireLayer1.getPath().substring("textures/".length()));
+        if (fireLayer1.getResourcePath().startsWith("textures/"))
+            fireLayer1 = new ResourceLocation(fireLayer1.getResourceDomain(), fireLayer1.getResourcePath().substring("textures/".length()));
 
         return this;
     }
@@ -576,8 +576,8 @@ public class RendererAPI {
         }
 
         fireLayer2 = LuaUtils.parsePath(id);
-        if (fireLayer2.getPath().startsWith("textures/"))
-            fireLayer2 = new ResourceLocation(fireLayer2.getNamespace(), fireLayer2.getPath().substring("textures/".length()));
+        if (fireLayer2.getResourcePath().startsWith("textures/"))
+            fireLayer2 = new ResourceLocation(fireLayer2.getResourceDomain(), fireLayer2.getResourcePath().substring("textures/".length()));
 
         return this;
     }

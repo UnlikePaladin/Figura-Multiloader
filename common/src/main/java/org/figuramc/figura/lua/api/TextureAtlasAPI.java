@@ -2,6 +2,7 @@ package org.figuramc.figura.lua.api;
 
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.client.renderer.texture.TextureMap;
 import net.minecraft.resources.ResourceLocation;
 import org.figuramc.figura.lua.LuaNotNil;
 import org.figuramc.figura.lua.LuaWhitelist;
@@ -22,9 +23,9 @@ import java.util.List;
 )
 public class TextureAtlasAPI {
 
-    private final TextureAtlas atlas;
+    private final TextureMap atlas;
 
-    public TextureAtlasAPI(TextureAtlas atlas) {
+    public TextureAtlasAPI(TextureMap atlas) {
         this.atlas = atlas;
     }
 

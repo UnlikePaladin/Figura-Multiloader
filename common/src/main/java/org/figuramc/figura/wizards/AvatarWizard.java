@@ -4,9 +4,8 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
-import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.client.resources.IResourceManager;
 import org.apache.commons.codec.binary.Base64;
 import org.figuramc.figura.avatar.local.LocalAvatarFetcher;
 import org.figuramc.figura.exporters.BlockBenchModel;
@@ -31,7 +30,7 @@ public class AvatarWizard {
     private static String capeTexture = "";
     private static byte[] iconTexture;
 
-    private static final BiFunction<ResourceManager, String, String> GET_TEXTURE_DATA = (manager, path) -> {
+    private static final BiFunction<IResourceManager, String, String> GET_TEXTURE_DATA = (manager, path) -> {
         byte[] bytes = ResourceUtils.getResource(manager, new FiguraIdentifier(path));
         return bytes != null ? Base64.encodeBase64String(bytes) : "";
     };
@@ -126,7 +125,7 @@ public class AvatarWizard {
                 .write("avatar.png", iconTexture);
 
         //open file manager
-        Util.getPlatform().openUri(folder.toUri());
+        PlatformUtils.openWebLink(folder.toUri());
     }
 
     private byte[] buildMetadata(String name) {
@@ -141,7 +140,7 @@ public class AvatarWizard {
 
         //authors
         String authorStr = (String) map.get(WizardEntry.AUTHORS);
-        String playerName = Minecraft.getInstance().player.getName().getString();
+        String playerName = Minecraft.getMinecraft().player.getName();
         String[] authors = authorStr == null ? new String[]{playerName} : authorStr.split(",");
         if (authors.length == 0) authors = new String[]{playerName};
 

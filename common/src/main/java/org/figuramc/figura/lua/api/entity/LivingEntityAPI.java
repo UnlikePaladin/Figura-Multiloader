@@ -1,22 +1,23 @@
 package org.figuramc.figura.lua.api.entity;
 
-import net.minecraft.util.Mth;
-import net.minecraft.world.entity.HumanoidArm;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.MobType;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.EnumCreatureAttribute;
+import net.minecraft.util.EnumHandSide;
 import org.figuramc.figura.lua.LuaWhitelist;
 import org.figuramc.figura.lua.api.world.ItemStackAPI;
 import org.figuramc.figura.lua.docs.LuaMethodDoc;
 import org.figuramc.figura.lua.docs.LuaMethodOverload;
 import org.figuramc.figura.lua.docs.LuaTypeDoc;
+import org.figuramc.figura.mixin.EntityPotionAccessor;
 import org.figuramc.figura.mixin.LivingEntityAccessor;
+import org.figuramc.figura.utils.MathUtils;
 
 @LuaWhitelist
 @LuaTypeDoc(
         name = "LivingEntityAPI",
         value = "living_entity"
 )
-public class LivingEntityAPI<T extends LivingEntity> extends EntityAPI<T> {
+public class LivingEntityAPI<T extends EntityLivingBase> extends EntityAPI<T> {
 
     public LivingEntityAPI(T entity) {
         super(entity);
@@ -36,7 +37,7 @@ public class LivingEntityAPI<T extends LivingEntity> extends EntityAPI<T> {
     public double getBodyYaw(Float delta) {
         checkEntity();
         if (delta == null) delta = 1f;
-        return Mth.lerp(delta, entity.yBodyRotO, entity.yBodyRot);
+        return MathUtils.lerp(delta, entity.prevRenderYawOffset, entity.renderYawOffset);
     }
 
     @LuaWhitelist
@@ -52,21 +53,21 @@ public class LivingEntityAPI<T extends LivingEntity> extends EntityAPI<T> {
     )
     public ItemStackAPI getHeldItem(boolean offhand) {
         checkEntity();
-        return ItemStackAPI.verify(offhand ? entity.getOffhandItem() : entity.getMainHandItem());
+        return ItemStackAPI.verify(offhand ? entity.getHeldItemOffhand() : entity.getHeldItemMainhand());
     }
 
     @LuaWhitelist
     @LuaMethodDoc("living_entity.get_active_item")
     public ItemStackAPI getActiveItem() {
         checkEntity();
-        return ItemStackAPI.verify(entity.getUseItem());
+        return ItemStackAPI.verify(entity.getActiveItemStack());
     }
 
     @LuaWhitelist
     @LuaMethodDoc("living_entity.get_active_item_time")
     public int getActiveItemTime() {
         checkEntity();
-        return entity.getTicksUsingItem();
+        return entity.getItemInUseMaxCount();
     }
 
     @LuaWhitelist
@@ -87,7 +88,7 @@ public class LivingEntityAPI<T extends LivingEntity> extends EntityAPI<T> {
     @LuaMethodDoc("living_entity.get_armor")
     public float getArmor() {
         checkEntity();
-        return entity.getArmorValue();
+        return entity.getTotalArmorValue();
     }
 
     @LuaWhitelist
@@ -101,63 +102,63 @@ public class LivingEntityAPI<T extends LivingEntity> extends EntityAPI<T> {
     @LuaMethodDoc("living_entity.get_arrow_count")
     public int getArrowCount() {
         checkEntity();
-        return entity.getArrowCount();
+        return entity.getArrowCountInEntity();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("living_entity.get_stinger_count")
     public int getStingerCount() {
         checkEntity();
-        return entity.getStingerCount();
+        return 0;
     }
 
     @LuaWhitelist
     @LuaMethodDoc("living_entity.is_left_handed")
     public boolean isLeftHanded() {
         checkEntity();
-        return entity.getMainArm() == HumanoidArm.LEFT;
+        return entity.getPrimaryHand() == EnumHandSide.LEFT;
     }
 
     @LuaWhitelist
     @LuaMethodDoc("living_entity.is_using_item")
     public boolean isUsingItem() {
         checkEntity();
-        return entity.isUsingItem();
+        return entity.isHandActive();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("living_entity.get_active_hand")
     public String getActiveHand() {
         checkEntity();
-        return entity.getUsedItemHand().name();
+        return entity.getActiveHand().name();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("living_entity.is_climbing")
     public boolean isClimbing() {
         checkEntity();
-        return entity.onClimbable();
+        return entity.isOnLadder();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("living_entity.get_swing_time")
     public int getSwingTime() {
       checkEntity();
-      return entity.swingTime;
+      return entity.swingProgressInt;
     }
 
     @LuaWhitelist
     @LuaMethodDoc("living_entity.is_swinging_arm")
     public boolean isSwingingArm() {
       checkEntity();
-      return entity.swinging;
+      return entity.isSwingInProgress;
     }
 
     @LuaWhitelist
     @LuaMethodDoc("living_entity.get_swing_arm")
     public String getSwingArm() {
       checkEntity();
-      return entity.swinging ? entity.swingingArm.name() : null;
+      return entity.isSwingInProgress ? entity.swingingHand.name() : null;
     }
 
     @LuaWhitelist
@@ -178,7 +179,7 @@ public class LivingEntityAPI<T extends LivingEntity> extends EntityAPI<T> {
     @LuaMethodDoc("living_entity.is_sensitive_to_water")
     public boolean isSensitiveToWater() {
         checkEntity();
-        return entity.isSensitiveToWater();
+        return EntityPotionAccessor.invokeIsWaterSensitiveEntity(entity);
     }
 
     @LuaWhitelist
@@ -186,14 +187,12 @@ public class LivingEntityAPI<T extends LivingEntity> extends EntityAPI<T> {
     public String getEntityCategory() {
         checkEntity();
 
-        MobType mobType = entity.getMobType(); // why it is not an enum
-        if (mobType == MobType.ARTHROPOD)
+        EnumCreatureAttribute mobType = entity.getCreatureAttribute(); // why it is not an enum
+        if (mobType == EnumCreatureAttribute.ARTHROPOD)
             return "ARTHROPOD";
-        if (mobType == MobType.UNDEAD)
+        if (mobType == EnumCreatureAttribute.UNDEAD)
             return "UNDEAD";
-        if (mobType == MobType.WATER)
-            return "WATER";
-        if (mobType == MobType.ILLAGER)
+        if (mobType == EnumCreatureAttribute.ILLAGER)
             return "ILLAGER";
 
         return "UNDEFINED";
@@ -203,33 +202,34 @@ public class LivingEntityAPI<T extends LivingEntity> extends EntityAPI<T> {
     @LuaMethodDoc("living_entity.is_gliding")
     public boolean isGliding() {
         checkEntity();
-        return entity.isFallFlying();
+        return entity.isElytraFlying();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("living_entity.is_blocking")
     public boolean isBlocking() {
         checkEntity();
-        return entity.isBlocking();
+        return entity.isActiveItemStackBlocking();
     }
 
+    // No swimming or riptide in 1.12
     @LuaWhitelist
     @LuaMethodDoc("living_entity.is_visually_swimming")
     public boolean isVisuallySwimming() {
         checkEntity();
-        return entity.isVisuallySwimming();
+        return false;
     }
 
     @LuaWhitelist
     @LuaMethodDoc("living_entity.riptide_spinning")
     public boolean riptideSpinning() {
         checkEntity();
-        return entity.isAutoSpinAttack();
+        return false;
     }
 
     @Override
     public String toString() {
         checkEntity();
-        return (entity.hasCustomName() ? entity.getCustomName().getString() + " (" + getType() + ")" : getType() ) + " (LivingEntity)";
+        return (entity.hasCustomName() ? entity.getCustomNameTag() + " (" + getType() + ")" : getType() ) + " (LivingEntity)";
     }
 }

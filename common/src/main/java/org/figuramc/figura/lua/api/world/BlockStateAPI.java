@@ -1,8 +1,13 @@
 package org.figuramc.figura.lua.api.world;
 
+import net.minecraft.block.Block;
+import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.BlockRendererDispatcher;
+import net.minecraft.client.renderer.EnumFaceDirection;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
 import net.minecraft.client.renderer.block.model.BakedQuad;
+import net.minecraft.client.renderer.block.model.IBakedModel;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.resources.model.BakedModel;
@@ -10,11 +15,20 @@ import net.minecraft.commands.arguments.blocks.BlockStateParser;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Registry;
+import net.minecraft.item.Item;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTUtil;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.EnumBlockRenderType;
+import net.minecraft.util.EnumFacing;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.math.AxisAlignedBB;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.RenderShape;
@@ -36,6 +50,7 @@ import org.figuramc.figura.math.vector.FiguraVec3;
 import org.figuramc.figura.mixin.BlockBehaviourAccessor;
 import org.figuramc.figura.utils.ColorUtils;
 import org.figuramc.figura.utils.LuaUtils;
+import org.figuramc.figura.utils.RegistryUtils;
 import org.luaj.vm2.LuaTable;
 
 import java.util.*;
@@ -47,7 +62,7 @@ import java.util.*;
 )
 public class BlockStateAPI {
 
-    public final BlockState blockState;
+    public final IBlockState blockState;
     private BlockPos pos;
 
     @LuaWhitelist
@@ -57,23 +72,22 @@ public class BlockStateAPI {
     @LuaFieldDoc("blockstate.properties")
     public final LuaTable properties;
 
-    public BlockStateAPI(BlockState blockstate, BlockPos pos) {
+    public BlockStateAPI(IBlockState blockstate, BlockPos pos) {
         this.blockState = blockstate;
         this.pos = pos;
-        this.id = Registry.BLOCK.getKey(blockstate.getBlock()).toString();
+        this.id = RegistryUtils.getResourceLocationForRegistryObj(Block.class, blockstate.getBlock()).toString();
 
-        CompoundTag tag = NbtUtils.writeBlockState(blockstate);
-        this.properties = new ReadOnlyLuaTable(tag.contains("Properties") ? NbtToLua.convert(tag.get("Properties")) : new LuaTable());
+        NBTTagCompound tag = NBTUtil.writeBlockState(new NBTTagCompound(), blockstate);
+        this.properties = new ReadOnlyLuaTable(tag.hasKey("Properties") ? NbtToLua.convert(tag.getTag("Properties")) : new LuaTable());
     }
 
     protected BlockPos getBlockPos() {
-        return pos == null ? BlockPos.ZERO : pos;
+        return pos == null ? BlockPos.ORIGIN : pos;
     }
 
-    protected static List<List<FiguraVec3>> voxelShapeToTable(VoxelShape shape) {
+    protected static List<List<FiguraVec3>> voxelShapeToTable(AxisAlignedBB shape) {
         List<List<FiguraVec3>> shapes = new ArrayList<>();
-        for (AABB aabb : shape.toAabbs())
-            shapes.add(Arrays.asList(FiguraVec3.of(aabb.minX, aabb.minY, aabb.minZ), FiguraVec3.of(aabb.maxX, aabb.maxY, aabb.maxZ)));
+        shapes.add(Arrays.asList(FiguraVec3.of(shape.minX, shape.minY, shape.minZ), FiguraVec3.of(shape.maxX, shape.maxY, shape.maxZ)));
         return shapes;
     }
 
@@ -130,7 +144,7 @@ public class BlockStateAPI {
     @LuaWhitelist
     @LuaMethodDoc("blockstate.get_opacity")
     public int getOpacity() {
-        return blockState.getLightBlock(WorldAPI.getCurrentWorld(), getBlockPos());
+        return blockState.getPackedLightmapCoords(WorldAPI.getCurrentWorld(), getBlockPos());
     }
 
     @LuaWhitelist
@@ -148,7 +162,7 @@ public class BlockStateAPI {
     @LuaWhitelist
     @LuaMethodDoc("blockstate.is_full_cube")
     public boolean isFullCube() {
-        return blockState.isCollisionShapeFullBlock(WorldAPI.getCurrentWorld(), getBlockPos());
+        return blockState.getBlock().isFullCube(WorldAPI.getCurrentWorld(), getBlockPos());
     }
 
     @LuaWhitelist
@@ -239,13 +253,13 @@ public class BlockStateAPI {
     @LuaWhitelist
     @LuaMethodDoc("blockstate.has_collision")
     public boolean hasCollision() {
-        return ((BlockBehaviourAccessor) blockState.getBlock()).hasCollision();
+        return blockState.getBlock().isCollidable();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("blockstate.get_collision_shape")
     public List<List<FiguraVec3>> getCollisionShape() {
-        return voxelShapeToTable(blockState.getCollisionShape(WorldAPI.getCurrentWorld(), getBlockPos()));
+        return voxelShapeToTable(blockState.getCollisionBoundingBox(WorldAPI.getCurrentWorld(), getBlockPos()));
     }
 
     @LuaWhitelist
@@ -286,13 +300,13 @@ public class BlockStateAPI {
     @LuaWhitelist
     @LuaMethodDoc("blockstate.get_entity_data")
     public LuaTable getEntityData() {
-        BlockEntity entity = WorldAPI.getCurrentWorld().getBlockEntity(getBlockPos());
+        TileEntity entity = WorldAPI.getCurrentWorld().getTileEntity(getBlockPos());
         if (entity != null) {
-            CompoundTag tag = entity.save(new CompoundTag());
-            tag.remove("id");
-            tag.remove("x");
-            tag.remove("y");
-            tag.remove("z");
+            NBTTagCompound tag = entity.writeToNBT(new NBTTagCompound());
+            tag.removeTag("id");
+            tag.removeTag("x");
+            tag.removeTag("y");
+            tag.removeTag("z");
             return (LuaTable) NbtToLua.convert(tag);
         }
         return null;
@@ -301,13 +315,13 @@ public class BlockStateAPI {
     @LuaWhitelist
     @LuaMethodDoc("blockstate.to_state_string")
     public String toStateString() {
-        BlockEntity entity = WorldAPI.getCurrentWorld().getBlockEntity(getBlockPos());
-        CompoundTag tag = entity != null ? entity.save(new CompoundTag()) : new CompoundTag();
+        TileEntity entity = WorldAPI.getCurrentWorld().getTileEntity(getBlockPos());
+        NBTTagCompound tag = entity != null ? entity.writeToNBT(new NBTTagCompound()) : new NBTTagCompound();
         if (entity != null) {
-            tag.remove("id");
-            tag.remove("x");
-            tag.remove("y");
-            tag.remove("z");
+            tag.removeTag("id");
+            tag.removeTag("x");
+            tag.removeTag("y");
+            tag.removeTag("z");
         }
         return BlockStateParser.serialize(blockState) + tag;
     }
@@ -317,23 +331,23 @@ public class BlockStateAPI {
     public HashMap<String, Set<String>> getTextures() {
         HashMap<String, Set<String>> map = new HashMap<>();
 
-        RenderShape renderShape = blockState.getRenderShape();
+        EnumBlockRenderType renderShape = blockState.getRenderType();
 
-        if (renderShape == RenderShape.MODEL) {
-            BlockRenderDispatcher blockRenderer = Minecraft.getInstance().getBlockRenderer();
+        if (renderShape == EnumBlockRenderType.MODEL) {
+            BlockRendererDispatcher blockRenderer = Minecraft.getMinecraft().getBlockRendererDispatcher();
 
-            BakedModel bakedModel = blockRenderer.getBlockModel(blockState);
+            IBakedModel bakedModel = blockRenderer.getModelForState(blockState);
             Random randomSource = new Random();
             long seed = 42L;
 
-            for (Direction direction : Direction.values())
+            for (EnumFacing direction : EnumFacing.values())
                 map.put(direction.name(), getTexturesForFace(blockState, direction, randomSource, bakedModel, seed));
             map.put("NONE", getTexturesForFace(blockState, null, randomSource, bakedModel, seed));
 
-            TextureAtlasSprite particle = blockRenderer.getBlockModelShaper().getParticleIcon(blockState);
+            TextureAtlasSprite particle = blockRenderer.getBlockModelShapes().getTexture(blockState);
             map.put("PARTICLE", Collections.singleton(getTextureName(particle)));
-        } else if (renderShape == RenderShape.ENTITYBLOCK_ANIMATED) {
-            map.put("PARTICLE", Collections.singleton((getTextureName(Minecraft.getInstance().getItemRenderer().getModel(blockState.getBlock().asItem().getDefaultInstance(), WorldAPI.getCurrentWorld(), null).getParticleIcon()))));
+        } else if (renderShape == EnumBlockRenderType.ENTITYBLOCK_ANIMATED) {
+            map.put("PARTICLE", Collections.singleton((getTextureName(Minecraft.getMinecraft().getRenderItem().getItemModelMesher().getItemModel(Item.getItemFromBlock(blockState.getBlock()).getDefaultInstance()).getParticleTexture()))));
         }
         return map;
     }
@@ -344,9 +358,9 @@ public class BlockStateAPI {
         return blockState.isAir();
     }
 
-    private static Set<String> getTexturesForFace(BlockState blockState, Direction direction, Random randomSource, BakedModel bakedModel, long seed) {
+    private static Set<String> getTexturesForFace(IBlockState blockState, EnumFacing direction, Random randomSource, IBakedModel bakedModel, long seed) {
         randomSource.setSeed(seed);
-        List<BakedQuad> quads = bakedModel.getQuads(blockState, direction, randomSource);
+        List<BakedQuad> quads = bakedModel.getQuads(blockState, direction, randomSource.nextLong());
         Set<String> textures = new HashSet<>();
 
         for (BakedQuad quad : quads)
@@ -356,8 +370,8 @@ public class BlockStateAPI {
     }
 
     private static String getTextureName(TextureAtlasSprite sprite) {
-        ResourceLocation location = sprite.getName(); // do not close it
-        return location.getNamespace() + ":textures/" + location.getPath();
+        ResourceLocation location = new ResourceLocation(sprite.getIconName()); // do not close it
+        return location.getResourceDomain() + ":textures/" + location.getResourcePath();
     }
 
     @LuaWhitelist

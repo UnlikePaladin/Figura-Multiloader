@@ -1,7 +1,6 @@
 package org.figuramc.figura.lua.api.net;
 
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TextComponent;
+import net.minecraft.util.text.TextComponentString;
 import org.figuramc.figura.lua.LuaNotNil;
 import org.figuramc.figura.lua.LuaWhitelist;
 import org.figuramc.figura.lua.api.data.FiguraFuture;
@@ -36,7 +35,7 @@ public class SocketAPI {
         try {
             parent.securityCheck(host);
         } catch (NetworkingAPI.LinkNotAllowedException e) {
-            parent.error(NetworkingAPI.LogSource.SOCKET, new TextComponent(String.format("Tried to establish connection to not allowed host %s", host)));
+            parent.error(NetworkingAPI.LogSource.SOCKET, new TextComponentString(String.format("Tried to establish connection to not allowed host %s", host)));
             throw e.luaError;
         }
         int maxSockets = parent.owner.permissions.get(Permissions.MAX_SOCKETS);
@@ -47,7 +46,7 @@ public class SocketAPI {
             try {
                 FiguraSocket socket = new FiguraSocket(host, port, parent.owner);
                 parent.owner.openSockets.add(socket);
-                parent.log(NetworkingAPI.LogSource.SOCKET, new TextComponent(String.format("Established connection to host %s", host)));
+                parent.log(NetworkingAPI.LogSource.SOCKET, new TextComponentString(String.format("Established connection to host %s", host)));
                 return socket;
             } catch (IOException e) {
                 throw new LuaError(e);

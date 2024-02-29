@@ -7,6 +7,7 @@ import com.google.gson.JsonPrimitive;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.text.ITextComponent;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.gui.screens.NetworkFilterScreen;
 import org.figuramc.figura.lua.api.net.NetworkingAPI;
@@ -23,8 +24,8 @@ public abstract class ConfigType<T> {
     public final boolean hidden;
 
     // display
-    public Component name;
-    public Component tooltip;
+    public ITextComponent name;
+    public ITextComponent tooltip;
 
     // values
     public T value;
@@ -161,7 +162,7 @@ public abstract class ConfigType<T> {
 
 
     public static class EnumConfig extends ParentedConfig<Integer> {
-        public List<Component> enumList, enumTooltip;
+        public List<ITextComponent> enumList, enumTooltip;
 
         public EnumConfig(String name, Category category, int defaultValue, int length) {
             super(name, category, defaultValue);
@@ -169,8 +170,8 @@ public abstract class ConfigType<T> {
             name = "config." + name;
 
             // generate enum list
-            ArrayList<Component> enumList = new ArrayList<>();
-            ArrayList<Component> enumTooltip = new ArrayList<>();
+            ArrayList<ITextComponent> enumList = new ArrayList<>();
+            ArrayList<ITextComponent> enumTooltip = new ArrayList<>();
 
             for (int i = 1; i <= length; i++) {
                 enumList.add(new FiguraText(name + "." + i));
@@ -298,11 +299,11 @@ public abstract class ConfigType<T> {
 
 
     public static class KeybindConfig extends ParentedConfig<String> {
-        public ConfigKeyBind keyBind;
+        public ConfigKeyBinding keyBind;
 
         public KeybindConfig(String name, Category category, String defaultValue) {
             super(name, category, defaultValue);
-            this.keyBind = new ConfigKeyBind(this.name.getString(), InputConstants.getKey(defaultValue), this);
+            this.keyBind = new ConfigKeyBinding(this.name.getUnformattedText(), InputConstants.getKey(defaultValue), this);
         }
 
         @Override
@@ -337,8 +338,8 @@ public abstract class ConfigType<T> {
         private final ArrayList<NetworkingAPI.Filter> filters = new ArrayList<>();
         public NetworkFilterConfig(String name, Category category) {
             super(name, category, () -> {
-                Minecraft mc = Minecraft.getInstance();
-                mc.setScreen(new NetworkFilterScreen(mc.screen));
+                Minecraft mc = Minecraft.getMinecraft();
+                mc.displayGuiScreen(new NetworkFilterScreen(mc.currentScreen));
             });
         }
         public ArrayList<NetworkingAPI.Filter> getFilters() {

@@ -1,6 +1,6 @@
 package org.figuramc.figura.lua.api.nameplate;
 
-import net.minecraft.network.chat.Component;
+import net.minecraft.util.text.ITextComponent;
 import org.figuramc.figura.avatar.Badges;
 import org.figuramc.figura.font.Emojis;
 import org.figuramc.figura.lua.LuaWhitelist;
@@ -17,11 +17,11 @@ import org.luaj.vm2.LuaError;
 )
 public class NameplateCustomization {
 
-    private Component json;
+    private ITextComponent json;
     private String text;
 
-    private Component parseJsonText(String text) {
-        Component component = TextUtils.tryParseJson(text);
+    private ITextComponent parseJsonText(String text) {
+        ITextComponent component = TextUtils.tryParseJson(text);
         component = Badges.noBadges4U(component);
         component = TextUtils.removeClickableObjects(component);
         component = Emojis.applyEmojis(component);
@@ -29,7 +29,7 @@ public class NameplateCustomization {
         return component;
     }
 
-    public Component getJson() {
+    public ITextComponent getJson() {
         return json;
     }
 
@@ -50,8 +50,8 @@ public class NameplateCustomization {
     public NameplateCustomization setText(String text) {
         this.text = text;
         if (text != null) {
-            Component component = parseJsonText(text);
-            if (component.getString().length() > 64)
+            ITextComponent component = parseJsonText(text);
+            if (component.getUnformattedText().length() > 64)
                 throw new LuaError("Text length exceeded limit of 64 characters");
             json = component;
         } else {

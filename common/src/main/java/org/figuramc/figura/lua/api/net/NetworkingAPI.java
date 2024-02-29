@@ -1,23 +1,26 @@
 package org.figuramc.figura.lua.api.net;
 
-import net.minecraft.ChatFormatting;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.network.chat.TextComponent;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.Style;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextFormatting;
 import org.figuramc.figura.FiguraMod;
-import org.figuramc.figura.lua.docs.LuaMethodOverload;
-import org.figuramc.figura.utils.ColorUtils;
-import org.luaj.vm2.LuaError;
-import org.luaj.vm2.LuaValue;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.config.Configs;
 import org.figuramc.figura.lua.LuaWhitelist;
 import org.figuramc.figura.lua.docs.LuaFieldDoc;
 import org.figuramc.figura.lua.docs.LuaMethodDoc;
+import org.figuramc.figura.lua.docs.LuaMethodOverload;
 import org.figuramc.figura.lua.docs.LuaTypeDoc;
 import org.figuramc.figura.permissions.Permissions;
+import org.figuramc.figura.utils.ColorUtils;
+import org.luaj.vm2.LuaError;
+import org.luaj.vm2.LuaValue;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.LocalDate;
@@ -96,15 +99,15 @@ public class NetworkingAPI {
         }
     }
 
-    void log(LogSource source, Component text) {
+    void log(LogSource source, ITextComponent text) {
         // 0 - FILE, 1 - FILE + LOGGER, 2 - FILE + LOGGER + CHAT, 3 - NONE
         int log = Configs.LOG_NETWORKING.value;
         if (log == 3) return;
-        MutableComponent finalText =
-                new TextComponent(String.format("[networking:%s:%s] ", source.name().toLowerCase(),owner.entityName))
-                        .withStyle(ColorUtils.Colors.LUA_PING.style)
-                        .append(text.copy().withStyle(ChatFormatting.WHITE));
-        String logTextString = finalText.getString();
+        ITextComponent finalText =
+                new TextComponentString(String.format("[networking:%s:%s] ", source.name().toLowerCase(),owner.entityName))
+                        .setStyle(ColorUtils.Colors.LUA_PING.style)
+                        .appendSibling(text.createCopy().setStyle(new Style().setColor(TextFormatting.WHITE)));
+        String logTextString = finalText.getUnformattedText();
         switch (log) {
             case 2:
                 FiguraMod.sendChatMessage(finalText);
@@ -117,21 +120,21 @@ public class NetworkingAPI {
         try {
             LocalTime t = LocalTime.now();
             writeToLogStream(String.format("[%02d:%02d:%02d] [INFO] %s\n", t.getHour(), t.getMinute(),
-                    t.getSecond(), finalText.getString()));
+                    t.getSecond(), finalText.getUnformattedText()));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
-    void error(LogSource source, Component text) {
+    void error(LogSource source, ITextComponent text) {
         // 0 - FILE, 1 - FILE + LOGGER, 2 - FILE + LOGGER + CHAT, 3 - NONE
         int log = Configs.LOG_NETWORKING.value;
         if (log == 3) return;
-        MutableComponent finalText =
-                new TextComponent(String.format("[networking:%s:%s] ", source.name().toLowerCase(),owner.entityName))
-                        .withStyle(ColorUtils.Colors.LUA_ERROR.style)
-                        .append(text.copy().withStyle(ChatFormatting.WHITE));
-        String logTextString = finalText.getString();
+        ITextComponent finalText =
+                new TextComponentString(String.format("[networking:%s:%s] ", source.name().toLowerCase(),owner.entityName))
+                        .setStyle(ColorUtils.Colors.LUA_ERROR.style)
+                        .appendSibling(text.createCopy().setStyle(new Style().setColor(TextFormatting.WHITE)));
+        String logTextString = finalText.getUnformattedText();
         switch (log) {
             case 2:
                 FiguraMod.sendChatMessage(finalText);
@@ -144,7 +147,7 @@ public class NetworkingAPI {
         try {
             LocalTime t = LocalTime.now();
             writeToLogStream(String.format("[%02d:%02d:%02d] [ERROR] %s\n", t.getHour(), t.getMinute(),
-                    t.getSecond(), finalText.getString()));
+                    t.getSecond(), finalText.getUnformattedText()));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

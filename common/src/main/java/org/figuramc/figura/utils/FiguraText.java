@@ -1,10 +1,9 @@
 package org.figuramc.figura.utils;
 
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.network.chat.TranslatableComponent;
+import net.minecraft.util.text.TextComponentTranslation;
 import org.figuramc.figura.FiguraMod;
 
-public class FiguraText extends TranslatableComponent {
+public class FiguraText extends TextComponentTranslation {
 
     public FiguraText() {
         super(FiguraMod.MOD_ID);

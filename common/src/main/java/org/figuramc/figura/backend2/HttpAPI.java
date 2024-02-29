@@ -38,8 +38,8 @@ public class HttpAPI {
     }
 
     protected static String getBackendAddress() {
-        ServerAddress backendIP = ServerAddress.parseString(Configs.SERVER_IP.value);
-        return "https://" + backendIP.getHost() + "/api";
+        ServerAddress backendIP = ServerAddress.fromString(Configs.SERVER_IP.value);
+        return "https://" + backendIP.getIP() + "/api";
     }
 
     protected HttpRequestBase header(String url) {

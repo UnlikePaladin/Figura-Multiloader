@@ -7,6 +7,7 @@ import net.minecraft.client.particle.Particle;
 import net.minecraft.commands.arguments.ParticleArgument;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.Registry;
+import net.minecraft.util.EnumParticleTypes;
 import org.figuramc.figura.lua.LuaNotNil;
 import org.figuramc.figura.lua.LuaWhitelist;
 import org.luaj.vm2.LuaError;
@@ -35,13 +36,14 @@ public class ParticleAPI {
     }
 
     public static ParticleEngineAccessor getParticleEngine() {
-        return (ParticleEngineAccessor) Minecraft.getInstance().particleEngine;
+        return (ParticleEngineAccessor) Minecraft.getMinecraft().effectRenderer;
     }
 
     private LuaParticle generate(String id, double x, double y, double z, double w, double t, double h) {
         try {
+            EnumParticleTypes particleType = EnumParticleTypes.getByName(id);
             ParticleOptions options = ParticleArgument.readParticle(new StringReader(id));
-            Particle p = getParticleEngine().figura$makeParticle(options, x, y, z, w, t, h);
+            Particle p = getParticleEngine().figura$makeParticle(particleType, x, y, z, w, t, h);
             if (p == null) throw new LuaError("Could not parse particle \"" + id + "\"");
             return new LuaParticle(id, p, owner);
         } catch (Exception e) {

@@ -2,12 +2,21 @@ package org.figuramc.figura.lua.api.world;
 
 import com.mojang.brigadier.StringReader;
 import com.mojang.datafixers.util.Pair;
+import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.WorldClient;
 import net.minecraft.commands.arguments.blocks.BlockStateArgument;
 import net.minecraft.commands.arguments.item.ItemArgument;
 import net.minecraft.core.BlockPos;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.init.Blocks;
+import net.minecraft.item.ItemStack;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.core.RegistryAccess;
+import net.minecraft.util.EnumFacing;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.EnumSkyBlock;
+import net.minecraft.world.World;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.ProjectileUtil;
 import net.minecraft.world.item.CompassItem;
@@ -36,6 +45,7 @@ import org.figuramc.figura.math.vector.FiguraVec2;
 import org.figuramc.figura.math.vector.FiguraVec3;
 import org.figuramc.figura.utils.EntityUtils;
 import org.figuramc.figura.utils.LuaUtils;
+import org.figuramc.figura.utils.Pair;
 import org.luaj.vm2.LuaError;
 import org.luaj.vm2.LuaTable;
 
@@ -50,8 +60,8 @@ public class WorldAPI {
 
     public static final WorldAPI INSTANCE = new WorldAPI();
 
-    public static Level getCurrentWorld() {
-        return Minecraft.getInstance().level;
+    public static WorldClient getCurrentWorld() {
+        return Minecraft.getMinecraft().world;
     }
 
     @LuaWhitelist
@@ -91,9 +101,9 @@ public class WorldAPI {
     public static BlockStateAPI getBlockState(Object x, Double y, Double z) {
         FiguraVec3 pos = LuaUtils.parseVec3("getBlockState", x, y, z);
         BlockPos blockPos = pos.asBlockPos();
-        Level world = getCurrentWorld();
-        if (!world.hasChunkAt(blockPos))
-            return new BlockStateAPI(Blocks.VOID_AIR.defaultBlockState(), blockPos);
+        World world = getCurrentWorld();
+        if (!world.isBlockLoaded(blockPos))
+            return new BlockStateAPI(Blocks.AIR.getDefaultState(), blockPos);
         return new BlockStateAPI(world.getBlockState(blockPos), blockPos);
     }
     @SuppressWarnings("deprecation")
@@ -114,8 +124,8 @@ public class WorldAPI {
     public static boolean isChunkLoaded(Object x, Double y, Double z) {
         FiguraVec3 pos = LuaUtils.parseVec3("getBlockState", x, y, z);
         BlockPos blockPos = pos.asBlockPos();
-        Level world = getCurrentWorld();
-        return world.hasChunkAt(blockPos);
+        World world = getCurrentWorld();
+        return world.isBlockLoaded(blockPos);
     }
 
     @SuppressWarnings("deprecation")
@@ -153,11 +163,11 @@ public class WorldAPI {
                 Math.min(min.getZ() + 8, max.getZ())
         );
 
-        Level world = getCurrentWorld();
-        if (!world.hasChunksAt(min, max))
+        World world = getCurrentWorld();
+        if (!world.isAreaLoaded(min, max))
             return list;
 
-        BlockPos.betweenClosedStream(min, max).forEach(blockPos -> {
+        BlockPos.getAllInBox(min, max).forEach(blockPos -> {
             BlockPos pos = new BlockPos(blockPos);
             list.add(new BlockStateAPI(world.getBlockState(pos), pos));
         });
@@ -181,9 +191,10 @@ public class WorldAPI {
     public static int getRedstonePower(Object x, Double y, Double z) {
         FiguraVec3 pos = LuaUtils.parseVec3("getRedstonePower", x, y, z);
         BlockPos blockPos = pos.asBlockPos();
-        if (getCurrentWorld().getChunkAt(blockPos) == null)
+        if (getCurrentWorld().getChunkFromBlockCoords(blockPos) == null)
             return 0;
-        return getCurrentWorld().getBestNeighborSignal(blockPos);
+        //TODO: Check if this introduces issues, it has no args on modern
+        return getCurrentWorld().getRedstonePower(blockPos, EnumFacing.NORTH);
     }
 
     @LuaWhitelist
@@ -220,7 +231,7 @@ public class WorldAPI {
             value = "world.get_time"
     )
     public static double getTime(double delta) {
-        return getCurrentWorld().getGameTime() + delta;
+        return getCurrentWorld().getTotalWorldTime() + delta;
     }
 
     @LuaWhitelist
@@ -235,7 +246,7 @@ public class WorldAPI {
             value = "world.get_time_of_day"
     )
     public static double getTimeOfDay(double delta) {
-        return getCurrentWorld().getDayTime() + delta;
+        return getCurrentWorld().getWorldTime() + delta;
     }
 
     @LuaWhitelist
@@ -260,7 +271,7 @@ public class WorldAPI {
     )
     public static double getRainGradient(Float delta) {
         if (delta == null) delta = 1f;
-        return getCurrentWorld().getRainLevel(delta);
+        return getCurrentWorld().getRainStrength(delta);
     }
 
     @LuaWhitelist
@@ -286,11 +297,11 @@ public class WorldAPI {
     public static Integer getLightLevel(Object x, Double y, Double z) {
         FiguraVec3 pos = LuaUtils.parseVec3("getLightLevel", x, y, z);
         BlockPos blockPos = pos.asBlockPos();
-        Level world = getCurrentWorld();
-        if (world.getChunkAt(blockPos) == null)
+        World world = getCurrentWorld();
+        if (world.getChunkFromBlockCoords(blockPos) == null)
             return null;
-        world.updateSkyBrightness();
-        return world.getLightEngine().getRawBrightness(blockPos, world.getSkyDarken());
+        world.calculateInitialSkylight();
+        return world.getChunkFromBlockCoords(blockPos).getLightSubtracted(blockPos, world.getSkylightSubtracted());
     }
 
     @LuaWhitelist
@@ -310,10 +321,10 @@ public class WorldAPI {
     public static Integer getSkyLightLevel(Object x, Double y, Double z) {
         FiguraVec3 pos = LuaUtils.parseVec3("getSkyLightLevel", x, y, z);
         BlockPos blockPos = pos.asBlockPos();
-        Level world = getCurrentWorld();
-        if (world.getChunkAt(blockPos) == null)
+        World world = getCurrentWorld();
+        if (world.getChunkFromBlockCoords(blockPos) == null)
             return null;
-        return world.getBrightness(LightLayer.SKY, blockPos);
+        return world.getLightFor(EnumSkyBlock.SKY, blockPos);
     }
 
     @LuaWhitelist
@@ -333,10 +344,10 @@ public class WorldAPI {
     public static Integer getBlockLightLevel(Object x, Double y, Double z) {
         FiguraVec3 pos = LuaUtils.parseVec3("getBlockLightLevel", x, y, z);
         BlockPos blockPos = pos.asBlockPos();
-        Level world = getCurrentWorld();
-        if (world.getChunkAt(blockPos) == null)
+        World world = getCurrentWorld();
+        if (world.getChunkFromBlockCoords(blockPos) == null)
             return null;
-        return world.getBrightness(LightLayer.BLOCK, blockPos);
+        return world.getLightFor(EnumSkyBlock.BLOCK, blockPos);
     }
 
     @LuaWhitelist
@@ -355,20 +366,13 @@ public class WorldAPI {
     )
     public static Integer getHeight(Object x, Double z, String heightmap) {
         FiguraVec2 pos = LuaUtils.parseVec2("getHeight", x, z);
-        Level world = getCurrentWorld();
+        World world = getCurrentWorld();
 
         BlockPos blockPos = new BlockPos((int) pos.x(), 0, (int) pos.y());
-        if (world.getChunkAt(blockPos) == null)
+        if (world.getChunkFromBlockCoords(blockPos) == null)
             return null;
 
-        Heightmap.Types heightmapType;
-        try {
-            heightmapType = heightmap != null ? Heightmap.Types.valueOf(heightmap.toUpperCase()) : Heightmap.Types.MOTION_BLOCKING;
-        } catch (IllegalArgumentException e) {
-            throw new LuaError("Invalid heightmap type provided");
-        }
-
-        return world.getHeight(heightmapType, (int) pos.x(), (int) pos.y());
+        return world.getHeight((int) pos.x(), (int) pos.y());
     }
 
     @LuaWhitelist
@@ -388,8 +392,8 @@ public class WorldAPI {
     public static Boolean isOpenSky(Object x, Double y, Double z) {
         FiguraVec3 pos = LuaUtils.parseVec3("isOpenSky", x, y, z);
         BlockPos blockPos = pos.asBlockPos();
-        Level world = getCurrentWorld();
-        if (world.getChunkAt(blockPos) == null)
+        World world = getCurrentWorld();
+        if (world.getChunkFromBlockCoords(blockPos) == null)
             return null;
         return world.canSeeSky(blockPos);
     }
@@ -397,7 +401,7 @@ public class WorldAPI {
     @LuaWhitelist
     @LuaMethodDoc("world.get_dimension")
     public static String getDimension() {
-        Level world = getCurrentWorld();
+        World world = getCurrentWorld();
         return world.dimension().location().toString();
     }
 
@@ -405,8 +409,8 @@ public class WorldAPI {
     @LuaMethodDoc("world.get_players")
     public static Map<String, EntityAPI<?>> getPlayers() {
         HashMap<String, EntityAPI<?>> playerList = new HashMap<>();
-        for (Player player : getCurrentWorld().players())
-            playerList.put(player.getName().getString(), PlayerAPI.wrap(player));
+        for (EntityPlayer player : getCurrentWorld().playerEntities)
+            playerList.put(player.getName(), PlayerAPI.wrap(player));
         return playerList;
     }
 
@@ -458,8 +462,8 @@ public class WorldAPI {
     public static BlockStateAPI newBlock(@LuaNotNil String string, Object x, Double y, Double z) {
         BlockPos pos = LuaUtils.parseVec3("newBlock", x, y, z).asBlockPos();
         try {
-            Level level = getCurrentWorld();
-            BlockState block = new BlockStateArgument().parse(new StringReader(string)).getState();
+            World level = getCurrentWorld();
+            IBlockState block = new BlockStateArgument().parse(new StringReader(string)).getState();
             return new BlockStateAPI(block, pos);
         } catch (Exception e) {
             throw new LuaError("Could not parse block state from string: " + string);
@@ -486,12 +490,12 @@ public class WorldAPI {
     )
     public static ItemStackAPI newItem(@LuaNotNil String string, Integer count, Integer damage) {
         try {
-            Level level = getCurrentWorld();
+            World level = getCurrentWorld();
             ItemStack item = new ItemArgument().parse(new StringReader(string)).createItemStack(1, false);
             if (count != null)
                 item.setCount(count);
             if (damage != null)
-                item.setDamageValue(damage);
+                item.setItemDamage(damage);
             return new ItemStackAPI(item);
         } catch (Exception e) {
             throw new LuaError("Could not parse item stack from string: " + string);
@@ -507,16 +511,16 @@ public class WorldAPI {
     @LuaWhitelist
     @LuaMethodDoc("world.get_build_height")
     public static int[] getBuildHeight() {
-        Level world = getCurrentWorld();
-        return new int[]{0, world.getMaxBuildHeight()};
+        World world = getCurrentWorld();
+        return new int[]{0, world.getHeight()};
     }
 
     @LuaWhitelist
     @LuaMethodDoc("world.get_spawn_point")
     public static FiguraVec3 getSpawnPoint() {
-        Level world = getCurrentWorld();
-        LevelData levelData = world.getLevelData();
-        return FiguraVec3.fromBlockPos(new BlockPos(levelData.getXSpawn(), levelData.getYSpawn(), levelData.getZSpawn()));
+        World world = getCurrentWorld();
+        LevelData levelData = world.getSpawnPoint();
+        return FiguraVec3.fromBlockPos(new BlockPos(world.getSpawnPoint().getX(), world.getSpawnPoint().getY(), world.getSpawnPoint().getZ()));
     }
 
     @Override

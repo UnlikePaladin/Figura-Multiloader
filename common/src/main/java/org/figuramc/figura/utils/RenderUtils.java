@@ -10,11 +10,14 @@ import dev.architectury.injectables.annotations.ExpectPlatform;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.HumanoidModel;
+import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.RenderStateShard;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.layers.HumanoidArmorLayer;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
@@ -27,6 +30,8 @@ import org.figuramc.figura.mixin.render.GlStateManagerAccessor;
 import org.figuramc.figura.model.ParentType;
 import org.figuramc.figura.permissions.Permissions;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.util.vector.Vector3f;
+import org.lwjgl.util.vector.Vector4f;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.function.Function;
@@ -57,14 +62,14 @@ public class RenderUtils {
         ResourceLocation layer2 = avatar.luaRuntime.renderer.fireLayer2;
 
         if (layer2 != null)
-            return Minecraft.getInstance().getTextureAtlas(InventoryMenu.BLOCK_ATLAS).apply(layer2);
+            return Minecraft.getMinecraft().getTextureAtlas(InventoryMenu.BLOCK_ATLAS).apply(layer2);
         if (layer1 != null)
             return Minecraft.getInstance().getTextureAtlas(InventoryMenu.BLOCK_ATLAS).apply(layer1);
 
         return null;
     }
 
-    public static VanillaPart partFromSlot(Avatar avatar, EquipmentSlot equipmentSlot) {
+    public static VanillaPart partFromSlot(Avatar avatar, EntityEquipmentSlot equipmentSlot) {
         if (!RenderUtils.vanillaModelAndScript(avatar))
             return null;
 
@@ -82,13 +87,13 @@ public class RenderUtils {
         }
     }
 
-    public static EquipmentSlot slotFromPart(ParentType type) {
+    public static EntityEquipmentSlot slotFromPart(ParentType type) {
         switch (type) {
             case Head:
             case HelmetItemPivot:
             case HelmetPivot:
             case Skull:
-                return EquipmentSlot.HEAD;
+                return EntityEquipmentSlot.HEAD;
             case Body:
             case ChestplatePivot:
             case LeftShoulderPivot:
@@ -96,24 +101,24 @@ public class RenderUtils {
             case LeftElytra:
             case RightElytra:
             case ElytraPivot:
-                return EquipmentSlot.CHEST;
+                return EntityEquipmentSlot.CHEST;
             case LeftArm:
             case LeftItemPivot:
             case LeftSpyglassPivot:
-                return EquipmentSlot.OFFHAND;
+                return EntityEquipmentSlot.OFFHAND;
             case RightArm:
             case RightItemPivot:
             case RightSpyglassPivot:
-                return EquipmentSlot.MAINHAND;
+                return EntityEquipmentSlot.MAINHAND;
             case LeftLeggingPivot:
             case RightLeggingPivot:
             case LeftLeg:
             case RightLeg:
             case LeggingsPivot:
-                return EquipmentSlot.LEGS;
+                return EntityEquipmentSlot.LEGS;
             case LeftBootPivot:
             case RightBootPivot:
-                return EquipmentSlot.FEET;
+                return EntityEquipmentSlot.FEET;
             default:
                 return null;
         }
@@ -154,27 +159,26 @@ public class RenderUtils {
 
     }
 
-    public static final Vector3f INVENTORY_DIFFUSE_LIGHT_0 = Util.make(new Vector3f(0.2f, -1.0f, -1.0f), Vector3f::normalize);
-    public static final Vector3f INVENTORY_DIFFUSE_LIGHT_1 = Util.make(new Vector3f(-0.2f, -1.0f, 0.0f), Vector3f::normalize);
+    public static final Vector3f INVENTORY_DIFFUSE_LIGHT_0 = ResourceUtils.make(new Vector3f(0.2f, -1.0f, -1.0f), Vector3f::normalise);
+    public static final Vector3f INVENTORY_DIFFUSE_LIGHT_1 = ResourceUtils.make(new Vector3f(-0.2f, -1.0f, 0.0f), Vector3f::normalise);
     public static void setLights(Vector3f lightingVector1, Vector3f lightingVector2) {
-        RenderSystem.assertThread(RenderSystem::isOnGameThread);
-        Vector4f vector4f = new Vector4f(lightingVector1);
-        GlStateManager._pushMatrix();
-        GlStateManager._light(GL11.GL_LIGHT0, GL11.GL_POSITION, GlStateManagerAccessor.invokeGetFloatBuffer(vector4f.x(), vector4f.y(), vector4f.z(), 0.0f));
+        Vector4f vector4f = new Vector4f(lightingVector1.x, lightingVector1.y, lightingVector2.z, 1.0f);
+        GlStateManager.pushMatrix();
+        GlStateManager.glLight(GL11.GL_LIGHT0, GL11.GL_POSITION, GlStateManagerAccessor.invokeGetFloatBuffer(vector4f.x, vector4f.y, vector4f.z, 0.0f));
         float f = 0.6f;
-        GlStateManager._light(GL11.GL_LIGHT0, GL11.GL_DIFFUSE, GlStateManagerAccessor.invokeGetFloatBuffer(f, f, f, 1.0f));
-        GlStateManager._light(GL11.GL_LIGHT0, GL11.GL_AMBIENT, GlStateManagerAccessor.invokeGetFloatBuffer(0.0f, 0.0f, 0.0f, 1.0f));
-        GlStateManager._light(GL11.GL_LIGHT0, GL11.GL_SPECULAR, GlStateManagerAccessor.invokeGetFloatBuffer(0.0f, 0.0f, 0.0f, 1.0f));
-        Vector4f vector4f2 = new Vector4f(lightingVector2);
+        GlStateManager.glLight(GL11.GL_LIGHT0, GL11.GL_DIFFUSE, GlStateManagerAccessor.invokeGetFloatBuffer(f, f, f, 1.0f));
+        GlStateManager.glLight(GL11.GL_LIGHT0, GL11.GL_AMBIENT, GlStateManagerAccessor.invokeGetFloatBuffer(0.0f, 0.0f, 0.0f, 1.0f));
+        GlStateManager.glLight(GL11.GL_LIGHT0, GL11.GL_SPECULAR, GlStateManagerAccessor.invokeGetFloatBuffer(0.0f, 0.0f, 0.0f, 1.0f));
+        Vector4f vector4f2 = new Vector4f(lightingVector2.x, lightingVector2.y, lightingVector2.z, 1.0f);
 
-        GlStateManager._light(GL11.GL_LIGHT1, GL11.GL_POSITION, GlStateManagerAccessor.invokeGetFloatBuffer(vector4f2.x(), vector4f2.y(), vector4f2.z(), 0.0f));
-        GlStateManager._light(GL11.GL_LIGHT1, GL11.GL_DIFFUSE, GlStateManagerAccessor.invokeGetFloatBuffer(f, f, f, 1.0f));
-        GlStateManager._light(GL11.GL_LIGHT1, GL11.GL_AMBIENT, GlStateManagerAccessor.invokeGetFloatBuffer(0.0f, 0.0f, 0.0f, 1.0f));
-        GlStateManager._light(GL11.GL_LIGHT1, GL11.GL_SPECULAR, GlStateManagerAccessor.invokeGetFloatBuffer(0.0f, 0.0f, 0.0f, 1.0f));
-        GlStateManager._shadeModel(GL11.GL_FLAT);
+        GlStateManager.glLight(GL11.GL_LIGHT1, GL11.GL_POSITION, GlStateManagerAccessor.invokeGetFloatBuffer(vector4f2.x, vector4f2.y, vector4f2.z, 0.0f));
+        GlStateManager.glLight(GL11.GL_LIGHT1, GL11.GL_DIFFUSE, GlStateManagerAccessor.invokeGetFloatBuffer(f, f, f, 1.0f));
+        GlStateManager.glLight(GL11.GL_LIGHT1, GL11.GL_AMBIENT, GlStateManagerAccessor.invokeGetFloatBuffer(0.0f, 0.0f, 0.0f, 1.0f));
+        GlStateManager.glLight(GL11.GL_LIGHT1, GL11.GL_SPECULAR, GlStateManagerAccessor.invokeGetFloatBuffer(0.0f, 0.0f, 0.0f, 1.0f));
+        GlStateManager.shadeModel(GL11.GL_FLAT);
         float g = 0.4f;
-        GlStateManager._lightModel(GL11.GL_LIGHT_MODEL_AMBIENT, GlStateManagerAccessor.invokeGetFloatBuffer(g, g, g, 1.0f));
-        GlStateManager._popMatrix();
+        GlStateManager.glLightModel(GL11.GL_LIGHT_MODEL_AMBIENT, GlStateManagerAccessor.invokeGetFloatBuffer(g, g, g, 1.0f));
+        GlStateManager.popMatrix();
     }
 
 

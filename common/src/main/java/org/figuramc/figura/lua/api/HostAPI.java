@@ -1,30 +1,25 @@
 package org.figuramc.figura.lua.api;
 
-import com.mojang.blaze3d.platform.NativeImage;
-import com.mojang.datafixers.util.Pair;
-import net.minecraft.client.GuiMessage;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.Screenshot;
-import net.minecraft.client.gui.screens.ChatScreen;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
-import net.minecraft.client.multiplayer.ClientPacketListener;
-import net.minecraft.client.multiplayer.PlayerInfo;
-import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.core.NonNullList;
-import net.minecraft.network.chat.Component;
-import net.minecraft.world.Container;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.effect.MobEffectInstance;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.inventory.Slot;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.client.entity.EntityPlayerSP;
+import net.minecraft.client.gui.ChatLine;
+import net.minecraft.client.gui.GuiChat;
+import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.gui.inventory.GuiContainer;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.player.InventoryPlayer;
+import net.minecraft.inventory.IInventory;
+import net.minecraft.inventory.Slot;
+import net.minecraft.item.ItemStack;
+import net.minecraft.potion.PotionEffect;
+import net.minecraft.util.EnumHand;
+import net.minecraft.util.ScreenShotHelper;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.avatar.AvatarManager;
 import org.figuramc.figura.config.Configs;
-import org.figuramc.figura.ducks.GuiMessageAccessor;
+import org.figuramc.figura.ducks.ChatLineAccessor;
 import org.figuramc.figura.lua.LuaNotNil;
 import org.figuramc.figura.lua.LuaWhitelist;
 import org.figuramc.figura.lua.api.entity.EntityAPI;
@@ -35,15 +30,17 @@ import org.figuramc.figura.lua.docs.LuaMethodOverload;
 import org.figuramc.figura.lua.docs.LuaTypeDoc;
 import org.figuramc.figura.math.vector.FiguraVec3;
 import org.figuramc.figura.mixin.LivingEntityAccessor;
-import org.figuramc.figura.mixin.gui.ChatComponentAccessor;
-import org.figuramc.figura.mixin.gui.ChatScreenAccessor;
-import org.figuramc.figura.mixin.gui.GuiAccessor;
+import org.figuramc.figura.mixin.gui.GuiChatAccessor;
+import org.figuramc.figura.mixin.gui.GuiIngameAccessor;
+import org.figuramc.figura.mixin.gui.GuiNewChatAccessor;
 import org.figuramc.figura.model.rendering.texture.FiguraTexture;
 import org.figuramc.figura.utils.ColorUtils;
 import org.figuramc.figura.utils.LuaUtils;
+import org.figuramc.figura.utils.Pair;
 import org.figuramc.figura.utils.TextUtils;
 import org.luaj.vm2.LuaError;
 
+import java.awt.image.BufferedImage;
 import java.util.*;
 
 @LuaWhitelist
@@ -64,7 +61,7 @@ public class HostAPI {
 
     public HostAPI(Avatar owner) {
         this.owner = owner;
-        this.minecraft = Minecraft.getInstance();
+        this.minecraft = Minecraft.getMinecraft();
         this.isHost = owner.isHost;
     }
 
@@ -111,13 +108,13 @@ public class HostAPI {
         if (!isHost()) return this;
         FiguraVec3 times = LuaUtils.parseVec3("setTitleTimes", x, y, z);
         if (times.x >= 0)
-            ((GuiAccessor)this.minecraft.gui).setTitleFadeInTime((int) times.x);
+            ((GuiIngameAccessor)this.minecraft.ingameGUI).setTitleFadeInTime((int) times.x);
         if (times.y >= 0)
-            ((GuiAccessor)this.minecraft.gui).setTitleStayTime((int) times.y);
+            ((GuiIngameAccessor)this.minecraft.ingameGUI).setTitleStayTime((int) times.y);
         if (times.z >= 0)
-            ((GuiAccessor)this.minecraft.gui).setTitleFadeOutTime((int) times.y);
-        if (((GuiAccessor)this.minecraft.gui).getTitleTime() > 0)
-            ((GuiAccessor)this.minecraft.gui).setTitleTime(((GuiAccessor)this.minecraft.gui).getTitleFadeInTime() + ((GuiAccessor)this.minecraft.gui).getTitleStayTime() + ((GuiAccessor)this.minecraft.gui).getTitleFadeOutTime());
+            ((GuiIngameAccessor)this.minecraft.ingameGUI).setTitleFadeOutTime((int) times.y);
+        if (((GuiIngameAccessor)this.minecraft.ingameGUI).getTitleTime() > 0)
+            ((GuiIngameAccessor)this.minecraft.ingameGUI).setTitleTime(((GuiIngameAccessor)this.minecraft.ingameGUI).getTitleFadeInTime() + ((GuiIngameAccessor)this.minecraft.ingameGUI).getTitleStayTime() + ((GuiIngameAccessor)this.minecraft.ingameGUI).getTitleFadeOutTime());
         return this;
     }
 
@@ -125,14 +122,14 @@ public class HostAPI {
     public HostAPI titleTimes(Object x, Double y, Double z) {
         return setTitleTimes(x, y, z);
     }
-
+//TODO Fix wrong GUI Mixin, subtitle points to the title on 1.16
     @LuaWhitelist
     @LuaMethodDoc("host.clear_title")
     public HostAPI clearTitle() {
         if (isHost()) {
-            ((GuiAccessor)this.minecraft.gui).setTitle(null);
-            ((GuiAccessor)this.minecraft.gui).setSubtitle(null);
-            ((GuiAccessor)this.minecraft.gui).setTitleTime(0);
+            ((GuiIngameAccessor)this.minecraft.ingameGUI).setTitle(null);
+            ((GuiIngameAccessor)this.minecraft.ingameGUI).setSubtitle(null);
+            ((GuiIngameAccessor)this.minecraft.ingameGUI).setTitleTime(0);
         }
         return this;
     }
@@ -148,7 +145,7 @@ public class HostAPI {
     )
     public HostAPI setTitle(@LuaNotNil String text) {
         if (isHost())
-            ((GuiAccessor)this.minecraft.gui).setTitle(TextUtils.tryParseJson(text));
+            ((GuiIngameAccessor)this.minecraft.ingameGUI).setTitle(TextUtils.tryParseJson(text).getUnformattedText());
         return this;
     }
 
@@ -168,7 +165,7 @@ public class HostAPI {
     )
     public HostAPI setSubtitle(@LuaNotNil String text) {
         if (isHost())
-            ((GuiAccessor)this.minecraft.gui).setSubtitle(TextUtils.tryParseJson(text));
+            ((GuiIngameAccessor)this.minecraft.ingameGUI).setSubtitle(TextUtils.tryParseJson(text).getUnformattedText());
         return this;
     }
 
@@ -194,7 +191,7 @@ public class HostAPI {
     )
     public HostAPI setActionbar(@LuaNotNil String text, boolean animated) {
         if (isHost())
-            this.minecraft.gui.setOverlayMessage(TextUtils.tryParseJson(text), animated);
+            this.minecraft.ingameGUI.setOverlayMessage(TextUtils.tryParseJson(text), animated);
         return this;
     }
 
@@ -213,8 +210,8 @@ public class HostAPI {
     )
     public HostAPI sendChatMessage(@LuaNotNil String message) {
         if (!isHost() || !Configs.CHAT_MESSAGES.value) return this;
-        LocalPlayer player = this.minecraft.player;
-        if (player != null) player.chat(message.startsWith("/") ? message.substring(1) : message);
+        EntityPlayerSP player = this.minecraft.player;
+        if (player != null) player.sendChatMessage(message.startsWith("/") ? message.substring(1) : message);
         return this;
     }
 
@@ -228,8 +225,8 @@ public class HostAPI {
     )
     public HostAPI sendChatCommand(@LuaNotNil String command) {
         if (!isHost() || !Configs.CHAT_MESSAGES.value) return this;
-        LocalPlayer player = this.minecraft.player;
-        if (player != null) player.chat(command.startsWith("/") ? command : "/" + command);
+        EntityPlayerSP player = this.minecraft.player;
+        if (player != null) player.sendChatMessage(command.startsWith("/") ? command : "/" + command);
         return this;
     }
 
@@ -243,7 +240,7 @@ public class HostAPI {
     )
     public HostAPI appendChatHistory(@LuaNotNil String message) {
         if (isHost())
-            this.minecraft.gui.getChat().addRecentChat(message);
+            this.minecraft.ingameGUI.getChatGUI().addToSentMessages(message);
         return this;
     }
 
@@ -260,17 +257,17 @@ public class HostAPI {
             return null;
 
         index--;
-        List<GuiMessage<Component>> messages = ((ChatComponentAccessor) this.minecraft.gui.getChat()).getAllMessages();
+        List<ChatLine> messages = ((GuiNewChatAccessor) this.minecraft.ingameGUI.getChatGUI()).getAllMessages();
         if (index < 0 || index >= messages.size())
             return null;
 
-        GuiMessage<Component> message = messages.get(index);
+        ChatLine message = messages.get(index);
         Map<String, Object> map = new HashMap<>();
 
-        map.put("addedTime", message.getAddedTime());
-        map.put("message", message.getMessage().getString());
-        map.put("json", message.getMessage());
-        map.put("backgroundColor", ((GuiMessageAccessor) (Object) message).figura$getColor());
+        map.put("addedTime", message.getUpdatedCounter());
+        map.put("message", message.getChatComponent().getUnformattedText());
+        map.put("json", message.getChatComponent());
+        map.put("backgroundColor", ((ChatLineAccessor) message).figura$getColor());
 
         return map;
     }
@@ -296,20 +293,20 @@ public class HostAPI {
         if (!isHost()) return this;
 
         index--;
-        List<GuiMessage<Component>> messages = ((ChatComponentAccessor) this.minecraft.gui.getChat()).getAllMessages();
+        List<ChatLine> messages = ((GuiNewChatAccessor) this.minecraft.ingameGUI.getChatGUI()).getAllMessages();
         if (index < 0 || index >= messages.size())
             return this;
 
         if (newMessage == null)
             messages.remove(index);
         else {
-            GuiMessage old = messages.get(index);
-            GuiMessage neww = new GuiMessage(this.minecraft.gui.getGuiTicks(), TextUtils.tryParseJson(newMessage), old.getId());
+            ChatLine old = messages.get(index);
+            ChatLine neww = new ChatLine(this.minecraft.ingameGUI.getUpdateCounter(), TextUtils.tryParseJson(newMessage), old.getChatLineID());
             messages.set(index, neww);
-            ((GuiMessageAccessor) neww).figura$setColor(backgroundColor != null ? ColorUtils.rgbToInt(backgroundColor) : ((GuiMessageAccessor) (Object) old).figura$getColor());
+            ((ChatLineAccessor) neww).figura$setColor(backgroundColor != null ? ColorUtils.rgbToInt(backgroundColor) : ((ChatLineAccessor) old).figura$getColor());
         }
 
-        this.minecraft.gui.getChat().rescaleChat();
+        this.minecraft.ingameGUI.getChatGUI().refreshChat();
         return this;
     }
 
@@ -326,7 +323,7 @@ public class HostAPI {
     )
     public HostAPI swingArm(boolean offhand) {
         if (isHost() && this.minecraft.player != null)
-            this.minecraft.player.swing(offhand ? InteractionHand.OFF_HAND : InteractionHand.MAIN_HAND);
+            this.minecraft.player.swingArm(offhand ? EnumHand.OFF_HAND : EnumHand.MAIN_HAND);
         return this;
     }
 
@@ -347,12 +344,12 @@ public class HostAPI {
     public ItemStackAPI getSlot(@LuaNotNil Object slot) {
         if (!isHost()) return null;
         Entity e = this.owner.luaRuntime.getUser();
-        if (e == null || !e.isAlive())
+        if (e == null || !e.isEntityAlive())
             return ItemStackAPI.verify(ItemStack.EMPTY);
-        if (e instanceof Container)
-            return ItemStackAPI.verify(((Container) e).getItem(LuaUtils.parseSlot(slot, null)));
-        else if (e instanceof Player)
-            ItemStackAPI.verify(((Player) e).inventory.getItem(LuaUtils.parseSlot(slot, null)));
+        if (e instanceof IInventory)
+            return ItemStackAPI.verify(((IInventory) e).getStackInSlot(LuaUtils.parseSlot(slot, null)));
+        else if (e instanceof EntityPlayer)
+            ItemStackAPI.verify(((EntityPlayer) e).inventory.getStackInSlot(LuaUtils.parseSlot(slot, null)));
 
         return ItemStackAPI.verify(ItemStack.EMPTY);
     }
@@ -368,16 +365,16 @@ public class HostAPI {
             value = "host.set_slot"
     )
     public HostAPI setSlot(@LuaNotNil Object slot, Object item) {
-        if (!isHost() || (slot == null && item == null) || this.minecraft.gameMode == null || this.minecraft.player == null || !this.minecraft.gameMode.getPlayerMode().isCreative())
+        if (!isHost() || (slot == null && item == null) || this.minecraft.playerController == null || this.minecraft.player == null || !this.minecraft.playerController.getCurrentGameType().isCreative())
             return this;
 
-        Inventory inventory = this.minecraft.player.inventory;
+        InventoryPlayer inventory = this.minecraft.player.inventory;
 
         int index = LuaUtils.parseSlot(slot, inventory);
         ItemStack stack = LuaUtils.parseItemStack("setSlot", item);
 
-        inventory.setItem(index, stack);
-        this.minecraft.gameMode.handleCreativeModeItemAdd(stack, index + 36);
+        inventory.setInventorySlotContents(index, stack);
+        this.minecraft.playerController.sendSlotPacket(stack, index + 36);
 
         return this;
     }
@@ -436,9 +433,9 @@ public class HostAPI {
     @LuaWhitelist
     @LuaMethodDoc("host.get_chat_text")
     public String getChatText() {
-        if (isHost() && this.minecraft.screen instanceof ChatScreen) {
-            ChatScreen chat = (ChatScreen) this.minecraft.screen;
-            return ((ChatScreenAccessor) chat).getInput().getValue();
+        if (isHost() && this.minecraft.currentScreen instanceof GuiChat) {
+            GuiChat chat = (GuiChat) this.minecraft.currentScreen;
+            return ((GuiChatAccessor) chat).getInput().getText();
         }
 
         return null;
@@ -454,9 +451,9 @@ public class HostAPI {
             value = "host.set_chat_text"
     )
     public HostAPI setChatText(@LuaNotNil String text) {
-        if (isHost() && Configs.CHAT_MESSAGES.value && this.minecraft.screen instanceof ChatScreen) {
-            ChatScreen chat = (ChatScreen) this.minecraft.screen;
-            ((ChatScreenAccessor) chat).getInput().setValue(text);
+        if (isHost() && Configs.CHAT_MESSAGES.value && this.minecraft.currentScreen instanceof GuiChat) {
+            GuiChat chat = (GuiChat) this.minecraft.currentScreen;
+            ((GuiChatAccessor) chat).getInput().setText(text);
         }
         return this;
     }
@@ -469,17 +466,17 @@ public class HostAPI {
     @LuaWhitelist
     @LuaMethodDoc("host.get_screen")
     public String getScreen() {
-        if (!isHost() || this.minecraft.screen == null)
+        if (!isHost() || this.minecraft.currentScreen == null)
             return null;
-        return this.minecraft.screen.getClass().getName();
+        return this.minecraft.currentScreen.getClass().getName();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("host.get_screen_slot_count")
     public Integer getScreenSlotCount() {
-        if (isHost() && this.minecraft.screen instanceof AbstractContainerScreen<?>) {
-            AbstractContainerScreen<?> screen = (AbstractContainerScreen<?>) this.minecraft.screen;
-            return screen.getMenu().slots.size();
+        if (isHost() && this.minecraft.currentScreen instanceof GuiContainer) {
+            GuiContainer screen = (GuiContainer) this.minecraft.currentScreen;
+            return screen.inventorySlots.inventorySlots.size();
         }
         return null;
     }
@@ -490,27 +487,27 @@ public class HostAPI {
             @LuaMethodOverload(argumentTypes = Integer.class, argumentNames = "slot")
     }, value = "host.get_screen_slot")
     public ItemStackAPI getScreenSlot(@LuaNotNil Object slot) {
-        if (!isHost() || !(this.minecraft.screen instanceof AbstractContainerScreen<?>))
+        if (!isHost() || !(this.minecraft.currentScreen instanceof GuiContainer))
             return null;
-        AbstractContainerScreen<?> screen = (AbstractContainerScreen<?>) this.minecraft.screen;
+        GuiContainer screen = (GuiContainer) this.minecraft.currentScreen;
 
-        List<Slot> slots = screen.getMenu().slots;
+        List<Slot> slots = screen.inventorySlots.inventorySlots;
         int index = LuaUtils.parseSlot(slot, null);
         if (index < 0 || index >= slots.size())
             return null;
-        return ItemStackAPI.verify(slots.get(index).getItem());
+        return ItemStackAPI.verify(slots.get(index).getStack());
     }
 
     @LuaWhitelist
     @LuaMethodDoc("host.is_chat_open")
     public boolean isChatOpen() {
-        return isHost() && this.minecraft.screen instanceof ChatScreen;
+        return isHost() && this.minecraft.currentScreen instanceof GuiChat;
     }
 
     @LuaWhitelist
     @LuaMethodDoc("host.is_container_open")
     public boolean isContainerOpen() {
-        return isHost() && this.minecraft.screen instanceof AbstractContainerScreen;
+        return isHost() && this.minecraft.currentScreen instanceof GuiContainer;
     }
 
     @LuaWhitelist
@@ -524,7 +521,7 @@ public class HostAPI {
         if (!isHost())
             return null;
 
-        NativeImage img = Screenshot.takeScreenshot(this.minecraft.getWindow().getWidth(), this.minecraft.getWindow().getHeight(), this.minecraft.getMainRenderTarget());
+        BufferedImage img = ScreenShotHelper.createScreenshot(this.minecraft.displayWidth, this.minecraft.displayHeight, this.minecraft.getFramebuffer());
         return owner.luaRuntime.texture.register(name, img, true);
     }
 
@@ -539,16 +536,16 @@ public class HostAPI {
     public List<Map<String, Object>> getStatusEffects() {
         List<Map<String, Object>> list = new ArrayList<>();
 
-        LocalPlayer player = this.minecraft.player;
+        EntityPlayerSP player = this.minecraft.player;
         if (!isHost() || player == null)
             return list;
 
-        for (MobEffectInstance effect : player.getActiveEffects()) {
+        for (PotionEffect effect : player.getActivePotionEffects()) {
             Map<String, Object> map = new HashMap<>();
-            map.put("name", effect.getEffect().getDescriptionId());
+            map.put("name", effect.getEffectName());
             map.put("amplifier", effect.getAmplifier());
             map.put("duration", effect.getDuration());
-            map.put("visible", effect.isVisible());
+            map.put("visible", effect.doesShowParticles());
 
             list.add(map);
         }
@@ -559,7 +556,7 @@ public class HostAPI {
     @LuaWhitelist
     @LuaMethodDoc("host.get_clipboard")
     public String getClipboard() {
-        return isHost() ? this.minecraft.keyboardHandler.getClipboard() : null;
+        return isHost() ? GuiScreen.getClipboardString() : null;
     }
 
     @LuaWhitelist
@@ -571,7 +568,7 @@ public class HostAPI {
             aliases = "clipboard",
             value = "host.set_clipboard")
     public HostAPI setClipboard(@LuaNotNil String text) {
-        if (isHost()) this.minecraft.keyboardHandler.setClipboard(text);
+        if (isHost()) GuiScreen.setClipboardString(text);
         return this;
     }
 
@@ -583,16 +580,16 @@ public class HostAPI {
     @LuaWhitelist
     @LuaMethodDoc("host.get_attack_charge")
     public float getAttackCharge() {
-        LocalPlayer player = this.minecraft.player;
+        EntityPlayerSP player = this.minecraft.player;
         if (isHost() && player != null)
-            return player.getAttackStrengthScale(0f);
+            return player.getCooledAttackStrength(0f);
         return 0f;
     }
 
     @LuaWhitelist
     @LuaMethodDoc("host.is_jumping")
     public boolean isJumping() {
-        LocalPlayer player = this.minecraft.player;
+        EntityPlayerSP player = this.minecraft.player;
         if (isHost() && player != null)
             return ((LivingEntityAccessor) player).isJumping();
         return false;
@@ -601,37 +598,37 @@ public class HostAPI {
     @LuaWhitelist
     @LuaMethodDoc("host.is_flying")
     public boolean isFlying() {
-        LocalPlayer player = this.minecraft.player;
+        EntityPlayerSP player = this.minecraft.player;
         if (isHost() && player != null)
-            return player.abilities.flying;
+            return player.capabilities.isFlying;
         return false;
     }
 
     @LuaWhitelist
     @LuaMethodDoc("host.get_reach_distance")
     public double getReachDistance() {
-        return this.minecraft.gameMode == null ? 0 : this.minecraft.gameMode.getPickRange();
+        return this.minecraft.playerController == null ? 0 : this.minecraft.playerController.getBlockReachDistance();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("host.get_air")
     public int getAir() {
-        LocalPlayer player = this.minecraft.player;
+        EntityPlayerSP player = this.minecraft.player;
         if (isHost() && player != null)
-            return player.getAirSupply();
+            return player.getAir();
         return 0;
     }
 
     @LuaWhitelist
     @LuaMethodDoc("host.get_pick_block")
     public Object[] getPickBlock() {
-        return isHost() ? LuaUtils.parseBlockHitResult(minecraft.hitResult) : null;
+        return isHost() ? LuaUtils.parseBlockHitResult(minecraft.objectMouseOver) : null;
     }
 
     @LuaWhitelist
     @LuaMethodDoc("host.get_pick_entity")
     public EntityAPI<?> getPickEntity() {
-        return isHost() && minecraft.crosshairPickEntity != null ? EntityAPI.wrap(minecraft.crosshairPickEntity) : null;
+        return isHost() && minecraft.pointedEntity != null ? EntityAPI.wrap(minecraft.pointedEntity) : null;
     }
 
     @LuaWhitelist

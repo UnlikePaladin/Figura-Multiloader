@@ -1,15 +1,14 @@
 package org.figuramc.figura.backend2;
 
 import com.google.gson.*;
-import com.mojang.datafixers.util.Pair;
 import com.neovisionaries.ws.client.WebSocket;
 import com.neovisionaries.ws.client.WebSocketException;
-import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientPacketListener;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtIo;
-import net.minecraft.network.chat.Component;
+import net.minecraft.client.network.NetHandlerPlayClient;
+import net.minecraft.client.network.NetworkPlayerInfo;
+import net.minecraft.nbt.CompressedStreamTools;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.util.text.ITextComponent;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
@@ -17,7 +16,6 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpUriRequest;
-import org.apache.http.impl.client.HttpClients;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.avatar.AvatarManager;
@@ -31,18 +29,12 @@ import org.figuramc.figura.font.Emojis;
 import org.figuramc.figura.gui.FiguraToast;
 import org.figuramc.figura.permissions.PermissionManager;
 import org.figuramc.figura.permissions.Permissions;
-import org.figuramc.figura.utils.FiguraText;
-import org.figuramc.figura.utils.RefilledNumber;
-import org.figuramc.figura.utils.TextUtils;
-import org.figuramc.figura.utils.Version;
+import org.figuramc.figura.utils.*;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.security.KeyManagementException;
-import java.security.NoSuchAlgorithmException;
-import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -71,7 +63,7 @@ public class NetworkStuff {
 
     public static boolean debug = false;
     @Nullable
-    public static Component motd;
+    public static ITextComponent motd;
 
     public static int lastPing, pingsSent, pingsReceived;
 
@@ -115,14 +107,15 @@ public class NetworkStuff {
     }
 
     private static void tickSubscriptions() {
-        ClientPacketListener connection = Minecraft.getInstance().getConnection();
+        NetHandlerPlayClient connection = Minecraft.getMinecraft().getConnection();
         if (connection == null) {
             unsubscribeAll();
             return;
         }
 
         List<UUID> unsub = new ArrayList<>(SUBSCRIPTIONS);
-        for (UUID uuid : connection.getOnlinePlayerIds()) {
+        for (NetworkPlayerInfo info : connection.getPlayerInfoMap()) {
+            UUID uuid = info.getGameProfile().getId();
             unsub.remove(uuid);
             if (!SUBSCRIPTIONS.contains(uuid)) {
                 SUBSCRIPTIONS.add(uuid);
@@ -211,7 +204,7 @@ public class NetworkStuff {
     }
 
     private static void fetchMOTD() {
-        queueString(Util.NIL_UUID, HttpAPI::getMotd, (code, data) -> {
+        queueString(ResourceUtils.NIL_UUID, HttpAPI::getMotd, (code, data) -> {
             responseDebug("motd", code, data);
             if (data != null) motd = Emojis.applyEmojis(TextUtils.tryParseJson(data));
         });
@@ -252,7 +245,7 @@ public class NetworkStuff {
 
     private static void disconnectAPI() {
         api = null;
-        clear(Util.NIL_UUID);
+        clear(ResourceUtils.NIL_UUID);
     }
 
     private static void checkAPI() {
@@ -270,7 +263,7 @@ public class NetworkStuff {
     }
 
     public static void checkVersion() {
-        queueString(Util.NIL_UUID, HttpAPI::getVersion, (code, data) -> {
+        queueString(ResourceUtils.NIL_UUID, HttpAPI::getVersion, (code, data) -> {
             responseDebug("checkVersion", code, data);
             JsonObject json = parser.parse(data).getAsJsonObject();
             int config = Configs.UPDATE_CHANNEL.value;
@@ -283,7 +276,7 @@ public class NetworkStuff {
     }
 
     public static void setLimits() {
-        queueString(Util.NIL_UUID, HttpAPI::getLimits, (code, data) -> {
+        queueString(ResourceUtils.NIL_UUID, HttpAPI::getLimits, (code, data) -> {
             responseDebug("setLimits", code, data);
             JsonObject json = parser.parse(data).getAsJsonObject();
 
@@ -359,8 +352,8 @@ public class NetworkStuff {
 
         try {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            NbtIo.writeCompressed(avatar.nbt, baos);
-            queueString(Util.NIL_UUID, api -> api.uploadAvatar(id, baos.toByteArray()), (code, data) -> {
+            CompressedStreamTools.writeCompressed(avatar.nbt, baos);
+            queueString(ResourceUtils.NIL_UUID, api -> api.uploadAvatar(id, baos.toByteArray()), (code, data) -> {
                 responseDebug("uploadAvatar", code, data);
 
                 if (code == 200) {
@@ -394,7 +387,7 @@ public class NetworkStuff {
 
     public static void deleteAvatar(String avatar) {
         String id = avatar == null || true ? "avatar" : avatar; //TODO - profile screen
-        queueString(Util.NIL_UUID, api -> api.deleteAvatar(id), (code, data) -> {
+        queueString(ResourceUtils.NIL_UUID, api -> api.deleteAvatar(id), (code, data) -> {
             responseDebug("deleteAvatar", code, data);
 
             switch (code) {
@@ -421,7 +414,7 @@ public class NetworkStuff {
             json.add(obj);
         }
 
-        queueString(Util.NIL_UUID, api -> api.setEquipped(GSON.toJson(json)), (code, data) -> {
+        queueString(ResourceUtils.NIL_UUID, api -> api.setEquipped(GSON.toJson(json)), (code, data) -> {
             responseDebug("equipAvatar", code, data);
             if (code != 200 && Configs.CONNECTION_TOASTS.value)
                 FiguraToast.sendToast(new FiguraText("backend.equip_error"), FiguraToast.ToastType.ERROR);
@@ -447,7 +440,7 @@ public class NetworkStuff {
 
             //success
             try {
-                CompoundTag nbt = NbtIo.readCompressed(stream);
+                NBTTagCompound nbt = CompressedStreamTools.readCompressed(stream);
                 CacheAvatarLoader.save(hash, nbt);
                 target.loadAvatar(nbt);
             } catch (Exception e) {
@@ -499,7 +492,7 @@ public class NetworkStuff {
         if (checkUUID(id) || !checkWS())
             return;
 
-        WS_REQUESTS.add(new Request<>(Util.NIL_UUID, client -> {
+        WS_REQUESTS.add(new Request<>(ResourceUtils.NIL_UUID, client -> {
             try {
                 ByteBuffer buffer = C2SMessageHandler.sub(id);
                 client.sendBinary(buffer.array());
@@ -514,7 +507,7 @@ public class NetworkStuff {
         if (checkUUID(id) || !checkWS())
             return;
 
-        WS_REQUESTS.add(new Request<>(Util.NIL_UUID, client -> {
+        WS_REQUESTS.add(new Request<>(ResourceUtils.NIL_UUID, client -> {
             try {
                 ByteBuffer buffer = C2SMessageHandler.unsub(id);
                 client.sendBinary(buffer.array());

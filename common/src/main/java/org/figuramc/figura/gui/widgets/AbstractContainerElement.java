@@ -1,22 +1,25 @@
 package org.figuramc.figura.gui.widgets;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Widget;
 import net.minecraft.client.gui.components.events.AbstractContainerEventHandler;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.TextComponent;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.TextComponentString;
 import org.figuramc.figura.utils.ui.UIHelper;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public abstract class AbstractContainerElement extends AbstractContainerEventHandler implements FiguraTickable, FiguraWidget {
+public abstract class AbstractContainerElement extends Gui implements FiguraTickable, FiguraWidget {
 
-    public static final Component HOVERED_ARROW = new TextComponent("•");
+    public static final ITextComponent HOVERED_ARROW = new TextComponentString("•");
 
-    protected final List<GuiEventListener> children = new ArrayList<>();
+    protected final List<Gui> children = new ArrayList<>();
 
     private int x, y;
     private int width, height;
@@ -32,7 +35,7 @@ public abstract class AbstractContainerElement extends AbstractContainerEventHan
 
     @Override
     public void tick() {
-        for (GuiEventListener listener : this.children) {
+        for (Gui listener : this.children) {
             if (listener instanceof FiguraTickable) {
                 FiguraTickable tickable = (FiguraTickable) listener;
                 tickable.tick();
@@ -41,7 +44,7 @@ public abstract class AbstractContainerElement extends AbstractContainerEventHan
     }
 
     @Override
-    public void render(PoseStack stack, int mouseX, int mouseY, float delta) {
+    public void render(int mouseX, int mouseY, float delta) {
         for (GuiEventListener listener : this.children) {
             if (listener instanceof Widget) {
                 Widget widget = (Widget) listener;

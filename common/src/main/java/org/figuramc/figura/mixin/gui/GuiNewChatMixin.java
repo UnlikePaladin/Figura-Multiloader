@@ -1,41 +1,36 @@
 package org.figuramc.figura.mixin.gui;
 
-import com.mojang.datafixers.util.Pair;
-import net.minecraft.client.GuiMessage;
-import net.minecraft.client.gui.components.ChatComponent;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TextComponent;
+import net.minecraft.client.gui.GuiNewChat;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.TextComponentString;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.avatar.AvatarManager;
 import org.figuramc.figura.avatar.Badges;
 import org.figuramc.figura.config.Configs;
-import org.figuramc.figura.ducks.GuiMessageAccessor;
 import org.figuramc.figura.font.Emojis;
 import org.figuramc.figura.lua.api.nameplate.NameplateCustomization;
 import org.figuramc.figura.permissions.Permissions;
 import org.figuramc.figura.utils.EntityUtils;
+import org.figuramc.figura.utils.Pair;
 import org.figuramc.figura.utils.TextUtils;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
-@Mixin(ChatComponent.class)
-public class ChatComponentMixin {
+@Mixin(GuiNewChat.class)
+public class GuiNewChatMixin {
 
     @Unique private Integer color;
     @Unique private int currColor;
 
-    @ModifyVariable(at = @At("HEAD"), method = "addMessage(Lnet/minecraft/network/chat/Component;IIZ)V", ordinal = 0, argsOnly = true)
-    private Component addMessage(Component message, Component msg, int k, int timestamp, boolean refresh) {
+    @ModifyVariable(at = @At("HEAD"), method = "setChatLine", ordinal = 0, argsOnly = true)
+    private ITextComponent addMessage(ITextComponent message, ITextComponent msg, int k, int timestamp, boolean refresh) {
         // do not change the message on refresh
         if (refresh) return message;
 
@@ -46,9 +41,9 @@ public class ChatComponentMixin {
         // receive event
         Avatar localPlayer = AvatarManager.getAvatarForPlayer(FiguraMod.getLocalPlayerUUID());
         if (localPlayer != null) {
-            String json = Component.Serializer.toJson(message);
+            String json = ITextComponent.Serializer.componentToJson(message);
 
-            Pair<String, Integer> event = localPlayer.chatReceivedMessageEvent(message.getString(), json);
+            Pair<String, Integer> event = localPlayer.chatReceivedMessageEvent(message.getUnformattedText(), json);
             if (event != null) {
                 String newMessage = event.getFirst();
                 if (newMessage == null)
@@ -80,7 +75,7 @@ public class ChatComponentMixin {
         Map<String, UUID> players = EntityUtils.getPlayerList();
         String owner = null;
 
-        String msgString = message.getString();
+        String msgString = message.getUnformattedText();
         String[] split = msgString.split("\\W+");
         for (String s : split) {
             if (players.containsKey(s)) {
@@ -99,7 +94,7 @@ public class ChatComponentMixin {
             UUID uuid = entry.getValue();
             boolean isOwner = name.equals(owner);
 
-            Component playerName = new TextComponent(name);
+            ITextComponent playerName = new TextComponentString(name);
 
             // apply customization
             Avatar avatar = AvatarManager.getAvatarForPlayer(uuid);
@@ -108,14 +103,14 @@ public class ChatComponentMixin {
             if (custom == null && config < 2) // no customization and no possible badges to append
                 continue;
 
-            Component replacement = custom != null && custom.getJson() != null && avatar.permissions.get(Permissions.NAMEPLATE_EDIT) == 1 ?
-                    TextUtils.replaceInText(custom.getJson().copy(), "\n|\\\\n", " ") : playerName;
+            ITextComponent replacement = custom != null && custom.getJson() != null && avatar.permissions.get(Permissions.NAMEPLATE_EDIT) == 1 ?
+                    TextUtils.replaceInText(custom.getJson().createCopy(), "\n|\\\\n", " ") : playerName;
 
             // name
             replacement = TextUtils.replaceInText(replacement, "\\$\\{name\\}", playerName);
 
             // badges
-            Component emptyReplacement = Badges.appendBadges(replacement, uuid, config > 1 && owner == null);
+            ITextComponent emptyReplacement = Badges.appendBadges(replacement, uuid, config > 1 && owner == null);
 
             // trim
             emptyReplacement = TextUtils.trim(emptyReplacement);
@@ -127,7 +122,7 @@ public class ChatComponentMixin {
             // sender badges
             if (config > 1 && isOwner) {
                 // badges
-                Component temp = Badges.appendBadges(replacement, uuid, true);
+                ITextComponent temp = Badges.appendBadges(replacement, uuid, true);
                 // trim
                 temp = TextUtils.trim(temp);
                 // modify message, only first

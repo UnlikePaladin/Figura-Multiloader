@@ -10,78 +10,82 @@ import org.spongepowered.asm.mixin.gen.Invoker;
 public interface ParticleAccessor {
 
     @Intrinsic
-    @Accessor
+    @Accessor("particleGravity")
     void setGravity(float gravity);
 
     @Intrinsic
-    @Accessor
+    @Accessor("particleGravity")
     float getGravity();
 
     @Intrinsic
-    @Accessor
+    @Accessor("canCollide")
     void setHasPhysics(boolean physics);
 
     @Intrinsic
-    @Accessor
+    @Accessor("canCollide")
     boolean getHasPhysics();
 
     @Intrinsic
-    @Accessor
+    @Accessor("prevPosX")
     void setXo(double xo);
 
     @Intrinsic
-    @Accessor
+    @Accessor("prevPosY")
     void setYo(double yo);
 
     @Intrinsic
-    @Accessor
+    @Accessor("prevPosZ")
     void setZo(double zo);
 
     @Intrinsic
-    @Invoker("setAlpha")
+    @Invoker("setAlphaF")
     void setParticleAlpha(float alpha);
 
     @Intrinsic
-    @Accessor("x")
+    @Accessor("posX")
     double getX();
 
     @Intrinsic
-    @Accessor("y")
+    @Accessor("posY")
     double getY();
 
     @Intrinsic
-    @Accessor("z")
+    @Accessor("posZ")
     double getZ();
 
     @Intrinsic
-    @Accessor
+    @Accessor("width")
     float getBbWidth();
 
     @Intrinsic
-    @Accessor
+    @Accessor("particleRed")
     float getRCol();
 
     @Intrinsic
-    @Accessor
+    @Accessor("particleGreen")
     float getGCol();
 
     @Intrinsic
-    @Accessor
+    @Accessor("particleBlue")
     float getBCol();
 
     @Intrinsic
-    @Accessor
+    @Accessor("particleAlpha")
     float getAlpha();
 
     @Intrinsic
-    @Accessor
+    @Accessor("motionX")
     double getXd();
 
     @Intrinsic
-    @Accessor
+    @Accessor("motionY")
     double getYd();
 
     @Intrinsic
-    @Accessor
+    @Accessor("motionZ")
     double getZd();
+
+    @Intrinsic
+    @Accessor("particleMaxAge")
+    int getLifetime();
 }

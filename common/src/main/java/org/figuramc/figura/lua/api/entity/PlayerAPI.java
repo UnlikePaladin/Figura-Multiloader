@@ -1,13 +1,12 @@
 package org.figuramc.figura.lua.api.entity;
 
-import net.minecraft.client.multiplayer.PlayerInfo;
+import net.minecraft.client.network.NetworkPlayerInfo;
 import net.minecraft.client.resources.DefaultPlayerSkin;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.entity.player.PlayerModelPart;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.GameType;
-import net.minecraft.world.scores.PlayerTeam;
-import org.figuramc.figura.ducks.FoodDataAccesor;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.player.EnumPlayerModelParts;
+import net.minecraft.scoreboard.ScorePlayerTeam;
+import net.minecraft.world.GameType;
+import org.figuramc.figura.ducks.FoodStatsAccessor;
 import org.figuramc.figura.lua.LuaNotNil;
 import org.figuramc.figura.lua.LuaWhitelist;
 import org.figuramc.figura.lua.NbtToLua;
@@ -16,7 +15,6 @@ import org.figuramc.figura.lua.api.world.ItemStackAPI;
 import org.figuramc.figura.lua.docs.LuaMethodDoc;
 import org.figuramc.figura.lua.docs.LuaMethodOverload;
 import org.figuramc.figura.lua.docs.LuaTypeDoc;
-import org.figuramc.figura.math.vector.FiguraVec3;
 import org.figuramc.figura.utils.EntityUtils;
 import org.luaj.vm2.LuaError;
 import org.luaj.vm2.LuaTable;
@@ -29,11 +27,11 @@ import java.util.Map;
         name = "PlayerAPI",
         value = "player"
 )
-public class PlayerAPI extends LivingEntityAPI<Player> {
+public class PlayerAPI extends LivingEntityAPI<EntityPlayer> {
 
-    private PlayerInfo playerInfo;
+    private NetworkPlayerInfo playerInfo;
 
-    public PlayerAPI(Player entity) {
+    public PlayerAPI(EntityPlayer entity) {
         super(entity);
     }
 
@@ -41,7 +39,7 @@ public class PlayerAPI extends LivingEntityAPI<Player> {
         if (playerInfo != null)
             return true;
 
-        PlayerInfo info = EntityUtils.getPlayerInfo(entity.getUUID());
+        NetworkPlayerInfo info = EntityUtils.getPlayerInfo(entity.getUniqueID());
         if (info == null)
             return false;
 
@@ -53,28 +51,28 @@ public class PlayerAPI extends LivingEntityAPI<Player> {
     @LuaMethodDoc("player.get_food")
     public int getFood() {
         checkEntity();
-        return entity.getFoodData().getFoodLevel();
+        return entity.getFoodStats().getFoodLevel();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("player.get_saturation")
     public float getSaturation() {
         checkEntity();
-        return entity.getFoodData().getSaturationLevel();
+        return entity.getFoodStats().getSaturationLevel();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("player.get_exhaustion")
     public float getExhaustion() {
         checkEntity();
-        return ((FoodDataAccesor)(entity.getFoodData())).figura$getExhaustionLevel();
+        return ((FoodStatsAccessor)(entity.getFoodStats())).figura$getExhaustionLevel();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("player.get_experience_progress")
     public float getExperienceProgress() {
         checkEntity();
-        return entity.experienceProgress;
+        return entity.experience;
     }
 
     @LuaWhitelist
@@ -88,7 +86,7 @@ public class PlayerAPI extends LivingEntityAPI<Player> {
     @LuaMethodDoc("player.get_model_type")
     public String getModelType() {
         checkEntity();
-        return (checkPlayerInfo() ? playerInfo.getModelName() : DefaultPlayerSkin.getSkinModelName(entity.getUUID())).toUpperCase();
+        return (checkPlayerInfo() ? playerInfo.getSkinType() : DefaultPlayerSkin.getSkinType(entity.getUniqueID())).toUpperCase();
     }
 
     @LuaWhitelist
@@ -98,7 +96,7 @@ public class PlayerAPI extends LivingEntityAPI<Player> {
         if (!checkPlayerInfo())
             return null;
 
-        GameType gamemode = playerInfo.getGameMode();
+        GameType gamemode = playerInfo.getGameType();
         return gamemode == null ? null : gamemode.getName().toUpperCase();
     }
 
@@ -106,14 +104,14 @@ public class PlayerAPI extends LivingEntityAPI<Player> {
     @LuaMethodDoc("player.has_cape")
     public boolean hasCape() {
         checkEntity();
-        return checkPlayerInfo() && playerInfo.getCapeLocation() != null;
+        return checkPlayerInfo() && playerInfo.getLocationCape() != null;
     }
 
     @LuaWhitelist
     @LuaMethodDoc("player.has_skin")
     public boolean hasSkin() {
         checkEntity();
-        return checkPlayerInfo() && playerInfo.isSkinLoaded();
+        return checkPlayerInfo() && playerInfo.hasLocationSkin();
     }
 
     @LuaWhitelist
@@ -129,7 +127,7 @@ public class PlayerAPI extends LivingEntityAPI<Player> {
         try {
             if (part.equalsIgnoreCase("left_pants") || part.equalsIgnoreCase("right_pants"))
                 part += "_leg";
-            return entity.isModelPartShown(PlayerModelPart.valueOf(part.toUpperCase()));
+            return entity.isWearing(EnumPlayerModelParts.valueOf(part.toUpperCase()));
         } catch (Exception ignored) {
             throw new LuaError("Invalid player model part: " + part);
         }
@@ -139,14 +137,14 @@ public class PlayerAPI extends LivingEntityAPI<Player> {
     @LuaMethodDoc("player.is_fishing")
     public boolean isFishing() {
         checkEntity();
-        return entity.fishing != null;
+        return entity.fishEntity != null;
     }
 
     @LuaWhitelist
     @LuaMethodDoc("player.get_charged_attack_delay")
     public float getChargedAttackDelay() {
         checkEntity();
-        return entity.getCurrentItemAttackStrengthDelay();
+        return entity.getCooldownPeriod();
     }
 
     @LuaWhitelist
@@ -161,7 +159,7 @@ public class PlayerAPI extends LivingEntityAPI<Player> {
             value = "player.get_shoulder_entity")
     public LuaTable getShoulderEntity(boolean right) {
         checkEntity();
-        return new ReadOnlyLuaTable(NbtToLua.convert(right ? entity.getShoulderEntityRight() : entity.getShoulderEntityLeft()));
+        return new ReadOnlyLuaTable(NbtToLua.convert(right ? entity.getRightShoulderEntity() : entity.getLeftShoulderEntity()));
     }
 
     @LuaWhitelist
@@ -171,21 +169,21 @@ public class PlayerAPI extends LivingEntityAPI<Player> {
         if (!checkPlayerInfo())
             return null;
 
-        PlayerTeam team = playerInfo.getTeam();
+        ScorePlayerTeam team = playerInfo.getPlayerTeam();
         if (team == null)
             return null;
 
         Map<String, Object> map = new HashMap<>();
 
         map.put("name", team.getName());
-        map.put("display_name", team.getDisplayName().getString());
-        map.put("color", team.getColor().getName());
-        map.put("prefix", team.getPlayerPrefix().getString());
-        map.put("suffix", team.getPlayerSuffix().getString());
-        map.put("friendly_fire", team.isAllowFriendlyFire());
-        map.put("see_friendly_invisibles", team.canSeeFriendlyInvisibles());
-        map.put("nametag_visibility", team.getNameTagVisibility().name);
-        map.put("death_message_visibility", team.getDeathMessageVisibility().name);
+        map.put("display_name", team.getDisplayName());
+        map.put("color", team.getColor().name());
+        map.put("prefix", team.getPrefix());
+        map.put("suffix", team.getSuffix());
+        map.put("friendly_fire", team.getAllowFriendlyFire());
+        map.put("see_friendly_invisibles", team.getSeeFriendlyInvisiblesEnabled());
+        map.put("nametag_visibility", team.getNameTagVisibility().internalName);
+        map.put("death_message_visibility", team.getDeathMessageVisibility().internalName);
         map.put("collision_rule", team.getCollisionRule().name);
 
         return map;
@@ -204,12 +202,12 @@ public class PlayerAPI extends LivingEntityAPI<Player> {
     public float getCooldownPercent(@LuaNotNil ItemStackAPI stack, Float delta) {
         checkEntity();
         if (delta == null) delta = 0f;
-        return this.entity.getCooldowns().getCooldownPercent(stack.itemStack.getItem(), delta);
+        return this.entity.getCooldownTracker().getCooldown(stack.itemStack.getItem(), delta);
     }
 
     @Override
     public String toString() {
         checkEntity();
-        return entity.getName().getString() + " (Player)";
+        return entity.getName() + " (Player)";
     }
 }

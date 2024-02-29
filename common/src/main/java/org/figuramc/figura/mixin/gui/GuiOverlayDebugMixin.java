@@ -1,7 +1,7 @@
 package org.figuramc.figura.mixin.gui;
 
-import net.minecraft.ChatFormatting;
-import net.minecraft.client.gui.components.DebugScreenOverlay;
+import net.minecraft.client.gui.GuiOverlayDebug;
+import net.minecraft.util.text.TextFormatting;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.avatar.AvatarManager;
@@ -13,10 +13,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.List;
 
-@Mixin(DebugScreenOverlay.class)
-public class DebugScreenOverlayMixin {
+@Mixin(GuiOverlayDebug.class)
+public class GuiOverlayDebugMixin {
 
-    @Inject(at = @At("RETURN"), method = "getSystemInformation")
+    @Inject(at = @At("RETURN"), method = "getDebugInfoRight")
     protected void getSystemInformation(CallbackInfoReturnable<List<String>> cir) {
         if (AvatarManager.panic) return;
 
@@ -28,7 +28,7 @@ public class DebugScreenOverlayMixin {
                 break;
         }
 
-        lines.add(++i, ChatFormatting.AQUA + "[" + FiguraMod.MOD_NAME + "]" + ChatFormatting.RESET);
+        lines.add(++i, TextFormatting.AQUA + "[" + FiguraMod.MOD_NAME + "]" + TextFormatting.RESET);
         lines.add(++i, "Version: " + FiguraMod.VERSION);
 
         Avatar avatar = AvatarManager.getAvatarForPlayer(FiguraMod.getLocalPlayerUUID());
@@ -38,12 +38,12 @@ public class DebugScreenOverlayMixin {
 
             // has script
             if (avatar.luaRuntime != null || avatar.scriptError) {
-                String color = (avatar.scriptError ? ChatFormatting.RED : "").toString();
+                String color = (avatar.scriptError ? TextFormatting.RED : "").toString();
                 lines.add(++i, color + String.format("Animations instructions: %d", avatar.animation.pre));
-                lines.add(++i, color + String.format("Init instructions: %d (W: %d E: %d)", avatar.init.getTotal(), avatar.init.pre, avatar.init.post) + ChatFormatting.RESET);
-                lines.add(++i, color + String.format("Tick instructions: %d (W: %d E: %d)", avatar.tick.getTotal() + avatar.worldTick.getTotal(), avatar.worldTick.pre, avatar.tick.pre)  + ChatFormatting.RESET);
-                lines.add(++i, color + String.format("Render instructions: %d (E: %d PE: %d)", avatar.render.getTotal(), avatar.render.pre, avatar.render.post) + ChatFormatting.RESET);
-                lines.add(++i, color + String.format("World Render instructions: %d (W: %d PW: %d)", avatar.worldRender.getTotal(), avatar.worldRender.pre, avatar.worldRender.post) + ChatFormatting.RESET);
+                lines.add(++i, color + String.format("Init instructions: %d (W: %d E: %d)", avatar.init.getTotal(), avatar.init.pre, avatar.init.post) + TextFormatting.RESET);
+                lines.add(++i, color + String.format("Tick instructions: %d (W: %d E: %d)", avatar.tick.getTotal() + avatar.worldTick.getTotal(), avatar.worldTick.pre, avatar.tick.pre)  + TextFormatting.RESET);
+                lines.add(++i, color + String.format("Render instructions: %d (E: %d PE: %d)", avatar.render.getTotal(), avatar.render.pre, avatar.render.post) + TextFormatting.RESET);
+                lines.add(++i, color + String.format("World Render instructions: %d (W: %d PW: %d)", avatar.worldRender.getTotal(), avatar.worldRender.pre, avatar.worldRender.post) + TextFormatting.RESET);
             }
         }
         lines.add(++i, String.format("Pings per second: ↑%d, ↓%d", NetworkStuff.pingsSent, NetworkStuff.pingsReceived));

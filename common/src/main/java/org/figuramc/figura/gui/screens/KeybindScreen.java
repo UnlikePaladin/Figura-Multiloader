@@ -1,6 +1,7 @@
 package org.figuramc.figura.gui.screens;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.screens.Screen;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.Avatar;
@@ -12,7 +13,7 @@ import org.figuramc.figura.utils.FiguraText;
 
 public class KeybindScreen extends AbstractPanelScreen {
 
-    private final Screen sourcePanel;
+    private final GuiScreen sourcePanel;
 
     private KeybindList list;
 
@@ -22,13 +23,13 @@ public class KeybindScreen extends AbstractPanelScreen {
     }
 
     @Override
-    public Class<? extends Screen> getSelectedPanel() {
+    public Class<? extends GuiScreen> getSelectedPanel() {
         return sourcePanel.getClass();
     }
 
     @Override
-    protected void init() {
-        super.init();
+    public void initGui() {
+        super.initGui();
 
         Avatar owner = AvatarManager.getAvatarForPlayer(FiguraMod.getLocalPlayerUUID());
 
@@ -56,8 +57,8 @@ public class KeybindScreen extends AbstractPanelScreen {
     }
 
     @Override
-    public void onClose() {
-        this.minecraft.setScreen(sourcePanel);
+    public void onGuiClosed() {
+        this.mc.displayGuiScreen(sourcePanel);
     }
 
     @Override

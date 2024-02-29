@@ -6,8 +6,10 @@ import com.mojang.blaze3d.platform.TextureUtil;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.SimpleTexture;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.client.renderer.texture.TextureUtil;
+import net.minecraft.client.resources.IResourceManager;
 import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.util.ResourceLocation;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.lua.LuaNotNil;
@@ -28,6 +30,7 @@ import org.luaj.vm2.LuaFunction;
 import org.luaj.vm2.LuaValue;
 import org.lwjgl.BufferUtils;
 
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
@@ -53,20 +56,20 @@ public class FiguraTexture extends SimpleTexture {
     /**
      * Native image holding the texture data for this texture.
      */
-    private final NativeImage texture;
-    private NativeImage backup;
+    private final BufferedImage texture;
+    private BufferedImage backup;
     private boolean isClosed = false;
 
     public FiguraTexture(Avatar owner, String name, byte[] data) {
         super(new FiguraIdentifier("avatar_tex/" + owner.owner + "/" + UUID.randomUUID()));
 
         // Read image from wrapper
-        NativeImage image;
+        BufferedImage image;
         try {
             ByteBuffer wrapper = BufferUtils.createByteBuffer(data.length);
             wrapper.put(data);
             wrapper.rewind();
-            image = NativeImage.read(wrapper);
+            image = TextureUtil.readBufferedImage(wrapper);
         } catch (IOException e) {
             FiguraMod.LOGGER.error("", e);
             image = new NativeImage(1, 1, true);
@@ -79,12 +82,12 @@ public class FiguraTexture extends SimpleTexture {
 
     public FiguraTexture(Avatar owner, String name, int width, int height) {
         super(new FiguraIdentifier("avatar_tex/" + owner.owner + "/" + UUID.randomUUID()));
-        this.texture = new NativeImage(width, height, true);
+        this.texture = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
         this.name = name;
         this.owner = owner;
     }
 
-    public FiguraTexture(Avatar owner, String name, NativeImage image) {
+    public FiguraTexture(Avatar owner, String name, BufferedImage image) {
         super(new FiguraIdentifier("avatar_tex/" + owner.owner + "/custom/" + UUID.randomUUID()));
         this.texture = image;
         this.name = name;
@@ -92,7 +95,7 @@ public class FiguraTexture extends SimpleTexture {
     }
 
     @Override
-    public void load(ResourceManager manager) throws IOException {}
+    public void loadTexture(IResourceManager resourceManager) throws IOException {}
 
     @Override
     public void close() {
@@ -107,12 +110,12 @@ public class FiguraTexture extends SimpleTexture {
             backup.close();
 
         this.releaseId();
-        ((TextureManagerAccessor) Minecraft.getInstance().getTextureManager()).getByPath().remove(this.location);
+        ((TextureManagerAccessor) Minecraft.getMinecraft().getTextureManager()).getByPath().remove(this.textureLocation);
     }
 
     public void uploadIfDirty() {
         if (!registered) {
-            Minecraft.getInstance().getTextureManager().register(this.location, this);
+            Minecraft.getMinecraft().getTextureManager().loadTexture(this.textureLocation, this);
             registered = true;
         }
 
@@ -158,7 +161,7 @@ public class FiguraTexture extends SimpleTexture {
     }
 
     public ResourceLocation getLocation() {
-        return this.location;
+        return this.textureLocation;
     }
 
 
@@ -223,7 +226,7 @@ public class FiguraTexture extends SimpleTexture {
     public FiguraTexture setPixel(int x, int y, Object r, Double g, Double b, Double a) {
         try {
             backupImage();
-            texture.setPixelRGBA(x, y, ColorUtils.rgbaToIntABGR(parseColor("setPixel", r, g, b, a)));
+            texture.setRGB(x, y, ColorUtils.rgbaToIntABGR(parseColor("setPixel", r, g, b, a)));
             return this;
         } catch (Exception e) {
             throw new LuaError(e.getMessage());

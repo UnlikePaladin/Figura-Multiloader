@@ -1,20 +1,15 @@
 package org.figuramc.figura.backend2;
 
 import com.mojang.authlib.exceptions.AuthenticationUnavailableException;
-import com.mojang.authlib.exceptions.InsufficientPrivilegesException;
 import com.mojang.authlib.exceptions.InvalidCredentialsException;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.User;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TranslatableComponent;
+import net.minecraft.util.Session;
+import net.minecraft.util.text.TextComponentTranslation;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.client.methods.RequestBuilder;
 import org.apache.http.util.EntityUtils;
 import org.figuramc.figura.FiguraMod;
-
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
 
 public class AuthHandler {
 
@@ -26,21 +21,19 @@ public class AuthHandler {
             FiguraMod.LOGGER.info("Authenticating with " + FiguraMod.MOD_NAME + " server...");
             NetworkStuff.backendStatus = 2;
 
-            Minecraft minecraft = Minecraft.getInstance();
-            User user = minecraft.getUser();
+            Minecraft minecraft = Minecraft.getMinecraft();
+            Session session = minecraft.getSession();
             try {
-                String username = user.getName();
+                String username = session.getUsername();
                 String serverID = getServerID(username);
                 FiguraMod.debug("Joining \"{}\" on server \"{}\"", username, serverID);
-                minecraft.getMinecraftSessionService().joinServer(user.getGameProfile(), user.getAccessToken(), serverID);
+                minecraft.getSessionService().joinServer(session.getProfile(), session.getToken(), serverID);
                 NetworkStuff.authSuccess(getToken(serverID));
             // cringe exceptions
             } catch (AuthenticationUnavailableException e) {
-                NetworkStuff.authFail(new TranslatableComponent("disconnect.loginFailedInfo.serversUnavailable").getString());
+                NetworkStuff.authFail(new TextComponentTranslation("disconnect.loginFailedInfo.serversUnavailable").getFormattedText());
             } catch (InvalidCredentialsException e) {
-                NetworkStuff.authFail(new TranslatableComponent("disconnect.loginFailedInfo.invalidSession").getString());
-            } catch (InsufficientPrivilegesException e) {
-                NetworkStuff.authFail(new TranslatableComponent("disconnect.loginFailedInfo.insufficientPrivileges").getString());
+                NetworkStuff.authFail(new TextComponentTranslation("disconnect.loginFailedInfo.invalidSession").getFormattedText());
             } catch (Exception e) {
                 NetworkStuff.authFail(e.getMessage());
             }

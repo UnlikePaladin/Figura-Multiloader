@@ -1,6 +1,6 @@
 package org.figuramc.figura.lua.api.action_wheel;
 
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.item.ItemStack;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.lua.LuaNotNil;
 import org.figuramc.figura.lua.LuaWhitelist;

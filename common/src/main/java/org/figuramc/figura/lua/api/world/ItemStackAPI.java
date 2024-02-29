@@ -1,19 +1,17 @@
 package org.figuramc.figura.lua.api.world;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.core.Registry;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.Mob;
-import net.minecraft.world.item.*;
+import net.minecraft.entity.monster.EntityMob;
+import net.minecraft.init.Items;
+import net.minecraft.item.*;
+import net.minecraft.nbt.NBTTagCompound;
 import org.figuramc.figura.lua.LuaWhitelist;
 import org.figuramc.figura.lua.NbtToLua;
 import org.figuramc.figura.lua.ReadOnlyLuaTable;
 import org.figuramc.figura.lua.docs.LuaFieldDoc;
 import org.figuramc.figura.lua.docs.LuaMethodDoc;
 import org.figuramc.figura.lua.docs.LuaTypeDoc;
+import org.figuramc.figura.utils.RegistryUtils;
 import org.luaj.vm2.LuaTable;
 
 import java.util.ArrayList;
@@ -50,8 +48,8 @@ public class ItemStackAPI {
 
     public ItemStackAPI(ItemStack itemStack) {
         this.itemStack = itemStack;
-        this.id = Registry.ITEM.getKey(itemStack.getItem()).toString();
-        this.tag = new ReadOnlyLuaTable(itemStack.getTag() != null ? NbtToLua.convert(itemStack.getTag()) : new LuaTable());
+        this.id = RegistryUtils.getResourceLocationForRegistryObj(Item.class, itemStack.getItem()).toString();
+        this.tag = new ReadOnlyLuaTable(itemStack.getTagCompound() != null ? NbtToLua.convert(itemStack.getTagCompound()) : new LuaTable());
     }
 
     @LuaWhitelist
@@ -75,19 +73,19 @@ public class ItemStackAPI {
     @LuaWhitelist
     @LuaMethodDoc("itemstack.get_damage")
     public int getDamage() {
-        return itemStack.getDamageValue();
+        return itemStack.getItemDamage();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("itemstack.get_pop_time")
     public int getPopTime() {
-        return itemStack.getPopTime();
+        return itemStack.getAnimationsToGo();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("itemstack.has_glint")
     public boolean hasGlint() {
-        return itemStack.hasFoil();
+        return itemStack.hasEffect();
     }
 
     @LuaWhitelist
@@ -100,7 +98,7 @@ public class ItemStackAPI {
         if (Minecraft.getInstance().getConnection() == null || Minecraft.getInstance().getConnection().getTags() == null)
             return list;
 
-        for (ResourceLocation resourceLocation : Minecraft.getInstance().getConnection().getTags().getItems().getMatchingTags(itemStack.getItem()))
+        for (ResourceLocation resourceLocation : Minecraft.getMinecraft().getConnection().getTags().getItems().getMatchingTags(itemStack.getItem()))
             list.add(resourceLocation.toString());
 
         return list;
@@ -109,25 +107,25 @@ public class ItemStackAPI {
     @LuaWhitelist
     @LuaMethodDoc("itemstack.is_block_item")
     public boolean isBlockItem() {
-        return itemStack.getItem() instanceof BlockItem;
+        return itemStack.getItem() instanceof ItemBlock;
     }
 
     @LuaWhitelist
     @LuaMethodDoc("itemstack.is_food")
     public boolean isFood() {
-        return itemStack.isEdible();
+        return itemStack.getItem() instanceof ItemFood;
     }
 
     @LuaWhitelist
     @LuaMethodDoc("itemstack.get_use_action")
     public String getUseAction() {
-        return itemStack.getUseAnimation().name();
+        return itemStack.getItemUseAction().name();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("itemstack.get_name")
     public String getName() {
-        return itemStack.getHoverName().getString();
+        return itemStack.getDisplayName();
     }
 
     @LuaWhitelist
@@ -145,7 +143,7 @@ public class ItemStackAPI {
     @LuaWhitelist
     @LuaMethodDoc("itemstack.is_enchantable")
     public boolean isEnchantable() {
-        return itemStack.isEnchantable();
+        return itemStack.isItemEnchantable();
     }
 
     @LuaWhitelist
@@ -157,7 +155,7 @@ public class ItemStackAPI {
     @LuaWhitelist
     @LuaMethodDoc("itemstack.is_damageable")
     public boolean isDamageable() {
-        return itemStack.isDamageableItem();
+        return itemStack.isItemStackDamageable();
     }
 
     @LuaWhitelist
@@ -169,22 +167,22 @@ public class ItemStackAPI {
     @LuaWhitelist
     @LuaMethodDoc("itemstack.get_repair_cost")
     public int getRepairCost() {
-        return itemStack.getBaseRepairCost();
+        return itemStack.getRepairCost();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("itemstack.get_use_duration")
     public int getUseDuration() {
-        return itemStack.getUseDuration();
+        return itemStack.getMaxItemUseDuration();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("itemstack.to_stack_string")
     public String toStackString() {
         ItemStack stack = itemStack;
-        String ret = Registry.ITEM.getKey(stack.getItem()).toString();
+        String ret = RegistryUtils.getResourceLocationForRegistryObj(Item.class, stack.getItem()).toString();
 
-        CompoundTag nbt = stack.getTag();
+        NBTTagCompound nbt = stack.getTagCompound();
         if (nbt != null)
             ret += nbt.toString();
 
@@ -194,19 +192,19 @@ public class ItemStackAPI {
     @LuaWhitelist
     @LuaMethodDoc("itemstack.is_armor")
     public boolean isArmor() {
-        return itemStack.getItem() instanceof ArmorItem;
+        return itemStack.getItem() instanceof ItemArmor;
     }
 
     @LuaWhitelist
     @LuaMethodDoc("itemstack.is_tool")
     public boolean isTool() {
-        return itemStack.getItem() instanceof DiggerItem;
+        return itemStack.getItem() instanceof ItemTool;
     }
 
     @LuaWhitelist
     @LuaMethodDoc("itemstack.get_equipment_slot")
     public String getEquipmentSlot() {
-        return Mob.getEquipmentSlotForItem(itemStack).name();
+        return EntityMob.getSlotForItemStack(itemStack).name();
     }
 
     @LuaWhitelist
@@ -218,7 +216,7 @@ public class ItemStackAPI {
     @LuaWhitelist
     @LuaMethodDoc("itemstack.get_blockstate")
     public BlockStateAPI getBlockstate() {
-        return itemStack.getItem() instanceof BlockItem ? new BlockStateAPI(((BlockItem) itemStack.getItem()).getBlock().defaultBlockState(), null) : null;
+        return itemStack.getItem() instanceof ItemBlock ? new BlockStateAPI(((ItemBlock) itemStack.getItem()).getBlock().getDefaultState(), null) : null;
     }
 
     @LuaWhitelist
@@ -233,8 +231,8 @@ public class ItemStackAPI {
         if (!(t.getItem() == o.getItem()))
             return false;
 
-        CompoundTag tag1 = t.getTag();
-        CompoundTag tag2 = o.getTag();
+        NBTTagCompound tag1 = t.getTagCompound();
+        NBTTagCompound tag2 = o.getTagCompound();
         if (tag1 == null && tag2 != null)
             return false;
 

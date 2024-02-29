@@ -1,9 +1,9 @@
 package org.figuramc.figura.animation;
 
-import com.mojang.realmsclient.util.Pair;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.math.vector.FiguraVec3;
+import org.figuramc.figura.utils.Pair;
 import org.luaj.vm2.LuaError;
 import org.luaj.vm2.LuaValue;
 import org.luaj.vm2.Varargs;
@@ -25,10 +25,10 @@ public class Keyframe implements Comparable<Keyframe> {
         this.animation = animation;
         this.time = time;
         this.interpolation = interpolation;
-        this.targetA = a.first();
-        this.targetB = b.first();
-        this.aCode = a.second();
-        this.bCode = b.second();
+        this.targetA = a.getFirst();
+        this.targetB = b.getFirst();
+        this.aCode = a.getSecond();
+        this.bCode = b.getSecond();
         this.chunkName = animation.getName() + " keyframe (" + time + "s)";
         this.bezierLeft = bezierLeft;
         this.bezierRight = bezierRight;

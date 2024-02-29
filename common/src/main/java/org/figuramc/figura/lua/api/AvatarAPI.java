@@ -2,8 +2,7 @@ package org.figuramc.figura.lua.api;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.Style;
+import net.minecraft.util.text.ITextComponent;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.avatar.Badges;
 import org.figuramc.figura.lua.LuaNotNil;
@@ -133,8 +132,8 @@ public class AvatarAPI {
             value = "avatar.get_badges"
     )
     public String getBadges() {
-        Component component = Badges.fetchBadges(avatar.owner);
-        return component.getString();
+        ITextComponent component = Badges.fetchBadges(avatar.owner);
+        return component.getFormattedText();
     }
 
     @LuaWhitelist

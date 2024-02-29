@@ -1,14 +1,13 @@
 package org.figuramc.figura.mixin;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.MouseHandler;
-import net.minecraft.client.Options;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.entity.player.Player;
+import net.minecraft.client.entity.EntityPlayerSP;
+import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.multiplayer.WorldClient;
+import net.minecraft.client.settings.GameSettings;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.util.MouseHelper;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.avatar.AvatarManager;
@@ -21,48 +20,52 @@ import org.figuramc.figura.gui.screens.WardrobeScreen;
 import org.figuramc.figura.lua.FiguraLuaPrinter;
 import org.figuramc.figura.utils.FiguraText;
 import org.jetbrains.annotations.Nullable;
-import org.spongepowered.asm.mixin.*;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
-import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(Minecraft.class)
 public abstract class MinecraftMixin {
 
-    @Shadow @Final public MouseHandler mouseHandler;
-    @Shadow @Final public Options options;
-    @Shadow public LocalPlayer player;
-    @Shadow public Entity cameraEntity;
+    @Shadow
+    public MouseHelper mouseHelper;
+    @Shadow
+    public GameSettings gameSettings;
+    @Shadow public EntityPlayerSP player;
+    @Shadow
+    private Entity renderViewEntity;
 
-    @Shadow public abstract void setScreen(@Nullable Screen screen);
+    @Shadow public abstract void displayGuiScreen(@Nullable GuiScreen screen);
 
     @Unique
     private boolean scriptMouseUnlock = false;
 
-    @Inject(at = @At("RETURN"), method = "handleKeybinds")
+    @Inject(at = @At("RETURN"), method = "processKeyBinds")
     private void handleKeybinds(CallbackInfo ci) {
         // don't handle keybinds on panic
         if (AvatarManager.panic)
             return;
 
         // reload avatar button
-        if (Configs.RELOAD_BUTTON.keyBind.consumeClick()) {
+        if (Configs.RELOAD_BUTTON.keyBind.isPressed()) {
             AvatarManager.reloadAvatar(FiguraMod.getLocalPlayerUUID());
             FiguraToast.sendToast(new FiguraText("toast.reload"));
         }
 
         // reload avatar button
-        if (Configs.WARDROBE_BUTTON.keyBind.consumeClick())
-            this.setScreen(new WardrobeScreen(null));
+        if (Configs.WARDROBE_BUTTON.keyBind.isPressed())
+            this.displayGuiScreen(new WardrobeScreen(null));
 
         // action wheel button
         Boolean wheel = null;
         if (Configs.ACTION_WHEEL_MODE.value % 2 == 1) {
-            if (Configs.ACTION_WHEEL_BUTTON.keyBind.consumeClick())
+            if (Configs.ACTION_WHEEL_BUTTON.keyBind.isPressed())
                 wheel = !ActionWheel.isEnabled();
-        } else if (Configs.ACTION_WHEEL_BUTTON.keyBind.isDown()) {
+        } else if (Configs.ACTION_WHEEL_BUTTON.keyBind.isKeyDown()) {
             wheel = true;
         } else if (ActionWheel.isEnabled()) {
             wheel = false;
@@ -70,25 +73,25 @@ public abstract class MinecraftMixin {
         if (wheel != null) {
             if (wheel) {
                 ActionWheel.setEnabled(true);
-                this.mouseHandler.releaseMouse();
+                this.mouseHelper.ungrabMouseCursor();
             } else {
                 if (Configs.ACTION_WHEEL_MODE.value >= 2)
                     ActionWheel.execute(ActionWheel.getSelected(), true);
                 ActionWheel.setEnabled(false);
-                this.mouseHandler.grabMouse();
+                this.mouseHelper.grabMouseCursor();
             }
         }
 
         // popup menu button
-        if (Configs.POPUP_BUTTON.keyBind.isDown()) {
+        if (Configs.POPUP_BUTTON.keyBind.isKeyDown()) {
             PopupMenu.setEnabled(true);
 
             if (!PopupMenu.hasEntity()) {
                 Entity target = FiguraMod.extendedPickEntity;
-                if (this.player != null && target instanceof Player && !target.isInvisibleTo(this.player)) {
+                if (this.player != null && target instanceof EntityPlayer && !target.isInvisibleToPlayer(this.player)) {
                     PopupMenu.setEntity(target);
-                } else if (!this.options.getCameraType().isFirstPerson()) {
-                    PopupMenu.setEntity(this.cameraEntity);
+                } else if (this.gameSettings.thirdPersonView != 0) {
+                    PopupMenu.setEntity(this.renderViewEntity);
                 }
             }
         } else if (PopupMenu.isEnabled()) {
@@ -98,15 +101,15 @@ public abstract class MinecraftMixin {
         // unlock cursor :p
         Avatar avatar = AvatarManager.getAvatarForPlayer(FiguraMod.getLocalPlayerUUID());
         if (avatar != null && avatar.luaRuntime != null && avatar.luaRuntime.host.unlockCursor) {
-            this.mouseHandler.releaseMouse();
+            this.mouseHelper.ungrabMouseCursor();
             scriptMouseUnlock = true;
         } else if (scriptMouseUnlock) {
-            this.mouseHandler.grabMouse();
+            this.mouseHelper.grabMouseCursor();
             scriptMouseUnlock = false;
         }
     }
 
-    @ModifyVariable(at = @At(value = "FIELD", target = "Lnet/minecraft/world/entity/player/Inventory;selected:I"), method = "handleKeybinds")
+    @ModifyVariable(at = @At(value = "FIELD", target = "Lnet/minecraft/entity/player/InventoryPlayer;currentItem:I"), method = "processKeyBinds")
     private int handleHotbarSlots(int value) {
         if (PopupMenu.isEnabled())
             PopupMenu.hotbarKeyPressed(value);
@@ -115,8 +118,8 @@ public abstract class MinecraftMixin {
         return value;
     }
 
-    @Inject(at = @At("HEAD"), method = "setScreen")
-    private void setScreen(Screen screen, CallbackInfo ci) {
+    @Inject(at = @At("HEAD"), method = "displayGuiScreen")
+    private void setScreen(GuiScreen screen, CallbackInfo ci) {
         if (ActionWheel.isEnabled())
             ActionWheel.setEnabled(false);
 
@@ -124,29 +127,33 @@ public abstract class MinecraftMixin {
             PopupMenu.run();
     }
 
-    @Inject(at = @At("RETURN"), method = "clearLevel(Lnet/minecraft/client/gui/screens/Screen;)V")
-    private void clearLevel(Screen screen, CallbackInfo ci) {
-        AvatarManager.clearAllAvatars();
-        FiguraLuaPrinter.clearPrintQueue();
-        NetworkStuff.unsubscribeAll();
+    @Inject(at = @At("RETURN"), method = "loadWorld(Lnet/minecraft/client/multiplayer/WorldClient;Ljava/lang/String;)V")
+    private void clearLevel(WorldClient worldClient, String loadingMessage, CallbackInfo ci) {
+        if (worldClient == null) {
+            AvatarManager.clearAllAvatars();
+            FiguraLuaPrinter.clearPrintQueue();
+            NetworkStuff.unsubscribeAll();
+        }
     }
 
-    @Inject(at = @At("RETURN"), method = "setLevel")
-    private void setLevel(ClientLevel world, CallbackInfo ci) {
-        NetworkStuff.auth();
+    @Inject(at = @At("RETURN"), method = "loadWorld(Lnet/minecraft/client/multiplayer/WorldClient;Ljava/lang/String;)V")
+    private void setLevel(WorldClient worldClient, String loadingMessage, CallbackInfo ci) {
+        if (worldClient != null) {
+            NetworkStuff.auth();
+        }
     }
 
-    @Inject(at = @At("HEAD"), method = "runTick")
-    private void preTick(boolean tick, CallbackInfo ci) {
+    @Inject(at = @At("HEAD"), method = "runGameLoop")
+    private void preTick(CallbackInfo ci) {
         AvatarManager.executeAll("applyBBAnimations", Avatar::applyAnimations);
     }
 
-    @Inject(at = @At("RETURN"), method = "runTick")
-    private void afterTick(boolean tick, CallbackInfo ci) {
+    @Inject(at = @At("RETURN"), method = "runGameLoop")
+    private void afterTick(CallbackInfo ci) {
         AvatarManager.executeAll("clearBBAnimations", Avatar::clearAnimations);
     }
 
-    @Inject(at = @At("HEAD"), method = "tick")
+    @Inject(at = @At("HEAD"), method = "runTick")
     private void startTick(CallbackInfo ci) {
         FiguraMod.pushProfiler(FiguraMod.MOD_ID);
         FiguraMod.tick();

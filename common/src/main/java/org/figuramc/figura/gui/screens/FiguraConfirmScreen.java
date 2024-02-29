@@ -1,11 +1,15 @@
 package org.figuramc.figura.gui.screens;
 
 import it.unimi.dsi.fastutil.booleans.BooleanConsumer;
+import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.TextComponent;
 import net.minecraft.network.chat.TranslatableComponent;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextComponentTranslation;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.gui.FiguraToast;
 import org.figuramc.figura.gui.widgets.Button;
@@ -13,20 +17,22 @@ import org.figuramc.figura.gui.widgets.Label;
 import org.figuramc.figura.utils.FiguraText;
 import org.figuramc.figura.utils.TextUtils;
 
+import java.util.function.Function;
+
 public class FiguraConfirmScreen extends AbstractPanelScreen {
 
-    private final BooleanConsumer callback;
-    private final Component message;
+    private final Function<Boolean, Void> callback;
+    private final ITextComponent message;
 
-    public FiguraConfirmScreen(BooleanConsumer callback, Object title, Object message, Screen parentScreen) {
-        super(parentScreen, title instanceof Component ? (Component) title : new TextComponent(title.toString()));
+    public FiguraConfirmScreen(Function<Boolean, Void> callback, Object title, Object message, GuiScreen parentScreen) {
+        super(parentScreen, title instanceof ITextComponent ? (ITextComponent) title : new TextComponentString(title.toString()));
         this.callback = callback;
-        this.message = message instanceof Component ? (Component) message : new TextComponent(message.toString()).withStyle(FiguraMod.getAccentColor());
+        this.message = message instanceof ITextComponent ? (ITextComponent) message : new TextComponentString(message.toString()).setStyle(FiguraMod.getAccentColor());
     }
 
     @Override
-    protected void init() {
-        super.init();
+    public void initGui() {
+        super.initGui();
         removeWidget(panels);
 
         // labels
@@ -77,8 +83,8 @@ public class FiguraConfirmScreen extends AbstractPanelScreen {
 
         private final String url;
 
-        public FiguraConfirmLinkScreen(BooleanConsumer callback, String link, Screen parentScreen) {
-            super(callback, new TranslatableComponent("chat.link.confirmTrusted"), link, parentScreen);
+        public FiguraConfirmLinkScreen(Function<Boolean, Void> callback, String link, GuiScreen parentScreen) {
+            super(callback, new TextComponentTranslation("chat.link.confirmTrusted"), link, parentScreen);
             this.url = link;
         }
 

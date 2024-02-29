@@ -1,18 +1,17 @@
 package org.figuramc.figura.mixin;
 
-import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.entity.EntityLivingBase;
 import org.spongepowered.asm.mixin.Intrinsic;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
-import org.spongepowered.asm.mixin.gen.Invoker;
 
-@Mixin(LivingEntity.class)
+@Mixin(EntityLivingBase.class)
 public interface LivingEntityAccessor {
     @Intrinsic
-    @Accessor("jumping")
+    @Accessor("isJumping")
     boolean isJumping();
 
     @Intrinsic
-    @Invoker("getCurrentSwingDuration")
+    @Accessor("swingProgressInt")
     int getSwingDuration();
 }

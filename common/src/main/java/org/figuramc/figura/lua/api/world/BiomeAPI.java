@@ -1,18 +1,16 @@
 package org.figuramc.figura.lua.api.world;
 
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Registry;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.world.level.biome.Biome;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.biome.Biome;
 import org.figuramc.figura.lua.LuaWhitelist;
 import org.figuramc.figura.lua.docs.LuaFieldDoc;
 import org.figuramc.figura.lua.docs.LuaMethodDoc;
 import org.figuramc.figura.lua.docs.LuaMethodOverload;
 import org.figuramc.figura.lua.docs.LuaTypeDoc;
 import org.figuramc.figura.math.vector.FiguraVec3;
-import org.figuramc.figura.mixin.BiomeAccessor;
 import org.figuramc.figura.utils.ColorUtils;
 import org.figuramc.figura.utils.LuaUtils;
+import org.figuramc.figura.utils.RegistryUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -35,11 +33,11 @@ public class BiomeAPI {
     public BiomeAPI(Biome biome, BlockPos pos) {
         this.biome = biome;
         this.pos = pos;
-        this.id = WorldAPI.getCurrentWorld().registryAccess().registry(Registry.BIOME_REGISTRY).get().getKey(biome).toString();
+        this.id = RegistryUtils.getResourceLocationForRegistryObj(Biome.class, biome).toString();
     }
 
     protected BlockPos getBlockPos() {
-        return pos == null ? BlockPos.ZERO : pos;
+        return pos == null ? BlockPos.ORIGIN : pos;
     }
 
     @LuaWhitelist
@@ -85,32 +83,32 @@ public class BiomeAPI {
         if (key.isPresent())
             return list;
 
-        list.add(biome.getBiomeCategory().getName());
+        list.add(biome.getTempCategory().name());
         return list;
     }
 
     @LuaWhitelist
     @LuaMethodDoc("biome.get_temperature")
     public float getTemperature() {
-        return biome.getBaseTemperature();
+        return biome.getDefaultTemperature();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("biome.get_precipitation")
     public String getPrecipitation() {
-        return biome.getPrecipitation().name();
+        return biome.getEnableSnow() ? "snow" : biome.canRain() ? "rain" : "none";
     }
 
     @LuaWhitelist
     @LuaMethodDoc("biome.get_sky_color")
     public FiguraVec3 getSkyColor() {
-        return ColorUtils.intToRGB(biome.getSkyColor());
+        return ColorUtils.intToRGB(biome.getSkyColorByTemp());
     }
 
     @LuaWhitelist
     @LuaMethodDoc("biome.get_foliage_color")
     public FiguraVec3 getFoliageColor() {
-        return ColorUtils.intToRGB(biome.getFoliageColor());
+        return ColorUtils.intToRGB(biome.getFoliageColorAtPos(pos));
     }
 
     @LuaWhitelist
@@ -141,19 +139,19 @@ public class BiomeAPI {
     @LuaWhitelist
     @LuaMethodDoc("biome.get_downfall")
     public float getDownfall() {
-        return biome.getDownfall();
+        return biome.getRainfall();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("biome.is_hot")
     public boolean isHot() {
-        return ((BiomeAccessor) (Object) biome).getTheTemperature(getBlockPos()) > 1f;
+        return  biome.getTemperature(getBlockPos()) > 1f;
     }
 
     @LuaWhitelist
     @LuaMethodDoc("biome.is_cold")
     public boolean isCold() {
-        return !(((BiomeAccessor) (Object) biome).getTheTemperature(getBlockPos()) >= 0.15f);
+        return !(biome.getTemperature(getBlockPos()) >= 0.15f);
     }
 
     @LuaWhitelist

@@ -7,10 +7,17 @@ import com.mojang.math.Vector3f;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.client.gui.ScaledResolution;
+import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.item.ItemStack;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.TextComponent;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.TextComponentString;
 import net.minecraft.world.item.ItemStack;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.Avatar;
@@ -24,6 +31,7 @@ import org.figuramc.figura.utils.FiguraIdentifier;
 import org.figuramc.figura.utils.FiguraText;
 import org.figuramc.figura.utils.TextUtils;
 import org.figuramc.figura.utils.ui.UIHelper;
+import org.lwjgl.opengl.Display;
 
 import java.util.List;
 import java.util.function.Function;
@@ -45,26 +53,26 @@ public class ActionWheel {
     private static int x, y;
     private static double mouseX, mouseY;
 
-    public static void render(PoseStack stack) {
+    public static void render() {
         if (!isEnabled()) return;
 
-        minecraft = Minecraft.getInstance();
-        Window window = minecraft.getWindow();
-        x = (int) (window.getGuiScaledWidth() / 2d);
-        y = (int) (window.getGuiScaledHeight() / 2d);
+        minecraft = Minecraft.getMinecraft();
+        ScaledResolution window = new ScaledResolution(minecraft);
+        x = (int) (window.getScaledWidth() / 2d);
+        y = (int) (window.getScaledHeight() / 2d);
 
         // rendering
-        stack.pushPose();
-        stack.translate(x, y, 0d);
+        GlStateManager.pushMatrix();
+        GlStateManager.translate(x, y, 0d);
 
         scale = Configs.ACTION_WHEEL_SCALE.value;
-        stack.scale(scale, scale, scale);
+        GlStateManager.scale(scale, scale, scale);
 
         Avatar avatar = AvatarManager.getAvatarForPlayer(FiguraMod.getLocalPlayerUUID());
         Page currentPage;
         if (avatar == null || avatar.luaRuntime == null || (currentPage = avatar.luaRuntime.action_wheel.currentPage) == null) {
             // this also pops the stack
-            renderEmpty(stack, avatar == null);
+            renderEmpty(avatar == null);
             return;
         }
 
@@ -73,8 +81,8 @@ public class ActionWheel {
         leftSlots = (int) Math.floor(slots / 2d);
         rightSlots = (int) Math.ceil(slots / 2d);
 
-        mouseX = minecraft.mouseHandler.xpos() * window.getGuiScaledWidth() / window.getScreenWidth();
-        mouseY = minecraft.mouseHandler.ypos() * window.getGuiScaledHeight() / window.getScreenHeight();
+        mouseX = minecraft.mouseHandler.xpos() * window.getScaledWidth() / minecraft.displayWidth;
+        mouseY = minecraft.mouseHelper.mouseHandler.ypos() * window.getScaledHeight() / minecraft.displayHeight;
 
         // calculate selected slot
         FiguraMod.pushProfiler("selectedSlot");
@@ -82,14 +90,14 @@ public class ActionWheel {
 
         // render overlays
         FiguraMod.popPushProfiler("wheel");
-        renderTextures(stack, currentPage);
+        renderTextures(currentPage);
 
         // reset colours
-        RenderSystem.color4f(1f, 1f, 1f, 1f);
+        GlStateManager.color(1f, 1f, 1f, 1f);
 
         // render items
         FiguraMod.popPushProfiler("items");
-        renderItemsAndIcons(stack, currentPage);
+        renderItemsAndIcons(currentPage);
 
         stack.popPose();
 
@@ -112,11 +120,11 @@ public class ActionWheel {
         return Math.toRadians(angle);
     }
 
-    private static void renderEmpty(PoseStack stack, boolean avatar) {
+    private static void renderEmpty(boolean avatar) {
         // render empty wheel
         TextureData data = OverlayTexture.values()[0].data[0];
-        data.render(stack, null, false);
-        data.render(stack, null, true);
+        data.render(null, false);
+        data.render(null, true);
 
         stack.popPose(); // previous stack
 
@@ -174,7 +182,7 @@ public class ActionWheel {
             UIHelper.setupTexture(ICONS);
 
             if (color != null)
-                RenderSystem.color4f((float) color.x, (float) color.y, (float) color.z, 1f);
+                GlStateManager.color((float) color.x, (float) color.y, (float) color.z, 1f);
             UIHelper.blit(stack,
                     (int) Math.round(x), (int) Math.round(y),
                     8, 8,
@@ -185,7 +193,7 @@ public class ActionWheel {
         }
     }
 
-    private static void renderItemsAndIcons(PoseStack stack, Page page) {
+    private static void renderItemsAndIcons(Page page) {
         for (int i = 0; i < slots; i++) {
             Action action = page.slots()[i];
             if (action == null)
@@ -229,8 +237,8 @@ public class ActionWheel {
         }
     }
 
-    private static void renderTexts(PoseStack stack, Page page) {
-        Font font = minecraft.font;
+    private static void renderTexts(Page page) {
+        FontRenderer font = minecraft.fontRenderer;
         int titlePosition = Configs.ACTION_WHEEL_TITLE.value;
         int indicatorPosition = Configs.ACTION_WHEEL_SLOTS_INDICATOR.value;
 
@@ -240,35 +248,35 @@ public class ActionWheel {
         // page indicator
         int groupCount = page.getGroupCount();
         if (groupCount > 1 && (selectedTitle == null || indicatorPosition != titlePosition - 2)) {
-            stack.pushPose();
-            stack.translate(0d, 0d, 999d);
+            GlStateManager.pushMatrix();
+            GlStateManager.translate(0d, 0d, 999d);
             int index = page.getSlotsShift();
             int greatest = page.getGreatestSlot() + 1;
 
-            MutableComponent indicator = TextComponent.EMPTY.copy();
+            ITextComponent indicator = new TextComponentString("");
             int extraWidth = 0;
 
             // down arrow
             if (index > 1) {
-                Component arrow = UIHelper.UP_ARROW.copy().append(" ");
-                indicator.append(arrow);
-                extraWidth -= font.width(arrow);
+                ITextComponent arrow = UIHelper.UP_ARROW.createCopy().appendText(" ");
+                indicator.appendSibling(arrow);
+                extraWidth -= font.getStringWidth(arrow.getFormattedText());
             }
             // text
-            indicator.append(new FiguraText("gui.action_wheel.slots_indicator",
-                    new TextComponent(String.valueOf((index - 1) * 8 + 1)).withStyle(FiguraMod.getAccentColor()),
-                    new TextComponent(String.valueOf(Math.min(index * 8, greatest))).withStyle(FiguraMod.getAccentColor()),
-                    new TextComponent(String.valueOf(greatest)).withStyle(FiguraMod.getAccentColor())
+            indicator.appendSibling(new FiguraText("gui.action_wheel.slots_indicator",
+                    new TextComponentString(String.valueOf((index - 1) * 8 + 1)).setStyle(FiguraMod.getAccentColor()),
+                    new TextComponentString(String.valueOf(Math.min(index * 8, greatest))).setStyle(FiguraMod.getAccentColor()),
+                    new TextComponentString(String.valueOf(greatest)).setStyle(FiguraMod.getAccentColor())
             ));
             // up arrow
             if (index < groupCount) {
-                Component arrow = new TextComponent(" ").append(UIHelper.DOWN_ARROW);
-                indicator.append(arrow);
-                extraWidth += font.width(arrow);
+                ITextComponent arrow = new TextComponentString(" ").appendSibling(UIHelper.DOWN_ARROW);
+                indicator.appendSibling(arrow);
+                extraWidth += font.getStringWidth(arrow.getFormattedText());
             }
 
             // draw
-            font.drawShadow(stack, indicator, x - (int) ((font.width(indicator) - extraWidth) / 2f), (int) Position.index(indicatorPosition).apply(font.lineHeight), 0xFFFFFF);
+            font.drawStringWithShadow(indicator.getFormattedText(), x - (int) ((font.getStringWidth(indicator.getFormattedText()) - extraWidth) / 2f), (int) Position.index(indicatorPosition).apply(font.FONT_HEIGHT), 0xFFFFFF);
             stack.popPose();
         }
 
@@ -320,8 +328,8 @@ public class ActionWheel {
             return;
 
         // vars
-        Component text = Emojis.applyEmojis(TextUtils.tryParseJson(selectedTitle));
-        List<Component> list = TextUtils.splitText(text, "\n");
+        ITextComponent text = Emojis.applyEmojis(TextUtils.tryParseJson(selectedTitle));
+        List<ITextComponent> list = TextUtils.splitText(text, "\n");
         int height = font.lineHeight * list.size();
 
         // render
@@ -465,16 +473,16 @@ public class ActionWheel {
             this(u, v, 0);
         }
 
-        public void render(PoseStack stack, FiguraVec3 color, boolean left) {
-            stack.pushPose();
-            stack.mulPose(Vector3f.ZP.rotationDegrees(rotation + (left ? 180 : 0)));
+        public void render(FiguraVec3 color, boolean left) {
+            GlStateManager.pushMatrix();
+            GlStateManager.multMatrix(Vector3f.ZP.rotationDegrees(rotation + (left ? 180 : 0)));
 
             UIHelper.setupTexture(TEXTURE);
             if (color != null)
-                RenderSystem.color4f((float) color.x, (float) color.y, (float) color.z, 1f);
+                GlStateManager.color((float) color.x, (float) color.y, (float) color.z, 1f);
             UIHelper.blit(stack, 0, y, 64, h, u, color == null ? v : v + 128, 64, rh, 256, 256);
 
-            stack.popPose();
+            GlStateManager.popMatrix();
         }
     }
 

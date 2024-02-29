@@ -2,6 +2,7 @@ package org.figuramc.figura.gui.screens;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.screens.Screen;
 import org.figuramc.figura.config.ConfigManager;
 import org.figuramc.figura.config.ConfigType;
@@ -15,7 +16,7 @@ public class NetworkFilterScreen extends AbstractPanelScreen {
     private final ConfigType.NetworkFilterConfig config = Configs.NETWORK_FILTER;
     private final Label titleLabel;
     private NetworkFilterList networkFilterList;
-    public NetworkFilterScreen(Screen parentScreen) {
+    public NetworkFilterScreen(GuiScreen parentScreen) {
         super(parentScreen, new FiguraText("gui.network_filter"));
         titleLabel = new Label(this.getTitle(), 0, 0, TextUtils.Alignment.CENTER);
     }

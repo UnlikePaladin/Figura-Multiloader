@@ -88,7 +88,7 @@ public class MathUtils {
     }
 
     public static FiguraVec3 toCameraSpace(FiguraVec3 vec) {
-        ActiveRenderInfo camera = Minecraft.getMinecraft().renderGlobal.getMainCamera();
+        ActiveRenderInfo camera = Minecraft.getMinecraft().renderGlobal.r();
 
         FiguraMat3 transformMatrix = FiguraMat3.of().set(new Matrix3f(camera.rotation()));
         Vec3d pos = ActiveRenderInfoAccessor.getPos();
@@ -104,8 +104,7 @@ public class MathUtils {
 
     public static FiguraVec4 worldToScreenSpace(FiguraVec3 worldSpace) {
         Minecraft minecraft = Minecraft.getMinecraft();
-        ActiveRenderInfo camera = minecraft.gameRenderer.getMainCamera();
-        Matrix3f transformMatrix = new Matrix3f(camera.rotation());
+        Matrix3f transformMatrix = new Matrix3f(ActiveRenderInfo.rotation());
         transformMatrix.invert();
 
         Vec3d camPos = ActiveRenderInfoAccessor.getPos();
@@ -264,5 +263,9 @@ public class MathUtils {
         newQ.z = vector3f.z * g;
         newQ.w = (float) Math.cos(f / 2.0F);
         return newQ;
+    }
+
+    public static float triangleWave(float f, float g) {
+        return (Math.abs(f % g - g * 0.5f) - g * 0.25f) / (g * 0.25f);
     }
 }

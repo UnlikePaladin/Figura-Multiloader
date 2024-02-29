@@ -1,13 +1,14 @@
 package org.figuramc.figura.lua.api.keybind;
 
 import net.minecraft.client.KeyMapping;
+import net.minecraft.client.settings.KeyBinding;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.lua.LuaNotNil;
 import org.figuramc.figura.lua.LuaWhitelist;
 import org.figuramc.figura.lua.docs.LuaMethodDoc;
 import org.figuramc.figura.lua.docs.LuaMethodOverload;
 import org.figuramc.figura.lua.docs.LuaTypeDoc;
-import org.figuramc.figura.mixin.input.KeyMappingAccessor;
+import org.figuramc.figura.mixin.input.KeyBindingAccessor;
 import org.luaj.vm2.LuaError;
 
 import java.util.ArrayList;
@@ -69,11 +70,11 @@ public class KeybindAPI {
             value = "keybinds.from_vanilla"
     )
     public FiguraKeybind fromVanilla(@LuaNotNil String id) {
-        KeyMapping key = KeyMappingAccessor.getAll().get(id);
+        KeyBinding key = KeyBindingAccessor.getAll().get(id);
         if (key == null)
             throw new LuaError("Failed to find key: \"" + id + "\"");
 
-        return newKeybind("[Vanilla] " + key.getTranslatedKeyMessage().getString(), key.saveString(), false);
+        return newKeybind("[Vanilla] " + key.getKeyDescription(), key.saveString(), false);
     }
 
     @LuaWhitelist
@@ -85,7 +86,7 @@ public class KeybindAPI {
             value = "keybinds.get_vanilla_key"
     )
     public String getVanillaKey(@LuaNotNil String id) {
-        KeyMapping key = KeyMappingAccessor.getAll().get(id);
+        KeyBinding key = KeyBindingAccessor.getAll().get(id);
         return key == null ? null : key.saveString();
     }
 

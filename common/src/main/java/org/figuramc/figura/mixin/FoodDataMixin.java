@@ -1,14 +1,13 @@
 package org.figuramc.figura.mixin;
 
-import net.minecraft.world.food.FoodData;
-import org.figuramc.figura.ducks.FoodDataAccesor;
+import net.minecraft.util.FoodStats;
+import org.figuramc.figura.ducks.FoodStatsAccessor;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
-@Mixin(FoodData.class)
-public abstract class FoodDataMixin implements FoodDataAccesor {
+@Mixin(FoodStats.class)
+public abstract class FoodDataMixin implements FoodStatsAccessor {
     @Override
-    @Accessor("exhaustionLevel")
+    @Accessor("foodExhaustionLevel")
     public abstract float figura$getExhaustionLevel();
 }

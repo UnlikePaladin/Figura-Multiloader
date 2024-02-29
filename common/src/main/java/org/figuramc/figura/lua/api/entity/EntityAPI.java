@@ -1,23 +1,22 @@
 package org.figuramc.figura.lua.api.entity;
 
+import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Registry;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.util.Mth;
-import net.minecraft.world.Container;
-import net.minecraft.world.ContainerListener;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityDimensions;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.entity.projectile.ProjectileUtil;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.EntityHitResult;
-import net.minecraft.world.phys.HitResult;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.init.Blocks;
+import net.minecraft.inventory.IInventory;
+import net.minecraft.inventory.IInventoryChangedListener;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.server.management.UserListOpsEntry;
+import net.minecraft.util.math.AxisAlignedBB;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.RayTraceResult;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.DimensionType;
+import net.minecraft.world.World;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.avatar.AvatarManager;
 import org.figuramc.figura.lua.LuaWhitelist;
@@ -31,9 +30,10 @@ import org.figuramc.figura.lua.docs.LuaMethodOverload;
 import org.figuramc.figura.lua.docs.LuaTypeDoc;
 import org.figuramc.figura.math.vector.FiguraVec2;
 import org.figuramc.figura.math.vector.FiguraVec3;
-import org.figuramc.figura.mixin.EntityAccessor;
 import org.figuramc.figura.utils.EntityUtils;
 import org.figuramc.figura.utils.LuaUtils;
+import org.figuramc.figura.utils.MathUtils;
+import org.figuramc.figura.utils.RegistryUtils;
 import org.luaj.vm2.LuaTable;
 import org.luaj.vm2.LuaValue;
 
@@ -56,25 +56,25 @@ public class EntityAPI<T extends Entity> {
 
     public EntityAPI(T entity) {
         this.entity = entity;
-        entityUUID = entity.getUUID();
+        entityUUID = entity.getUniqueID();
     }
 
     public static EntityAPI<?> wrap(Entity e) {
         if (e == null)
             return null;
-        if (e instanceof Player) {
-            Player p = (Player) e;
+        if (e instanceof EntityPlayer) {
+            EntityPlayer p = (EntityPlayer) e;
             return new PlayerAPI(p);
         }
-        if (e instanceof LivingEntity) {
-            LivingEntity le = (LivingEntity) e;
+        if (e instanceof EntityLivingBase) {
+            EntityLivingBase le = (EntityLivingBase) e;
             return new LivingEntityAPI<>(le);
         }
         return new EntityAPI<>(e);
     }
 
     protected final void checkEntity() {
-        if (entity.removed || getLevel() != Minecraft.getInstance().level) {
+        if (entity.addedToChunk || getLevel() != Minecraft.getMinecraft().world) {
             T newEntityInstance = (T) EntityUtils.getEntityByUUID(entityUUID);
             thingy = newEntityInstance != null;
             if (thingy)
@@ -82,8 +82,8 @@ public class EntityAPI<T extends Entity> {
         }
     }
 
-    protected Level getLevel() {
-        return ((EntityAccessor) entity).getLevel();
+    protected World getLevel() {
+        return entity.getEntityWorld();
     }
 
     public T getEntity() {
@@ -111,7 +111,10 @@ public class EntityAPI<T extends Entity> {
     public FiguraVec3 getPos(Float delta) {
         checkEntity();
         if (delta == null) delta = 1f;
-        return FiguraVec3.fromVec3(entity.getPosition(delta));
+        double d = MathUtils.lerp((double)delta, entity.prevPosX, entity.posX);
+        double e = MathUtils.lerp((double)delta, entity.prevPosY, entity.posY);
+        double f = MathUtils.lerp((double)delta, entity.prevPosZ, entity.posZ);
+        return FiguraVec3.of(d,e,f);
     }
 
     @LuaWhitelist
@@ -128,7 +131,7 @@ public class EntityAPI<T extends Entity> {
     public FiguraVec2 getRot(Float delta) {
         checkEntity();
         if (delta == null) delta = 1f;
-        return FiguraVec2.of(Mth.lerp(delta, entity.xRotO, entity.xRot), Mth.lerp(delta, entity.yRotO, entity.yRot));
+        return FiguraVec2.of(MathUtils.lerp(delta, entity.prevRotationPitch, entity.rotationPitch), MathUtils.lerp(delta, entity.prevRotationYaw, entity.rotationYaw));
     }
 
     @LuaWhitelist
@@ -141,21 +144,21 @@ public class EntityAPI<T extends Entity> {
     @LuaMethodDoc("entity.get_type")
     public String getType() {
         checkEntity();
-        return cacheType != null ? cacheType : (cacheType = Registry.ENTITY_TYPE.getKey(entity.getType()).toString());
+        return cacheType != null ? cacheType : (cacheType = RegistryUtils.getResourceLocationForRegistryObj(Entity.class, entity).toString());
     }
 
     @LuaWhitelist
     @LuaMethodDoc("entity.get_velocity")
     public FiguraVec3 getVelocity() {
         checkEntity();
-        return FiguraVec3.of(entity.getX() - entity.xOld, entity.getY() - entity.yOld, entity.getZ() - entity.zOld);
+        return FiguraVec3.of(entity.posX - entity.prevPosX, entity.posY - entity.prevPosY, entity.posZ - entity.prevPosZ);
     }
 
     @LuaWhitelist
     @LuaMethodDoc("entity.get_look_dir")
     public FiguraVec3 getLookDir() {
         checkEntity();
-        return FiguraVec3.fromVec3(entity.getLookAngle());
+        return FiguraVec3.fromVec3(entity.getLookVec());
     }
 
     @LuaWhitelist
@@ -169,64 +172,66 @@ public class EntityAPI<T extends Entity> {
     @LuaMethodDoc("entity.get_max_air")
     public int getMaxAir() {
         checkEntity();
-        return entity.getMaxAirSupply();
+        return entity.getAir();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("entity.get_dimension_name")
     public String getDimensionName() {
         checkEntity();
-        return getLevel().dimension().location().toString();
+        return DimensionType.getById(entity.dimension).toString();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("entity.get_pose")
     public String getPose() {
         checkEntity();
-        return entity.getPose().toString();
+        return entity instanceof EntityLivingBase ? ((EntityLivingBase) entity).isElytraFlying() ? "FALL_FLYING" : (((EntityLivingBase) entity).isPlayerSleeping() ? "SLEEPING" : (entity.isSneaking() && !(entity instanceof EntityPlayer && ((EntityPlayer) entity).capabilities.isFlying) ? "CROUCHING" : "STANDING")): entity.isSneaking() ? "CROUCHING" : "STANDING";
     }
 
     @LuaWhitelist
     @LuaMethodDoc("entity.get_vehicle")
     public EntityAPI<?> getVehicle() {
         checkEntity();
-        return wrap(entity.getVehicle());
+        return wrap(entity.getRidingEntity());
     }
 
     @LuaWhitelist
     @LuaMethodDoc("entity.is_on_ground")
     public boolean isOnGround() {
         checkEntity();
-        return entity.isOnGround();
+        return entity.onGround;
     }
 
     @LuaWhitelist
     @LuaMethodDoc("entity.get_eye_height")
     public float getEyeHeight() {
         checkEntity();
-        return entity.getEyeHeight(entity.getPose());
+        return entity.getEyeHeight();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("entity.get_bounding_box")
     public FiguraVec3 getBoundingBox() {
         checkEntity();
-        EntityDimensions dim = entity.getDimensions(entity.getPose());
-        return FiguraVec3.of(dim.width, dim.height, dim.width);
+        AxisAlignedBB dim = entity.getCollisionBoundingBox();
+        if (dim != null)
+            return FiguraVec3.of(dim.maxX - dim.minX, dim.maxY - dim.minY, dim.maxZ - dim.minZ);
+        return FiguraVec3.of();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("entity.get_name")
     public String getName() {
         checkEntity();
-        return entity.getName().getString();
+        return entity.getName();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("entity.is_wet")
     public boolean isWet() {
         checkEntity();
-        return entity.isInWaterRainOrBubble();
+        return entity.isWet();
     }
 
     @LuaWhitelist
@@ -240,7 +245,8 @@ public class EntityAPI<T extends Entity> {
     @LuaMethodDoc("entity.is_underwater")
     public boolean isUnderwater() {
         checkEntity();
-        return entity.isUnderWater();
+        Block block = entity.getEntityWorld().getBlockState(entity.getPosition()).getBlock();
+        return block == Blocks.WATER || block == Blocks.FLOWING_WATER;
     }
 
     @LuaWhitelist
@@ -254,8 +260,8 @@ public class EntityAPI<T extends Entity> {
     @LuaMethodDoc("entity.is_in_rain")
     public boolean isInRain() {
         checkEntity();
-        BlockPos blockPos = entity.blockPosition();
-        return getLevel().isRainingAt(blockPos) || getLevel().isRainingAt(new BlockPos(blockPos.getX(), (int) entity.getBoundingBox().maxY, (int) entity.getZ()));
+        BlockPos blockPos = entity.getPosition();
+        return getLevel().isRainingAt(blockPos) || getLevel().isRainingAt(new BlockPos(blockPos.getX(), (int) entity.getCollisionBoundingBox().maxY, (int) entity.posZ));
     }
 
     @LuaWhitelist
@@ -276,7 +282,7 @@ public class EntityAPI<T extends Entity> {
     @LuaMethodDoc("entity.get_eye_y")
     public double getEyeY() {
         checkEntity();
-        return entity.getEyeY();
+        return entity.getEyeHeight();
     }
 
     @LuaWhitelist
@@ -304,14 +310,14 @@ public class EntityAPI<T extends Entity> {
     @LuaMethodDoc("entity.is_sneaking")
     public boolean isSneaking() {
         checkEntity();
-        return entity.isDiscrete();
+        return entity.isSneaking();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("entity.is_crouching")
     public boolean isCrouching() {
         checkEntity();
-        return entity.isCrouching();
+        return entity.isSneaking();
     }
 
     @LuaWhitelist
@@ -328,7 +334,7 @@ public class EntityAPI<T extends Entity> {
             return null;
 
         int i = 0;
-        for (ItemStack item : entity.getAllSlots()) {
+        for (ItemStack item : entity.getEquipmentAndArmor()) {
             if (i == index)
                 return ItemStackAPI.verify(item);
             i++;
@@ -341,8 +347,8 @@ public class EntityAPI<T extends Entity> {
     @LuaMethodDoc("entity.get_nbt")
     public LuaTable getNbt() {
         checkEntity();
-        CompoundTag tag = new CompoundTag();
-        entity.saveWithoutId(tag);
+        NBTTagCompound tag = new NBTTagCompound();
+        entity.writeToNBT(tag);
         return (LuaTable) NbtToLua.convert(tag);
     }
 
@@ -350,21 +356,25 @@ public class EntityAPI<T extends Entity> {
     @LuaMethodDoc("entity.is_on_fire")
     public boolean isOnFire() {
         checkEntity();
-        return entity.displayFireAnimation();
+        return entity.canRenderOnFire();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("entity.is_alive")
     public boolean isAlive() {
         checkEntity();
-        return entity.isAlive();
+        return entity.isEntityAlive();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("entity.get_permission_level")
     public int getPermissionLevel() {
         checkEntity();
-        return ((EntityAccessor) entity).getPermissionLevel();
+        if (entity instanceof EntityPlayer && Minecraft.getMinecraft().getIntegratedServer() != null){
+            UserListOpsEntry userlistopsentry = Minecraft.getMinecraft().getIntegratedServer().getPlayerList().getOppedPlayers().getEntry(((EntityPlayer) entity).getGameProfile());
+            return userlistopsentry.getPermissionLevel();
+        }
+        return entity.canUseCommand(4, "") ? 4 : entity.canUseCommand(3, "") ? 3 : entity.canUseCommand(2, "") ? 2 : entity.canUseCommand(1, "") ? 1 : 0;
     }
 
     @LuaWhitelist
@@ -389,21 +399,21 @@ public class EntityAPI<T extends Entity> {
     @LuaMethodDoc("entity.get_controlled_vehicle")
     public EntityAPI<?> getControlledVehicle() {
         checkEntity();
-        return wrap(entity.getRootVehicle());
+        return wrap(entity.getLowestRidingEntity());
     }
 
     @LuaWhitelist
     @LuaMethodDoc("entity.has_container")
     public boolean hasContainer() {
         checkEntity();
-        return entity instanceof Container;
+        return entity instanceof IInventory;
     }
 
     @LuaWhitelist
     @LuaMethodDoc("entity.has_inventory")
     public boolean hasInventory() {
         checkEntity();
-        return entity instanceof ContainerListener;
+        return entity instanceof IInventoryChangedListener;
     }
 
     @LuaWhitelist
@@ -425,7 +435,11 @@ public class EntityAPI<T extends Entity> {
         checkEntity();
         if (distance == null) distance = 20d;
         distance = Math.max(Math.min(distance, 20), -20);
-        HitResult result = entity.pick(distance, 1f, !ignoreLiquids);
+        Vec3d startVec = entity.getPositionEyes(1f);
+        Vec3d look = entity.getLook(1f);
+        Vec3d endVec = startVec.add(new Vec3d(look.x * distance, look.y * distance, look.z * distance));
+
+        RayTraceResult result = entity.getEntityWorld().rayTraceBlocks(startVec, endVec, !ignoreLiquids);
         return LuaUtils.parseBlockHitResult(result);
     }
 
@@ -445,20 +459,52 @@ public class EntityAPI<T extends Entity> {
         if (distance == null) distance = 20d;
         distance = Math.max(Math.min(distance, 20), 0);
 
-        Vec3 vec3 = entity.getEyePosition(1f);
-        HitResult result = entity.pick(distance, 1f, false);
+        Vec3d eyePosition = entity.getPositionEyes(1f);
+        Vec3d look = this.entity.getLook(1f);
+        Vec3d endPosition = eyePosition.add(new Vec3d(look.x * distance, look.y * distance, look.z * distance));
+
+        RayTraceResult result = entity.world.rayTraceBlocks(eyePosition, endPosition, false);
 
         if (result != null)
-            distance = result.getLocation().distanceToSqr(vec3);
+            distance = result.getBlockPos().distanceSq(eyePosition.x, eyePosition.y, eyePosition.z);
 
-        Vec3 vec32 = entity.getViewVector(1f);
-        Vec3 vec33 = vec3.add(vec32.x * distance, vec32.y * distance, vec32.z * distance);
-        AABB aABB = entity.getBoundingBox().expandTowards(vec32.scale(distance)).inflate(1d);
-        EntityHitResult entityHit = ProjectileUtil.getEntityHitResult(entity, vec3, vec33, aABB, e -> e != entity, distance);
+        Vec3d endPos = eyePosition.add(new Vec3d(look.x * distance, look.y * distance, look.z * distance));
+        Vec3d scaled = look.scale(distance);
+        AxisAlignedBB aABB = entity.getEntityBoundingBox().expand(scaled.x, scaled.y, scaled.z).grow(1d);
 
-        if (entityHit != null)
-            return new Object[]{EntityAPI.wrap(entityHit.getEntity()), FiguraVec3.fromVec3(entityHit.getLocation())};
+        Entity entityHit = null;
+        Vec3d hitPosition = null;
 
+        for (Entity currentEntity : entity.getEntityWorld().getEntitiesWithinAABBExcludingEntity(entity, aABB)) {
+            AxisAlignedBB entityAABB = currentEntity.getEntityBoundingBox().grow(currentEntity.getCollisionBorderSize());
+            RayTraceResult rayTraceResult = entityAABB.calculateIntercept(eyePosition, endPos);
+            if (entityAABB.contains(eyePosition)) {
+                if (distance >= 0.0) {
+                    entityHit = currentEntity;
+                    hitPosition = rayTraceResult == null ? eyePosition : rayTraceResult.hitVec;
+                    distance = 0.0;
+                }
+            } else if (rayTraceResult != null) {
+                double eyeDistanceToHit = eyePosition.distanceTo(new Vec3d(rayTraceResult.getBlockPos()));
+                if (eyeDistanceToHit < distance || distance == 0.0) {
+                    if (currentEntity.getLowestRidingEntity() == entity.getLowestRidingEntity()) {
+                        if (distance == 0.0) {
+                            entityHit = currentEntity;
+                            hitPosition = rayTraceResult.hitVec;
+                        }
+                    } else {
+                        entityHit = currentEntity;
+                        hitPosition = rayTraceResult.hitVec;
+                        distance = eyeDistanceToHit;
+                    }
+                }
+            }
+        }
+
+        if (entityHit != null && hitPosition != null) {
+            RayTraceResult traceResult = new RayTraceResult(entityHit, hitPosition);
+            return new Object[]{EntityAPI.wrap(traceResult.entityHit), FiguraVec3.fromBlockPos(traceResult.getBlockPos())};
+        }
         return null;
     }
 
@@ -516,6 +562,6 @@ public class EntityAPI<T extends Entity> {
     @Override
     public String toString() {
         checkEntity();
-        return (entity.hasCustomName() ? entity.getCustomName().getString() + " (" + getType() + ")" : getType()) + " (Entity)";
+        return (entity.hasCustomName() ? entity.getCustomNameTag() + " (" + getType() + ")" : getType()) + " (Entity)";
     }
 }

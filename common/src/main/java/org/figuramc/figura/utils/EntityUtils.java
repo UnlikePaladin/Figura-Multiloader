@@ -1,22 +1,18 @@
 package org.figuramc.figura.utils;
 
 import com.mojang.authlib.GameProfile;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientPacketListener;
-import net.minecraft.client.multiplayer.PlayerInfo;
+import net.minecraft.client.network.NetHandlerPlayClient;
+import net.minecraft.client.network.NetworkPlayerInfo;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.player.EnumPlayerModelParts;
+import net.minecraft.util.math.AxisAlignedBB;
+import net.minecraft.util.math.RayTraceResult;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.text.TextFormatting;
 import net.minecraft.world.World;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.entity.player.PlayerModelPart;
-import net.minecraft.world.entity.projectile.ProjectileUtil;
-import net.minecraft.world.level.ClipContext;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.EntityHitResult;
-import net.minecraft.world.phys.Vec3;
 import org.figuramc.figura.mixin.ClientWorldInvoker;
 import org.figuramc.figura.mixin.EntityAccessor;
 import org.figuramc.figura.mixin.gui.PlayerTabOverlayAccessor;
@@ -52,84 +48,107 @@ public class EntityUtils {
         Entity entity = Minecraft.getMinecraft().getRenderViewEntity();
         if (entity == null) return null;
 
-        float tickDelta = Minecraft.getMinecraft().getFrameTime();
-        Vec3 entityEye = entity.getEyePosition(tickDelta);
-        Vec3 viewVec = entity.getViewVector(tickDelta).scale(distance);
-        AABB box = entity.getBoundingBox().expandTowards(viewVec).inflate(1f, 1f, 1f);
+        float tickDelta = Minecraft.getMinecraft().getRenderPartialTicks();
+        Vec3d entityEye = entity.getPositionEyes(tickDelta);
+        Vec3d viewVec = entity.getLook(tickDelta).scale(distance);
+        AxisAlignedBB box = entity.getEntityBoundingBox().expand(viewVec.x, viewVec.y, viewVec.z).grow(1f, 1f, 1f);
 
-        Vec3 raycastEnd = entityEye.add(viewVec);
+        Vec3d raycastEnd = entityEye.add(viewVec);
 
         double raycastDistanceSquared; // Has to be squared for some reason, thanks minecraft for not making that clear
-        BlockHitResult blockResult = ((EntityAccessor) entity).getLevel().clip(new ClipContext(entityEye, raycastEnd, ClipContext.Block.VISUAL, ClipContext.Fluid.NONE, entity));
+        RayTraceResult blockResult = ((EntityAccessor) entity).getWorld().rayTraceBlocks(entityEye, raycastEnd, false);
         if (blockResult != null)
-            raycastDistanceSquared = blockResult.getLocation().distanceToSqr(entityEye);
+            raycastDistanceSquared = blockResult.getBlockPos().distanceSq(entityEye.x, entityEye.y, entityEye.z);
         else
             raycastDistanceSquared = distance * distance;
 
-        EntityHitResult entityHitResult = ProjectileUtil.getEntityHitResult(entity, entityEye, raycastEnd, box, entity1 -> !entity1.isSpectator() && entity1.isPickable(), raycastDistanceSquared);
-        if (entityHitResult != null)
-            return entityHitResult.getEntity();
-        return null;
+
+        Entity entityHit = null;
+        for (Entity currentEntity : entity.getEntityWorld().getEntitiesWithinAABBExcludingEntity(entity, box)) {
+            AxisAlignedBB entityAABB = currentEntity.getEntityBoundingBox().grow(currentEntity.getCollisionBorderSize());
+            RayTraceResult rayTraceResult = entityAABB.calculateIntercept(entityEye, raycastEnd);
+            if (entityAABB.contains(entityEye)) {
+                if (raycastDistanceSquared >= 0.0f) {
+                    entityHit = currentEntity;
+                    entityEye = rayTraceResult == null ? entityEye : rayTraceResult.hitVec;
+                    raycastDistanceSquared = 0.0f;
+                }
+            } else if (rayTraceResult != null) {
+                double eyeDistanceToHit = entityEye.distanceTo(new Vec3d(rayTraceResult.getBlockPos()));
+                if (eyeDistanceToHit < raycastDistanceSquared || raycastDistanceSquared == 0.0f) {
+                    if (currentEntity.getLowestRidingEntity() == entity.getLowestRidingEntity()) {
+                        if (raycastDistanceSquared == 0.0f) {
+                            entityHit = currentEntity;
+                        }
+                    } else {
+                        entityHit = currentEntity;
+                        raycastDistanceSquared = eyeDistanceToHit;
+                    }
+                }
+            }
+        }
+
+        return entityHit;
     }
 
-    public static PlayerInfo getPlayerInfo(UUID uuid) {
-        ClientPacketListener connection = Minecraft.getInstance().getConnection();
+    public static NetworkPlayerInfo getPlayerInfo(UUID uuid) {
+        NetHandlerPlayClient connection = Minecraft.getMinecraft().getConnection();
         return connection == null ? null : connection.getPlayerInfo(uuid);
     }
 
     public static String getNameForUUID(UUID uuid) {
-        PlayerInfo player = getPlayerInfo(uuid);
+        NetworkPlayerInfo player = getPlayerInfo(uuid);
         if (player != null)
-            return player.getProfile().getName();
+            return player.getGameProfile().getName();
 
         Entity e = getEntityByUUID(uuid);
         if (e != null)
-            return e.getName().getString();
+            return e.getName();
 
         return null;
     }
 
     public static Map<String, UUID> getPlayerList() {
-        ClientPacketListener connection = Minecraft.getInstance().getConnection();
-        if (connection == null || connection.getOnlinePlayerIds().isEmpty())
+        NetHandlerPlayClient connection = Minecraft.getMinecraft().getConnection();
+        if (connection == null || connection.getPlayerInfoMap().isEmpty())
             return new HashMap<>();
 
         Map<String, UUID> playerList = new HashMap<>();
 
-        for (UUID uuid : connection.getOnlinePlayerIds()) {
-            PlayerInfo player = connection.getPlayerInfo(uuid);
+        for (NetworkPlayerInfo info : connection.getPlayerInfoMap()) {
+            NetworkPlayerInfo player = connection.getPlayerInfo(info.getGameProfile().getId());
             if (player != null)
-                playerList.put(player.getProfile().getName(), uuid);
+                playerList.put(player.getGameProfile().getName(), info.getGameProfile().getId());
         }
 
         return playerList;
     }
 
-    public static List<PlayerInfo> getTabList() {
-        ClientPacketListener clientPacketListener = Minecraft.getInstance().getConnection();
+    public static List<NetworkPlayerInfo> getTabList() {
+        NetHandlerPlayClient clientPacketListener = Minecraft.getMinecraft().getConnection();
         if (clientPacketListener == null)
             return new ArrayList<>();
 
-        return PlayerTabOverlayAccessor.getPlayerOrdering().sortedCopy(clientPacketListener.getOnlinePlayers());
+        return PlayerTabOverlayAccessor.getPlayerOrdering().sortedCopy(clientPacketListener.getPlayerInfoMap());
     }
 
     public static boolean checkInvalidPlayer(UUID id) {
         if (id.version() != 4)
             return true;
 
-        PlayerInfo playerInfo = getPlayerInfo(id);
+        NetworkPlayerInfo playerInfo = getPlayerInfo(id);
         if (playerInfo == null)
             return false;
 
-        GameProfile profile = playerInfo.getProfile();
+        GameProfile profile = playerInfo.getGameProfile();
         String name = profile.getName();
         return name != null && (name.trim().isEmpty() || name.charAt(0) == '\u0000');
     }
 
-    public static boolean isEntityUpsideDown(LivingEntity livingEntity) {
+    public static boolean isEntityUpsideDown(EntityLivingBase livingEntity) {
         String string;
-        if ((livingEntity instanceof Player || livingEntity.hasCustomName()) && ("Dinnerbone".equals(string = ChatFormatting.stripFormatting(livingEntity.getName().getString())) || "Grumm".equals(string))) {
-            return !(livingEntity instanceof Player) || ((Player)livingEntity).isModelPartShown(PlayerModelPart.CAPE);
+        if ((livingEntity instanceof EntityPlayer || livingEntity.hasCustomName()) && ("Dinnerbone".equals(string = TextFormatting.getTextWithoutFormattingCodes(livingEntity.getName())) || "Grumm".equals(string))) {
+            return !(livingEntity instanceof EntityPlayer) || ((EntityPlayer)livingEntity).isWearing(EnumPlayerModelParts.CAPE);
         }
         return false;
     }

@@ -2,12 +2,11 @@ package org.figuramc.figura;
 
 import com.mojang.authlib.GameProfile;
 import net.minecraft.client.Minecraft;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.Style;
-import net.minecraft.network.chat.TextColor;
-import net.minecraft.server.players.GameProfileCache;
-import net.minecraft.util.profiling.ProfilerFiller;
-import net.minecraft.world.entity.Entity;
+import net.minecraft.entity.Entity;
+import net.minecraft.profiler.Profiler;
+import net.minecraft.server.management.PlayerProfileCache;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.Style;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.figuramc.figura.avatar.Avatar;
@@ -18,13 +17,13 @@ import org.figuramc.figura.avatar.local.LocalAvatarLoader;
 import org.figuramc.figura.backend2.NetworkStuff;
 import org.figuramc.figura.compat.GeckoLibCompat;
 import org.figuramc.figura.compat.SimpleVCCompat;
-import org.figuramc.figura.config.ConfigManager;
 import org.figuramc.figura.config.Configs;
+import org.figuramc.figura.ducks.extensions.StyleExtension;
 import org.figuramc.figura.entries.EntryPointManager;
 import org.figuramc.figura.font.Emojis;
 import org.figuramc.figura.lua.FiguraLuaPrinter;
 import org.figuramc.figura.lua.docs.FiguraDocsManager;
-import org.figuramc.figura.mixin.SkullBlockEntityAccessor;
+import org.figuramc.figura.mixin.TileEntitySkullAccessor;
 import org.figuramc.figura.permissions.PermissionManager;
 import org.figuramc.figura.resources.FiguraRuntimeResources;
 import org.figuramc.figura.utils.*;
@@ -50,7 +49,7 @@ public class FiguraMod {
 
     public static int ticks;
     public static Entity extendedPickEntity;
-    public static Component splashText;
+    public static ITextComponent splashText;
     public static boolean parseMessages = true;
     public static boolean processingKeybind;
 
@@ -122,8 +121,8 @@ public class FiguraMod {
 
     // get local player uuid
     public static UUID getLocalPlayerUUID() {
-        Entity player = Minecraft.getInstance().player;
-        return player != null ? player.getUUID() : Minecraft.getInstance().getUser().getGameProfile().getId();
+        Entity player = Minecraft.getMinecraft().player;
+        return player != null ? player.getUniqueID() : Minecraft.getMinecraft().getSession().getProfile().getId();
     }
 
     public static boolean isLocal(UUID other) {
@@ -136,13 +135,13 @@ public class FiguraMod {
      *
      * @param message - text to send
      */
-    public static void sendChatMessage(Component message) {
-        if (Minecraft.getInstance().gui != null) {
+    public static void sendChatMessage(ITextComponent message) {
+        if (Minecraft.getMinecraft().ingameGUI != null) {
             parseMessages = false;
-            Minecraft.getInstance().gui.getChat().addMessage(TextUtils.replaceTabs(message));
+            Minecraft.getMinecraft().ingameGUI.getChatGUI().addToSentMessages(TextUtils.replaceTabs(message).getFormattedText());
             parseMessages = true;
         } else {
-            LOGGER.info(message.getString());
+            LOGGER.info(message.getFormattedText());
         }
     }
 
@@ -153,46 +152,46 @@ public class FiguraMod {
      * @return - the player's uuid or null
      */
     public static UUID playerNameToUUID(String playerName) {
-        GameProfileCache cache = SkullBlockEntityAccessor.getProfileCache();
+        PlayerProfileCache cache = TileEntitySkullAccessor.getProfileCache();
         if (cache == null) return null;
 
-        GameProfile profile = cache.get(playerName);
+        GameProfile profile = cache.getGameProfileForUsername(playerName);
         return profile == null ? null : profile.getId();
     }
 
     public static Style getAccentColor() {
         Avatar avatar = AvatarManager.getAvatarForPlayer(getLocalPlayerUUID());
         int color = avatar != null ? ColorUtils.rgbToInt(ColorUtils.userInputHex(avatar.color, ColorUtils.Colors.AWESOME_BLUE.vec)) : ColorUtils.Colors.AWESOME_BLUE.hex;
-        return Style.EMPTY.withColor(TextColor.fromRgb(color));
+        return ((StyleExtension)new Style()).setRGBColor(color);
     }
 
     // -- profiler -- //
 
     public static void pushProfiler(String name) {
-        Minecraft.getInstance().getProfiler().push(name);
+        Minecraft.getMinecraft().mcProfiler.startSection(name);
     }
 
     public static void pushProfiler(Avatar avatar) {
-        Minecraft.getInstance().getProfiler().push(avatar.entityName.trim().isEmpty() ? avatar.owner.toString() : avatar.entityName);
+        Minecraft.getMinecraft().mcProfiler.startSection(avatar.entityName.trim().isEmpty() ? avatar.owner.toString() : avatar.entityName);
     }
 
     public static void popPushProfiler(String name) {
-        Minecraft.getInstance().getProfiler().popPush(name);
+        Minecraft.getMinecraft().mcProfiler.endStartSection(name);
     }
 
     public static void popProfiler() {
-        Minecraft.getInstance().getProfiler().pop();
+        Minecraft.getMinecraft().mcProfiler.endSection();
     }
 
     public static <T> T popReturnProfiler(T var) {
-        Minecraft.getInstance().getProfiler().pop();
+        Minecraft.getMinecraft().mcProfiler.endSection();
         return var;
     }
 
     public static void popProfiler(int times) {
-        ProfilerFiller profiler = Minecraft.getInstance().getProfiler();
+        Profiler profiler = Minecraft.getMinecraft().mcProfiler;
         for (int i = 0; i < times; i++)
-            profiler.pop();
+            profiler.endSection();
     }
 
     public enum Links {

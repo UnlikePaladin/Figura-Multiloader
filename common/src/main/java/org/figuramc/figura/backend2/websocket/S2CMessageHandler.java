@@ -1,6 +1,7 @@
 package org.figuramc.figura.backend2.websocket;
 
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.text.TextComponentString;
 import org.figuramc.figura.FiguraMod;
 import net.minecraft.network.chat.TextComponent;
 import org.figuramc.figura.avatar.Avatar;
@@ -95,7 +96,7 @@ public class S2CMessageHandler {
 
     private static void chat(ByteBuffer bytes) {
         String message = StandardCharsets.UTF_8.decode(bytes).toString();
-        FiguraMod.sendChatMessage(TextComponent.EMPTY.copy().append(new TextComponent("-- " + FiguraMod.MOD_NAME + " backend message --\n\n").withStyle(ColorUtils.Colors.SOFT_BLUE.style)).append(TextUtils.tryParseJson(message)));
+        FiguraMod.sendChatMessage(new TextComponentString("").appendSibling(new TextComponentString("-- " + FiguraMod.MOD_NAME + " backend message --\n\n").setStyle(ColorUtils.Colors.SOFT_BLUE.style)).append(TextUtils.tryParseJson(message)));
     }
 
     private static void notice(ByteBuffer bytes) {

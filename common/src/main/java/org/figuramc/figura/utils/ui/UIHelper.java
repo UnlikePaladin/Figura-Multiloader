@@ -1,53 +1,47 @@
 package org.figuramc.figura.utils.ui;
 
-import com.mojang.blaze3d.platform.GlStateManager;
-import com.mojang.blaze3d.platform.Lighting;
-import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
-import com.mojang.math.Matrix4f;
-import com.mojang.math.Quaternion;
-import com.mojang.math.Vector3f;
-import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiComponent;
-import net.minecraft.client.renderer.GameRenderer;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
+import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.client.gui.Gui;
+import net.minecraft.client.gui.ScaledResolution;
+import net.minecraft.client.renderer.*;
+import net.minecraft.client.renderer.entity.RenderManager;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
+import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.HoverEvent;
-import net.minecraft.network.chat.Style;
-import net.minecraft.network.chat.TextComponent;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.FormattedCharSequence;
-import net.minecraft.util.Mth;
-import net.minecraft.world.entity.LivingEntity;
-import org.figuramc.figura.ducks.extensions.FontExtension;
-import org.figuramc.figura.utils.VertexFormatMode;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL30;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.Style;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.event.HoverEvent;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.avatar.AvatarManager;
 import org.figuramc.figura.avatar.Badges;
 import org.figuramc.figura.config.Configs;
+import org.figuramc.figura.ducks.extensions.FontExtension;
+import org.figuramc.figura.ducks.extensions.StyleExtension;
 import org.figuramc.figura.gui.screens.AbstractPanelScreen;
 import org.figuramc.figura.gui.screens.FiguraConfirmScreen;
 import org.figuramc.figura.gui.widgets.ContextMenu;
 import org.figuramc.figura.gui.widgets.FiguraWidget;
 import org.figuramc.figura.math.vector.FiguraVec4;
 import org.figuramc.figura.model.rendering.EntityRenderMode;
-import org.figuramc.figura.utils.FiguraIdentifier;
-import org.figuramc.figura.utils.RenderUtils;
-import org.figuramc.figura.utils.TextUtils;
+import org.figuramc.figura.utils.*;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL30;
+import org.lwjgl.util.vector.Quaternion;
+import org.lwjgl.util.vector.Vector3f;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.List;
-import java.util.function.Consumer;
 import java.util.Stack;
 
-public class UIHelper extends GuiComponent {
+public class UIHelper extends Gui {
 
     // -- Variables -- //
 
@@ -57,8 +51,8 @@ public class UIHelper extends GuiComponent {
     public static final ResourceLocation UI_FONT = new FiguraIdentifier("ui");
     public static final ResourceLocation SPECIAL_FONT = new FiguraIdentifier("special");
 
-    public static final Component UP_ARROW = new TextComponent("^").withStyle(Style.EMPTY.withFont(UI_FONT));
-    public static final Component DOWN_ARROW = new TextComponent("V").withStyle(Style.EMPTY.withFont(UI_FONT));
+    public static final ITextComponent UP_ARROW = new TextComponentString("^").setStyle(((StyleExtension)new Style()).setFont(UI_FONT));
+    public static final ITextComponent DOWN_ARROW = new TextComponentString("V").setStyle(((StyleExtension)new Style()).setFont(UI_FONT));
 
     // Used for GUI rendering
     private static final CustomFramebuffer FIGURA_FRAMEBUFFER = new CustomFramebuffer();
@@ -96,40 +90,40 @@ public class UIHelper extends GuiComponent {
 
     public static void useVanillaFramebuffer() {
         // Reset state before we go back to normal rendering
-        GlStateManager._enableDepthTest();
+        GlStateManager.enableDepth();
         // Set a sensible default for stencil buffer operations
-        GlStateManager._stencilFunc(GL11.GL_EQUAL, 0, 0xFF);
-        GL30.glDisable(GL30.GL_STENCIL_TEST);
+        GL11.glStencilFunc(GL11.GL_EQUAL, 0, 0xFF);
+        GL11.glDisable(GL11.GL_STENCIL_TEST);
 
         // Bind vanilla framebuffer again
-        GlStateManager._glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, previousFBO);
+        GL30.glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, previousFBO);
 
-        RenderSystem.disableBlend();
+        GlStateManager.disableBlend();
         // Draw GUI framebuffer -> vanilla framebuffer
-        int windowWidth = Minecraft.getInstance().getWindow().getWidth();
-        int windowHeight = Minecraft.getInstance().getWindow().getHeight();
+        int windowWidth = Minecraft.getMinecraft().displayWidth;
+        int windowHeight = Minecraft.getMinecraft().displayHeight;
 
         // I don't feel like porting this rn + we don't switch framebuffers anymore in rewrite
      //   Matrix4f mf = RenderSystem.getProjectionMatrix();
       //  FIGURA_FRAMEBUFFER.drawToScreen(windowWidth, windowHeight);
       //  RenderSystem.setProjectionMatrix(mf);
-        RenderSystem.enableBlend();
+        GlStateManager.enableBlend();
     }
 
-    private static final Vector3f INVENTORY_DIFFUSE_LIGHT_0 = Util.make(new Vector3f(0.2f, -1.0f, -1.0f), Vector3f::normalize);
-    private static final Vector3f INVENTORY_DIFFUSE_LIGHT_1 = Util.make(new Vector3f(-0.2f, -1.0f, 0.0f), Vector3f::normalize);
+    private static final Vector3f INVENTORY_DIFFUSE_LIGHT_0 = ResourceUtils.make(new Vector3f(0.2f, -1.0f, -1.0f), Vector3f::normalise);
+    private static final Vector3f INVENTORY_DIFFUSE_LIGHT_1 = ResourceUtils.make(new Vector3f(-0.2f, -1.0f, 0.0f), Vector3f::normalise);
     @SuppressWarnings("deprecation")
-    public static void drawEntity(float x, float y, float scale, float pitch, float yaw, LivingEntity entity, PoseStack stack, EntityRenderMode renderMode) {
+    public static void drawEntity(float x, float y, float scale, float pitch, float yaw, EntityLivingBase entity, EntityRenderMode renderMode) {
         // backup entity variables
-        float headX = entity.xRot;
-        float headY = entity.yHeadRot;
+        float headX = entity.rotationPitch;
+        float headY = entity.rotationYawHead;
         boolean invisible = entity.isInvisible();
 
-        float bodyY = entity.yBodyRot; // not truly a backup
-        if (entity.getVehicle() instanceof LivingEntity) {
-            LivingEntity l = (LivingEntity) entity.getVehicle();
+        float bodyY = entity.renderYawOffset; // not truly a backup
+        if (entity.getRidingEntity() instanceof EntityLivingBase) {
+            EntityLivingBase l = (EntityLivingBase) entity.getRidingEntity();
             // drawEntity(x, y, scale, pitch, yaw, l, stack, renderMode);
-            bodyY = l.yBodyRot;
+            bodyY = l.renderYawOffset;
         }
 
         // setup rendering properties
@@ -146,12 +140,12 @@ public class UIHelper extends GuiComponent {
                 // positions
                 yPos--;
 
-                if (entity.isFallFlying())
-                    xPos += Mth.triangleWave((float) Math.toRadians(270), (float) (Math.PI * 2));
+                if (entity.isElytraFlying())
+                    xPos += MathUtils.triangleWave((float) Math.toRadians(270), (float) (Math.PI * 2));
 
-                if (entity.isAutoSpinAttack() || entity.isVisuallySwimming() || entity.isFallFlying()) {
+                if (entity.isElytraFlying()) {
                     yPos++;
-                    entity.xRot = 0f;
+                    entity.rotationPitch = 0f;
                 }
 
                 RenderUtils.setLights(RenderUtils.INVENTORY_DIFFUSE_LIGHT_0, RenderUtils.INVENTORY_DIFFUSE_LIGHT_1);
@@ -167,16 +161,16 @@ public class UIHelper extends GuiComponent {
                 yRot = yaw + bodyY + 180;
 
                 if (!Configs.PREVIEW_HEAD_ROTATION.value) {
-                    entity.xRot = 0f;
-                    entity.yHeadRot = bodyY;
+                    entity.rotationPitch = 0f;
+                    entity.rotationYawHead = bodyY;
                 }
 
                 // positions
                 yPos--;
 
                 // set up lighting
-                Lighting.setupForFlatItems();
-                RenderUtils.setLights(Util.make(new Vector3f(-0.2f, -1f, -1f), Vector3f::normalize), Util.make(new Vector3f(-0.2f, 0.4f, -0.3f), Vector3f::normalize));
+                RenderHelper.enableGUIStandardItemLighting();
+                RenderUtils.setLights(ResourceUtils.make(new Vector3f(-0.2f, -1f, -1f), Vector3f::normalise), ResourceUtils.make(new Vector3f(-0.2f, 0.4f, -0.3f), Vector3f::normalise));
 
                 // invisibility
                 entity.setInvisible(false);
@@ -187,8 +181,8 @@ public class UIHelper extends GuiComponent {
                 xRot = pitch;
                 yRot = yaw + bodyY + 180;
 
-                entity.xRot = -xRot;
-                entity.yHeadRot = -yaw + bodyY;
+                entity.rotationPitch = -xRot;
+                entity.rotationYawHead = -yaw + bodyY;
 
                 // lightning
 
@@ -198,10 +192,10 @@ public class UIHelper extends GuiComponent {
         }
 
         // apply matrix transformers
-        stack.pushPose();
-        stack.translate(x, y, renderMode == EntityRenderMode.MINECRAFT_GUI ? 250d : -250d);
-        stack.scale(scale, scale, scale);
-        stack.last().pose().multiply(Matrix4f.createScaleMatrix(1f, 1f, -1f)); // Scale ONLY THE POSITIONS! Inverted normals don't work for whatever reason
+        GlStateManager.pushMatrix();
+        GlStateManager.translate(x, y, renderMode == EntityRenderMode.MINECRAFT_GUI ? 250d : -250d);
+        GlStateManager.scale(scale, scale, scale);
+        stack.last().pose().multuliply(Matrix4f.createScaleMatrix(1f, 1f, -1f)); // Scale ONLY THE POSITIONS! Inverted normals don't work for whatever reason
 
         Avatar avatar = AvatarManager.getAvatar(entity);
         if (RenderUtils.vanillaModelAndScript(avatar) && !avatar.luaRuntime.renderer.getRootRotationAllowed()) {
@@ -212,19 +206,18 @@ public class UIHelper extends GuiComponent {
         Quaternion quaternion = Vector3f.ZP.rotationDegrees(180f);
         Quaternion quaternion2 = Vector3f.YP.rotationDegrees(yRot);
         Quaternion quaternion3 = Vector3f.XP.rotationDegrees(xRot);
-        quaternion3.mul(quaternion2);
-        quaternion.mul(quaternion3);
+        Quaternion.mul(quaternion3, quaternion2, quaternion3);
+        Quaternion.mul(quaternion, quaternion3, quaternion);
         stack.mulPose(quaternion);
         quaternion3.conj();
 
         // setup entity renderer
-        Minecraft minecraft = Minecraft.getInstance();
-        EntityRenderDispatcher dispatcher = minecraft.getEntityRenderDispatcher();
-        boolean renderHitboxes = dispatcher.shouldRenderHitBoxes();
-        dispatcher.setRenderHitBoxes(false);
+        Minecraft minecraft = Minecraft.getMinecraft();
+        RenderManager dispatcher = minecraft.getRenderManager();
+        boolean renderHitboxes = dispatcher.isDebugBoundingBox();
+        dispatcher.setDebugBoundingBox(false);
         dispatcher.setRenderShadow(false);
         dispatcher.overrideCameraOrientation(quaternion3);
-        MultiBufferSource.BufferSource immediate = minecraft.renderBuffers().bufferSource();
 
         // render
         paperdoll = true;
@@ -235,38 +228,50 @@ public class UIHelper extends GuiComponent {
 
         double finalXPos = xPos;
         double finalYPos = yPos;
-        RenderSystem.runAsFancy(() -> dispatcher.render(entity, finalXPos, finalYPos, 0d, 0f, 1f, stack, immediate, 15 << 20 | 15 << 4));
-        immediate.endBatch();
+        int packedLight = 15 << 20 | 15 << 4;
+        int j = packedLight % 65536;
+        int k = packedLight / 65536;
+        OpenGlHelper.setLightmapTextureCoords(OpenGlHelper.lightmapTexUnit, (float)j, (float)k);
+        dispatcher.renderEntity(entity, finalXPos, finalYPos, 0d, 0f, 1f, false);
 
         paperdoll = false;
 
         // restore entity rendering data
-        dispatcher.setRenderHitBoxes(renderHitboxes);
+        dispatcher.setDebugBoundingBox(renderHitboxes);
         dispatcher.setRenderShadow(true);
 
         // pop matrix
-        stack.popPose();
-        Lighting.setupFor3DItems();
+        GlStateManager.popMatrix();
+        RenderHelper.enableStandardItemLighting();
 
         // restore entity data
-        entity.xRot = headX;
-        entity.yHeadRot = headY;
+        entity.rotationPitch = headX;
+        entity.rotationYawHead = headY;
         entity.setInvisible(invisible);
     }
 
     public static void setupTexture(ResourceLocation texture) {
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        Minecraft.getInstance().getTextureManager().bind(texture);
-        RenderSystem.color4f(1f, 1f, 1f, 1f);
+        GlStateManager.enableBlend();
+        //Sus
+        GlStateManager.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA);
+        Minecraft.getMinecraft().getTextureManager().bindTexture(texture);
+        GlStateManager.color(1f, 1f, 1f, 1f);
     }
 
-    public static void renderTexture(PoseStack stack, int x, int y, int width, int height, ResourceLocation texture) {
+    public static void renderTexture(int x, int y, int width, int height, ResourceLocation texture) {
         setupTexture(texture);
-        blit(stack, x, y, width, height, 0f, 0f, 1, 1, 1, 1);
+        blit(x, y, width, height, 0, 0, 1, 1, 1, 1);
     }
 
-    public static void renderAnimatedBackground(PoseStack stack, ResourceLocation texture, float x, float y, float width, float height, float textureWidth, float textureHeight, double speed, float delta) {
+    public static void blit(int x, int y, float u, float v, int uWidth, int vHeight, int width, int height, float tileWidth, float tileHeight) {
+        Gui.drawScaledCustomSizeModalRect(x, y, u, v, uWidth, vHeight, width, height, tileWidth, tileHeight);
+    }
+
+    public static void blit(int x, int y, float u, float v, int width, int height, float textureWidth, float textureHeight) {
+        Gui.drawModalRectWithCustomSizedTexture(x, y, u, v, width, height, textureWidth, textureHeight);
+    }
+
+    public static void renderAnimatedBackground(ResourceLocation texture, float x, float y, float width, float height, float textureWidth, float textureHeight, double speed, float delta) {
         if (speed != 0) {
             double d = (FiguraMod.ticks + delta) * speed;
             x -= d % textureWidth;
@@ -281,99 +286,97 @@ public class UIHelper extends GuiComponent {
             y -= textureHeight;
         }
 
-        renderBackgroundTexture(stack, texture, x, y, width, height, textureWidth, textureHeight);
+        renderBackgroundTexture(texture, x, y, width, height, textureWidth, textureHeight);
     }
 
-    public static void renderBackgroundTexture(PoseStack stack, ResourceLocation texture, float x, float y, float width, float height, float textureWidth, float textureHeight) {
+    public static void renderBackgroundTexture(ResourceLocation texture, float x, float y, float width, float height, float textureWidth, float textureHeight) {
         setupTexture(texture);
 
-        Tesselator tessellator = Tesselator.getInstance();
-        BufferBuilder bufferBuilder = tessellator.getBuilder();
-        bufferBuilder.begin(VertexFormatMode.QUADS.asGLMode, DefaultVertexFormat.POSITION_TEX);
+        Tessellator tessellator = Tessellator.getInstance();
+        BufferBuilder bufferBuilder = tessellator.getBuffer();
+        bufferBuilder.begin(VertexFormatMode.QUADS.asGLMode, DefaultVertexFormats.POSITION_TEX);
 
         float u1 = width / textureWidth;
         float v1 = height / textureHeight;
-        quad(bufferBuilder, stack.last().pose(), x, y, width, height, -999f, 0f, u1, 0f, v1);
+        quad(bufferBuilder, x, y, width, height, -999f, 0f, u1, 0f, v1);
 
-        tessellator.end();
+        tessellator.draw();
     }
 
-    public static void fillRounded(PoseStack stack, int x, int y, int width, int height, int color) {
-        fill(stack, x + 1, y, x + width - 1, y + 1, color);
-        fill(stack, x, y + 1, x + width, y + height - 1, color);
-        fill(stack, x + 1, y + height - 1, x + width - 1, y + height, color);
+    public static void fillRounded(int x, int y, int width, int height, int color) {
+        drawRect(x + 1, y, x + width - 1, y + 1, color);
+        drawRect(x, y + 1, x + width, y + height - 1, color);
+        drawRect(x + 1, y + height - 1, x + width - 1, y + height, color);
     }
 
-    public static void fillOutline(PoseStack stack, int x, int y, int width, int height, int color) {
-        fill(stack, x + 1, y, x + width - 1, y + 1, color);
-        fill(stack, x, y + 1, x + 1, y + height - 1, color);
-        fill(stack, x + width - 1, y + 1, x + width, y + height - 1, color);
-        fill(stack, x + 1, y + height - 1, x + width - 1, y + height, color);
+    public static void fillOutline(int x, int y, int width, int height, int color) {
+        drawRect(x + 1, y, x + width - 1, y + 1, color);
+        drawRect(x, y + 1, x + 1, y + height - 1, color);
+        drawRect(x + width - 1, y + 1, x + width, y + height - 1, color);
+        drawRect(x + 1, y + height - 1, x + width - 1, y + height, color);
     }
 
-    public static void renderSliced(PoseStack stack, int x, int y, int width, int height, ResourceLocation texture) {
-        renderSliced(stack, x, y, width, height, 0f, 0f, 15, 15, 15, 15, texture);
+    public static void renderSliced(int x, int y, int width, int height, ResourceLocation texture) {
+        renderSliced(x, y, width, height, 0f, 0f, 15, 15, 15, 15, texture);
     }
 
-    public static void renderSliced(PoseStack stack, int x, int y, int width, int height, float u, float v, int regionWidth, int regionHeight, int textureWidth, int textureHeight, ResourceLocation texture) {
+    public static void renderSliced(int x, int y, int width, int height, float u, float v, int regionWidth, int regionHeight, int textureWidth, int textureHeight, ResourceLocation texture) {
         setupTexture(texture);
 
-        Matrix4f pose = stack.last().pose();
-        Tesselator tessellator = Tesselator.getInstance();
-        BufferBuilder buffer = tessellator.getBuilder();
-        buffer.begin(VertexFormatMode.QUADS.asGLMode, DefaultVertexFormat.POSITION_TEX);
+        Tessellator tessellator = Tessellator.getInstance();
+        BufferBuilder buffer = tessellator.getBuffer();
+        buffer.begin(VertexFormatMode.QUADS.asGLMode, DefaultVertexFormats.POSITION_TEX);
 
         float rWidthThird = regionWidth / 3f;
         float rHeightThird = regionHeight / 3f;
 
         // top left
-        quad(buffer, pose, x, y, rWidthThird, rHeightThird, u, v, rWidthThird, rHeightThird, textureWidth, textureHeight);
+        quad(buffer, x, y, rWidthThird, rHeightThird, u, v, rWidthThird, rHeightThird, textureWidth, textureHeight);
         // top middle
-        quad(buffer, pose, x + rWidthThird, y, width - rWidthThird * 2, rHeightThird, u + rWidthThird, v, rWidthThird, rHeightThird, textureWidth, textureHeight);
+        quad(buffer, x + rWidthThird, y, width - rWidthThird * 2, rHeightThird, u + rWidthThird, v, rWidthThird, rHeightThird, textureWidth, textureHeight);
         // top right
-        quad(buffer, pose, x + width - rWidthThird, y, rWidthThird, rHeightThird, u + rWidthThird * 2, v, rWidthThird, rHeightThird, textureWidth, textureHeight);
+        quad(buffer, x + width - rWidthThird, y, rWidthThird, rHeightThird, u + rWidthThird * 2, v, rWidthThird, rHeightThird, textureWidth, textureHeight);
 
         // middle left
-        quad(buffer, pose, x, y + rHeightThird, rWidthThird, height - rHeightThird * 2, u, v + rHeightThird, rWidthThird, rHeightThird, textureWidth, textureHeight);
+        quad(buffer, x, y + rHeightThird, rWidthThird, height - rHeightThird * 2, u, v + rHeightThird, rWidthThird, rHeightThird, textureWidth, textureHeight);
         // middle middle
-        quad(buffer, pose, x + rWidthThird, y + rHeightThird, width - rWidthThird * 2, height - rHeightThird * 2, u + rWidthThird, v + rHeightThird, rWidthThird, rHeightThird, textureWidth, textureHeight);
+        quad(buffer, x + rWidthThird, y + rHeightThird, width - rWidthThird * 2, height - rHeightThird * 2, u + rWidthThird, v + rHeightThird, rWidthThird, rHeightThird, textureWidth, textureHeight);
         // middle right
-        quad(buffer, pose, x + width - rWidthThird, y + rHeightThird, rWidthThird, height - rHeightThird * 2, u + rWidthThird * 2, v + rHeightThird, rWidthThird, rHeightThird, textureWidth, textureHeight);
+        quad(buffer, x + width - rWidthThird, y + rHeightThird, rWidthThird, height - rHeightThird * 2, u + rWidthThird * 2, v + rHeightThird, rWidthThird, rHeightThird, textureWidth, textureHeight);
 
         // bottom left
-        quad(buffer, pose, x, y + height - rHeightThird, rWidthThird, rHeightThird, u, v + rHeightThird * 2, rWidthThird, rHeightThird, textureWidth, textureHeight);
+        quad(buffer, x, y + height - rHeightThird, rWidthThird, rHeightThird, u, v + rHeightThird * 2, rWidthThird, rHeightThird, textureWidth, textureHeight);
         // bottom middle
-        quad(buffer, pose, x + rWidthThird, y + height - rHeightThird, width - rWidthThird * 2, rHeightThird, u + rWidthThird, v + rHeightThird * 2, rWidthThird, rHeightThird, textureWidth, textureHeight);
+        quad(buffer, x + rWidthThird, y + height - rHeightThird, width - rWidthThird * 2, rHeightThird, u + rWidthThird, v + rHeightThird * 2, rWidthThird, rHeightThird, textureWidth, textureHeight);
         // bottom right
-        quad(buffer, pose, x + width - rWidthThird, y + height - rHeightThird, rWidthThird, rHeightThird, u + rWidthThird * 2, v + rHeightThird * 2, rWidthThird, rHeightThird, textureWidth, textureHeight);
+        quad(buffer, x + width - rWidthThird, y + height - rHeightThird, rWidthThird, rHeightThird, u + rWidthThird * 2, v + rHeightThird * 2, rWidthThird, rHeightThird, textureWidth, textureHeight);
 
-        tessellator.end();
+        tessellator.draw();
     }
 
-    public static void renderHalfTexture(PoseStack stack, int x, int y, int width, int height, int textureWidth, ResourceLocation texture) {
-        renderHalfTexture(stack, x, y, width, height, 0f, 0f, textureWidth, 1, textureWidth, 1, texture);
+    public static void renderHalfTexture(int x, int y, int width, int height, int textureWidth, ResourceLocation texture) {
+        renderHalfTexture(x, y, width, height, 0f, 0f, textureWidth, 1, textureWidth, 1, texture);
     }
 
-    public static void renderHalfTexture(PoseStack stack, int x, int y, int width, int height, float u, float v, int regionWidth, int regionHeight, int textureWidth, int textureHeight, ResourceLocation texture) {
+    public static void renderHalfTexture(int x, int y, int width, int height, float u, float v, int regionWidth, int regionHeight, int textureWidth, int textureHeight, ResourceLocation texture) {
         setupTexture(texture);
 
         // left
         int w = width / 2;
-        blit(stack, x, y, w, height, u, v, w, regionHeight, textureWidth, textureHeight);
-
+        blit(x, y, u, v, w, height, w, regionHeight, textureWidth, textureHeight);
         // right
         x += w;
         if (width % 2 == 1) w++;
-        blit(stack, x, y, w, height, u + regionWidth - w, v, w, regionHeight, textureWidth, textureHeight);
+        blit(x, y, u + regionWidth - w, v, w, height, w, regionHeight, textureWidth, textureHeight);
     }
 
-    public static void renderSprite(PoseStack stack, int x, int y, int z, int width, int height, TextureAtlasSprite sprite) {
+    public static void renderSprite(int x, int y, int z, int width, int height, TextureAtlasSprite sprite) {
         setupTexture(sprite.atlas().location());
-        BufferBuilder bufferBuilder = Tesselator.getInstance().getBuilder();
-        bufferBuilder.begin(VertexFormatMode.QUADS.asGLMode, DefaultVertexFormat.POSITION_TEX);
-        quad(bufferBuilder, stack.last().pose(), x, y, width, height, z, sprite.getU0(), sprite.getU1(), sprite.getV0(), sprite.getV1());
-        bufferBuilder.end();
-        BufferUploader.end(bufferBuilder);
+        BufferBuilder bufferBuilder = Tessellator.getInstance().getBuffer();
+        bufferBuilder.begin(VertexFormatMode.QUADS.asGLMode, DefaultVertexFormats.POSITION_TEX);
+        quad(bufferBuilder, x, y, width, height, z, sprite.getMinU(), sprite.getMaxU(), sprite.getMinU(), sprite.getMaxV());
+        bufferBuilder.finishDrawing();
+        Tessellator.getInstance().draw();
     }
 
     public static void setupScissor(int x, int y, int width, int height) {
@@ -391,30 +394,36 @@ public class UIHelper extends GuiComponent {
         setupScissor(vec);
     }
 
-    private static void quad(BufferBuilder bufferBuilder, Matrix4f pose, float x, float y, float width, float height, float u, float v, float regionWidth, float regionHeight, int textureWidth, int textureHeight) {
+    private static void quad(BufferBuilder bufferBuilder, float x, float y, float width, float height, float u, float v, float regionWidth, float regionHeight, int textureWidth, int textureHeight) {
         float u0 = u / textureWidth;
         float v0 = v / textureHeight;
         float u1 = (u + regionWidth) / textureWidth;
         float v1 = (v + regionHeight) / textureHeight;
-        quad(bufferBuilder, pose, x, y, width, height, 0f, u0, u1, v0, v1);
+        quad(bufferBuilder, x, y, width, height, 0f, u0, u1, v0, v1);
     }
 
-    private static void quad(BufferBuilder bufferBuilder, Matrix4f pose, float x, float y, float width, float height, float z, float u0, float u1, float v0, float v1) {
+    private static void quad(BufferBuilder bufferBuilder, float x, float y, float width, float height, float z, float u0, float u1, float v0, float v1) {
         float x1 = x + width;
         float y1 = y + height;
-        bufferBuilder.vertex(pose, x, y1, z).uv(u0, v1).endVertex();
-        bufferBuilder.vertex(pose, x1, y1, z).uv(u1, v1).endVertex();
-        bufferBuilder.vertex(pose, x1, y, z).uv(u1, v0).endVertex();
-        bufferBuilder.vertex(pose, x, y, z).uv(u0, v0).endVertex();
+        bufferBuilder.pos(x, y1, z).tex(u0, v1).endVertex();
+        bufferBuilder.pos(x1, y1, z).tex(u1, v1).endVertex();
+        bufferBuilder.pos(x1, y, z).tex(u1, v0).endVertex();
+        bufferBuilder.pos(x, y, z).tex(u0, v0).endVertex();
     }
 
     private static void setupScissor(FiguraVec4 dimensions) {
-        double scale = Minecraft.getInstance().getWindow().getGuiScale();
-        int screenY = Minecraft.getInstance().getWindow().getHeight();
+        ScaledResolution scaledResolution = new ScaledResolution(Minecraft.getMinecraft());
+        double scale = scaledResolution.getScaleFactor();
+        int screenY = scaledResolution.getScaledHeight();
 
         int scaledWidth = (int) Math.max(dimensions.z * scale, 0);
         int scaledHeight = (int) Math.max(dimensions.w * scale, 0);
-        RenderSystem.enableScissor((int) (dimensions.x * scale), (int) (screenY - dimensions.y * scale - scaledHeight), scaledWidth, scaledHeight);
+        enableScissor((int) (dimensions.x * scale), (int) (screenY - dimensions.y * scale - scaledHeight), scaledWidth, scaledHeight);
+    }
+
+    private static void enableScissor(int x, int y, int width, int height) {
+        GL11.glEnable(GL11.GL_SCISSOR_TEST);
+        GL11.glScissor(x, y, width, height);
     }
 
     public static void disableScissor() {
@@ -422,23 +431,23 @@ public class UIHelper extends GuiComponent {
         if (!SCISSORS_STACK.isEmpty()) {
             setupScissor(SCISSORS_STACK.peek());
         } else {
-            RenderSystem.disableScissor();
+            GL11.glDisable(GL11.GL_SCISSOR_TEST);
         }
     }
 
     public static void renderWithoutScissors(Runnable toRun) {
-        RenderSystem.disableScissor();
+        GL11.glDisable(GL11.GL_SCISSOR_TEST);
         toRun.run();
         if (!SCISSORS_STACK.isEmpty()) {
             setupScissor(SCISSORS_STACK.peek());
         }
     }
 
-    public static void highlight(PoseStack stack, FiguraWidget widget, Component text) {
+    public static void highlight(FiguraWidget widget, ITextComponent text) {
         // screen
         int screenW, screenH;
-        if (Minecraft.getInstance().screen instanceof AbstractPanelScreen) {
-            AbstractPanelScreen panel = (AbstractPanelScreen) Minecraft.getInstance().screen;
+        if (Minecraft.getMinecraft().currentScreen instanceof AbstractPanelScreen) {
+            AbstractPanelScreen panel = (AbstractPanelScreen) Minecraft.getMinecraft().currentScreen;
             screenW = panel.width;
             screenH = panel.height;
         } else {
@@ -454,16 +463,16 @@ public class UIHelper extends GuiComponent {
         int color = 0xDD000000;
 
         // left
-        fill(stack, 0, 0, x, y + height, color);
+        drawRect(0, 0, x, y + height, color);
         // right
-        fill(stack, x + width, y, screenW, screenH, color);
+        drawRect(x + width, y, screenW, screenH, color);
         // up
-        fill(stack, x, 0, screenW, y, color);
+        drawRect(x, 0, screenW, y, color);
         // down
-        fill(stack, 0, y + height, x + width, screenH, color);
+        drawRect(0, y + height, x + width, screenH, color);
 
         // outline
-        fillOutline(stack, Math.max(x - 1, 0), Math.max(y - 1, 0), Math.min(width + 2, screenW), Math.min(height + 2, screenH), 0xFFFFFFFF);
+        fillOutline(Math.max(x - 1, 0), Math.max(y - 1, 0), Math.min(width + 2, screenW), Math.min(height + 2, screenH), 0xFFFFFFFF);
 
         // text
 
@@ -504,18 +513,19 @@ public class UIHelper extends GuiComponent {
         return (context == null || !context.isVisible()) && mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
     }
 
-    public static void renderOutlineText(PoseStack stack, Font textRenderer, Component text, int x, int y, int color, int outline) {
+    public static void renderOutlineText(FontRenderer textRenderer, ITextComponent text, int x, int y, int color, int outline) {
         MultiBufferSource.BufferSource bufferSource = MultiBufferSource.immediate(Tesselator.getInstance().getBuilder());
         ((FontExtension)textRenderer).figura$drawInBatch8xOutline(text.getVisualOrderText(), x, y, color, outline, stack.last().pose(), bufferSource, 15 << 20 | 15 << 4);
         bufferSource.endBatch();
     }
 
-    public static void renderTooltip(PoseStack stack, Component tooltip, int mouseX, int mouseY, boolean background) {
-        Minecraft minecraft = Minecraft.getInstance();
+    public static void renderTooltip(ITextComponent tooltip, int mouseX, int mouseY, boolean background) {
+        Minecraft minecraft = Minecraft.getMinecraft();
 
         // window
-        int screenX = minecraft.getWindow().getGuiScaledWidth();
-        int screenY = minecraft.getWindow().getGuiScaledHeight();
+        ScaledResolution scaledResolution = new ScaledResolution(minecraft);
+        int screenX = scaledResolution.getScaledWidth();
+        int screenY = scaledResolution.getScaledHeight();
 
         boolean reduced = Configs.REDUCED_MOTION.value;
 
@@ -524,9 +534,9 @@ public class UIHelper extends GuiComponent {
         int y = reduced ? screenY : mouseY - 12;
 
         // prepare text
-        Font font = minecraft.font;
-        List<FormattedCharSequence> text = TextUtils.wrapTooltip(tooltip, font, x, screenX, 12);
-        int height = font.lineHeight * text.size();
+        FontRenderer font = minecraft.fontRenderer;
+        List<ITextComponent> text = TextUtils.wrapTooltip(tooltip, font, x, screenX, 12);
+        int height = font.FONT_HEIGHT * text.size();
 
         // clamp position to bounds
         x += 12;
@@ -542,18 +552,18 @@ public class UIHelper extends GuiComponent {
         }
 
         // render
-        stack.pushPose();
-        stack.translate(0d, 0d, 999d);
+        GlStateManager.pushMatrix();
+        GlStateManager.translate(0d, 0d, 999d);
 
         if (background)
-            renderSliced(stack, x - 4, y - 4, width + 8, height + 8, TOOLTIP);
+            renderSliced(x - 4, y - 4, width + 8, height + 8, TOOLTIP);
 
         for (int i = 0; i < text.size(); i++) {
-            FormattedCharSequence charSequence = text.get(i);
-            font.drawShadow(stack, charSequence, x, y + font.lineHeight * i, 0xFFFFFF);
+            ITextComponent charSequence = text.get(i);
+            font.drawStringWithShadow(charSequence.getUnformattedText(), x, y + font.FONT_HEIGHT * i, 0xFFFFFF);
         }
 
-        stack.popPose();
+        GlStateManager.popMatrix();
     }
 
     public static void renderScrollingText(PoseStack stack, Component text, int x, int y, int width, int color) {
@@ -576,15 +586,15 @@ public class UIHelper extends GuiComponent {
         disableScissor();
     }
 
-    public static void renderCenteredScrollingText(PoseStack stack, Component text, int x, int y, int width, int height, int color) {
-        Font font = Minecraft.getInstance().font;
-        int textWidth = font.width(text);
+    public static void renderCenteredScrollingText(ITextComponent text, int x, int y, int width, int height, int color) {
+        FontRenderer font = Minecraft.getMinecraft().fontRenderer;
+        int textWidth = font.getStringWidth(text.getUnformattedText());
         int textX = x + width / 2;
-        int textY = y + height / 2 - font.lineHeight / 2;
+        int textY = y + height / 2 - font.FONT_HEIGHT / 2;
 
         // the text fit :D
         if (textWidth <= width) {
-            drawCenteredString(stack, font, text, textX, textY, color);
+            font.drawStringWithShadow(text.getUnformattedText(), (float)(textX - font.getStringWidth(text.getUnformattedText()) / 2), (float)textY, color);
             return;
         }
 
@@ -593,7 +603,7 @@ public class UIHelper extends GuiComponent {
 
         // draw text
         setupScissor(x, y, width, height);
-        drawCenteredString(stack, font, text, textX, textY, color);
+        font.drawStringWithShadow(text.getUnformattedText(), (float)(textX - font.getStringWidth(text.getUnformattedText()) / 2), (float)textY, color);
         disableScissor();
     }
 
@@ -613,36 +623,42 @@ public class UIHelper extends GuiComponent {
     }
 
     public static Runnable openURL(String url) {
-        Minecraft minecraft = Minecraft.getInstance();
-        return () -> minecraft.setScreen(new FiguraConfirmScreen.FiguraConfirmLinkScreen((bl) -> {
-            if (bl) Util.getPlatform().openUri(url);
-        }, url, minecraft.screen));
+        Minecraft minecraft = Minecraft.getMinecraft();
+        return () -> minecraft.displayGuiScreen(new FiguraConfirmScreen.FiguraConfirmLinkScreen(bl -> {
+            if (bl) {
+                try {
+                    PlatformUtils.openWebLink(new URI(url));
+                } catch (URISyntaxException e) {
+                }
+            }
+            return null;
+        }, url, minecraft.currentScreen));
     }
 
-    public static void renderLoading(PoseStack stack, int x, int y) {
-        Component text = new TextComponent(Integer.toHexString(Math.abs(FiguraMod.ticks) % 16)).withStyle(Style.EMPTY.withFont(Badges.FONT));
-        Font font = Minecraft.getInstance().font;
-        font.drawShadow(stack, text, x - font.width(text) / 2, y - font.lineHeight / 2, -1);
+    public static void renderLoading(int x, int y) {
+        ITextComponent text = new TextComponentString(Integer.toHexString(Math.abs(FiguraMod.ticks) % 16)).setStyle(((StyleExtension)new Style()).setFont(Badges.FONT));
+        FontRenderer font = Minecraft.getMinecraft().fontRenderer;
+        font.drawStringWithShadow(text.getUnformattedText(), x - font.getStringWidth(text.getUnformattedText()) / 2, y - font.FONT_HEIGHT / 2, -1);
     }
 
     public static void setContext(ContextMenu context) {
-        if (Minecraft.getInstance().screen instanceof AbstractPanelScreen) {
-            AbstractPanelScreen panelScreen = (AbstractPanelScreen) Minecraft.getInstance().screen;
+        if (Minecraft.getMinecraft().currentScreen instanceof AbstractPanelScreen) {
+            AbstractPanelScreen panelScreen = (AbstractPanelScreen) Minecraft.getMinecraft().currentScreen;
             panelScreen.contextMenu = context;
         }
     }
 
     public static ContextMenu getContext() {
-        if (Minecraft.getInstance().screen instanceof AbstractPanelScreen) {
-            AbstractPanelScreen panelScreen = (AbstractPanelScreen) Minecraft.getInstance().screen;
+        if (Minecraft.getMinecraft().currentScreen instanceof AbstractPanelScreen) {
+            AbstractPanelScreen panelScreen = (AbstractPanelScreen) Minecraft.getMinecraft().currentScreen;
             return panelScreen.contextMenu;
         }
         return null;
     }
 
-    public static void setTooltip(Component text) {
-        if (Minecraft.getInstance().screen instanceof AbstractPanelScreen) {
-            AbstractPanelScreen panelScreen = (AbstractPanelScreen) Minecraft.getInstance().screen;
+    public static void setTooltip(ITextComponent text) {
+        if (Minecraft.getMinecraft().currentScreen instanceof AbstractPanelScreen) {
+            AbstractPanelScreen panelScreen = (AbstractPanelScreen) Minecraft.getMinecraft().currentScreen;
             panelScreen.tooltip = text;
         }
     }
@@ -651,16 +667,16 @@ public class UIHelper extends GuiComponent {
         if (style == null || style.getHoverEvent() == null)
             return;
 
-        Component text = style.getHoverEvent().getValue(HoverEvent.Action.SHOW_TEXT);
+        ITextComponent text = style.getHoverEvent().getValue(HoverEvent.Action.SHOW_TEXT);
         if (text != null)
             setTooltip(text);
     }
 
-    public static void renderOutline(PoseStack matrices, int x, int y, int width, int height, int color) {
-        fill(matrices, x, y, x + width, y + 1, color);
-        fill(matrices, x, y + height - 1, x + width, y + height, color);
-        fill(matrices, x, y + 1, x + 1, y + height - 1, color);
-        fill(matrices, x + width - 1, y + 1, x + width, y + height - 1, color);
+    public static void renderOutline(int x, int y, int width, int height, int color) {
+        drawRect(x, y, x + width, y + 1, color);
+        drawRect(x, y + height - 1, x + width, y + height, color);
+        drawRect(x, y + 1, x + 1, y + height - 1, color);
+        drawRect(x + width - 1, y + 1, x + width, y + height - 1, color);
     }
 
 }

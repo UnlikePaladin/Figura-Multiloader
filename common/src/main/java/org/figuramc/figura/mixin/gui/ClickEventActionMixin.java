@@ -1,6 +1,6 @@
 package org.figuramc.figura.mixin.gui;
 
-import net.minecraft.network.chat.ClickEvent;
+import net.minecraft.util.text.event.ClickEvent;
 import org.figuramc.figura.utils.TextUtils;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -22,11 +22,11 @@ public class ClickEventActionMixin {
     @Shadow @Final @Mutable
     private static ClickEvent.Action[] $VALUES;
     @Shadow @Final
-    private static Map<String, ClickEvent.Action> LOOKUP;
-    @Shadow @Final private String name;
+    private static Map<String, ClickEvent.Action> NAME_MAPPING;
+    @Shadow @Final private String canonicalName;
 
     static {
-        LOOKUP.put("figura_function", figura$addVariant("FIGURA_FUNCTION", "figura_function", false));
+        NAME_MAPPING.put("figura_function", figura$addVariant("FIGURA_FUNCTION", "figura_function", false));
     }
 
     @Invoker("<init>")
@@ -43,7 +43,7 @@ public class ClickEventActionMixin {
         return action;
     }
 
-    @Inject(at = @At("HEAD"), method = "isAllowedFromServer", cancellable = true)
+    @Inject(at = @At("HEAD"), method = "shouldAllowInChat", cancellable = true)
     private void isAllowedFromServer(CallbackInfoReturnable<Boolean> cir) {
         if (TextUtils.allowScriptEvents)
             cir.setReturnValue(true);

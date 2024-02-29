@@ -1,13 +1,16 @@
 package org.figuramc.figura.utils;
 
-import net.minecraft.ChatFormatting;
-import net.minecraft.network.chat.Style;
-import net.minecraft.network.chat.TextColor;
+import net.minecraft.item.EnumDyeColor;
+import net.minecraft.util.text.Style;
+import net.minecraft.util.text.TextFormatting;
 import org.apache.commons.lang3.StringUtils;
+import org.figuramc.figura.ducks.extensions.StyleExtension;
 import org.figuramc.figura.math.vector.FiguraVec3;
 import org.figuramc.figura.math.vector.FiguraVec4;
+import org.figuramc.figura.mixin.render.EnumDyeColorAccessor;
 
 import java.awt.*;
+import java.util.Arrays;
 
 public class ColorUtils {
 
@@ -39,7 +42,7 @@ public class ColorUtils {
         Colors(int hex) {
             this.hex = hex;
             this.vec = intToRGB(hex);
-            this.style = Style.EMPTY.withColor(TextColor.fromRgb(hex));
+            this.style = ((StyleExtension)new Style()).setRGBColor(hex);
         }
 
         public static Colors getColor(String s) {
@@ -110,8 +113,8 @@ public class ColorUtils {
             return color.vec;
 
         try {
-            ChatFormatting formatting = ChatFormatting.valueOf(hex.toUpperCase());
-            Integer i = formatting.getColor();
+            TextFormatting formatting = TextFormatting.valueOf(hex.toUpperCase());
+            Integer i = Arrays.stream(EnumDyeColor.values()).filter(enumDyeColor -> ((EnumDyeColorAccessor)(Object)enumDyeColor).getChatColor().equals(formatting)).findFirst().get().getColorValue();
             if (i != null)
                 return intToRGB(i);
         } catch (Exception ignored) {}

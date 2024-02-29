@@ -3,13 +3,16 @@ package org.figuramc.figura.gui.widgets;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiButton;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.TextComponent;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.text.ITextComponent;
 import org.figuramc.figura.utils.FiguraIdentifier;
 import org.figuramc.figura.utils.ui.UIHelper;
 
-public class Button extends net.minecraft.client.gui.components.Button implements FiguraWidget {
+public class Button extends GuiButton implements FiguraWidget {
 
     // default textures
     private static final ResourceLocation TEXTURE = new FiguraIdentifier("textures/gui/button.png");
@@ -24,7 +27,7 @@ public class Button extends net.minecraft.client.gui.components.Button implement
     protected final ResourceLocation texture;
 
     // extra fields
-    protected Component tooltip;
+    protected ITextComponent tooltip;
     private boolean hasBackground = true;
 
     // texture and text constructor
@@ -41,7 +44,7 @@ public class Button extends net.minecraft.client.gui.components.Button implement
     }
 
     // text constructor
-    public Button(int x, int y, int width, int height, Component text, Component tooltip, OnPress pressAction) {
+    public Button(int x, int y, int width, int height, ITextComponent text, ITextComponent tooltip, ScrollBarWidget.OnPress pressAction) {
         this(x, y, width, height, null, null, null, null, null, null, text, tooltip, pressAction);
     }
 
@@ -132,11 +135,11 @@ public class Button extends net.minecraft.client.gui.components.Button implement
         return (!this.isActive() ? ChatFormatting.DARK_GRAY : ChatFormatting.WHITE).getColor();
     }
 
-    public void setTooltip(Component tooltip) {
+    public void setTooltip(ITextComponent tooltip) {
         this.tooltip = tooltip;
     }
 
-    public Component getTooltip() {
+    public ITextComponent getTooltip() {
         return tooltip;
     }
 
@@ -149,7 +152,7 @@ public class Button extends net.minecraft.client.gui.components.Button implement
     }
 
     public void run() {
-        playDownSound(Minecraft.getInstance().getSoundManager());
+        playPressSound(Minecraft.getMinecraft().getSoundHandler());
         onPress();
     }
 

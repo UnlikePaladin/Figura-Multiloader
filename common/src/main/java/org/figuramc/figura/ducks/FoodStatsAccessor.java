@@ -1,5 +1,5 @@
 package org.figuramc.figura.ducks;
 
-public interface FoodDataAccesor {
+public interface FoodStatsAccessor {
     float figura$getExhaustionLevel();
 }

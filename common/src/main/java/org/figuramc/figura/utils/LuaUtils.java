@@ -2,24 +2,18 @@ package org.figuramc.figura.utils;
 
 import com.google.gson.*;
 import com.mojang.brigadier.StringReader;
-import com.mojang.datafixers.util.Pair;
 import net.minecraft.commands.arguments.SlotArgument;
 import net.minecraft.commands.arguments.blocks.BlockStateArgument;
 import net.minecraft.commands.arguments.item.ItemArgument;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.RegistryAccess;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.inventory.IInventory;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.RayTraceResult;
+import net.minecraft.world.World;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.HitResult;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-
 import org.figuramc.figura.lua.api.json.FiguraJsonSerializer;
 import org.figuramc.figura.lua.api.world.BlockStateAPI;
 import org.figuramc.figura.lua.api.world.ItemStackAPI;
@@ -32,6 +26,9 @@ import org.luaj.vm2.LuaError;
 import org.luaj.vm2.LuaString;
 import org.luaj.vm2.LuaTable;
 import org.luaj.vm2.LuaValue;
+
+import java.util.ArrayList;
+import java.util.Arrays;
 
 public class LuaUtils {
 
@@ -246,7 +243,7 @@ public class LuaUtils {
         } else if (item instanceof String) {
             String string = (String) item;
             try {
-                Level level = WorldAPI.getCurrentWorld();
+                World level = WorldAPI.getCurrentWorld();
                 return new ItemArgument().parse(new StringReader(string)).createItemStack(1, false);
             } catch (Exception e) {
                 throw new LuaError("Could not parse item stack from string: " + string);
@@ -283,16 +280,15 @@ public class LuaUtils {
         }
     }
 
-    public static Object[] parseBlockHitResult(HitResult hitResult) {
-        if (hitResult instanceof BlockHitResult) {
-            BlockHitResult blockHit = (BlockHitResult) hitResult;
-            BlockPos pos = blockHit.getBlockPos();
-            return new Object[]{new BlockStateAPI(WorldAPI.getCurrentWorld().getBlockState(pos), pos), FiguraVec3.fromVec3(blockHit.getLocation()), blockHit.getDirection().getName()};
+    public static Object[] parseBlockHitResult(RayTraceResult hitResult) {
+        if (hitResult != null && hitResult.typeOfHit == RayTraceResult.Type.BLOCK) {
+            BlockPos pos = hitResult.getBlockPos();
+            return new Object[]{new BlockStateAPI(WorldAPI.getCurrentWorld().getBlockState(pos), pos), FiguraVec3.fromVec3(hitResult.hitVec), hitResult.sideHit.getName()};
         }
         return null;
     }
 
-    public static int parseSlot(Object slot, Inventory inventory) {
+    public static int parseSlot(Object slot, IInventory inventory) {
         if (slot instanceof String) {
             String s = (String) slot;
             try {

@@ -55,8 +55,8 @@ public class FiguraWebSocketAdapter extends WebSocketAdapter {
     }
 
     public static String getBackendAddress() {
-        ServerAddress backendIP = ServerAddress.parseString(Configs.SERVER_IP.value);
-        return "wss://" + backendIP.getHost() + "/ws";
+        ServerAddress backendIP = ServerAddress.fromString(Configs.SERVER_IP.value);
+        return "wss://" + backendIP.getIP() + "/ws";
     }
 
     @Override

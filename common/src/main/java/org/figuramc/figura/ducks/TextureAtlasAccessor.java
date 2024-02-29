@@ -6,13 +6,14 @@ import net.minecraft.client.sounds.ChannelAccess;
 import net.minecraft.client.sounds.SoundBufferLibrary;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.ResourceLocation;
 import org.figuramc.figura.lua.api.sound.LuaSound;
 
 import java.util.Map;
 import java.util.UUID;
 
 public interface TextureAtlasAccessor {
-    Map<ResourceLocation, TextureAtlasSprite> getTexturesByName();
+    Map<String, TextureAtlasSprite> getTexturesByName();
 
     int getWidth();
 

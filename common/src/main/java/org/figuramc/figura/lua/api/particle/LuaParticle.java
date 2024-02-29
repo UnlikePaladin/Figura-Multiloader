@@ -2,10 +2,10 @@ package org.figuramc.figura.lua.api.particle;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.particle.Particle;
-import net.minecraft.client.particle.SingleQuadParticle;
-import net.minecraft.client.particle.WakeParticle;
+import net.minecraft.client.particle.ParticleSimpleAnimated;
+import net.minecraft.client.particle.ParticleWaterWake;
 import org.figuramc.figura.avatar.Avatar;
-import org.figuramc.figura.ducks.SingleQuadParticleAccessor;
+import org.figuramc.figura.ducks.ParticleAccessor;
 import org.figuramc.figura.ducks.extensions.ParticleExtension;
 import org.figuramc.figura.lua.LuaWhitelist;
 import org.figuramc.figura.lua.docs.LuaMethodDoc;
@@ -13,7 +13,6 @@ import org.figuramc.figura.lua.docs.LuaMethodOverload;
 import org.figuramc.figura.lua.docs.LuaTypeDoc;
 import org.figuramc.figura.math.vector.FiguraVec3;
 import org.figuramc.figura.math.vector.FiguraVec4;
-import org.figuramc.figura.mixin.particle.ParticleAccessor;
 import org.figuramc.figura.permissions.Permissions;
 import org.figuramc.figura.utils.LuaUtils;
 
@@ -39,7 +38,7 @@ public class LuaParticle {
     @LuaWhitelist
     @LuaMethodDoc("particle.spawn")
     public LuaParticle spawn() {
-        if (!Minecraft.getInstance().isPaused()) {
+        if (!Minecraft.getMinecraft().isGamePaused()) {
             if (owner.particlesRemaining.use()) {
                 ParticleAPI.getParticleEngine().figura$spawnParticle(particle, owner.owner);
                 owner.noPermissions.remove(Permissions.PARTICLES);
@@ -53,7 +52,7 @@ public class LuaParticle {
     @LuaWhitelist
     @LuaMethodDoc("particle.remove")
     public LuaParticle remove() {
-        particle.remove();
+        particle.setExpired();
         return this;
     }
 
@@ -66,7 +65,7 @@ public class LuaParticle {
     @LuaWhitelist
     @LuaMethodDoc("particle.get_pos")
     public FiguraVec3 getPos() {
-        ParticleAccessor p = (ParticleAccessor) particle;
+        org.figuramc.figura.mixin.particle.ParticleAccessor p = (org.figuramc.figura.mixin.particle.ParticleAccessor) particle;
         return FiguraVec3.of(p.getX(), p.getY(), p.getZ());
     }
 
@@ -86,9 +85,9 @@ public class LuaParticle {
             value = "particle.set_pos")
     public LuaParticle setPos(Object x, Double y, Double z) {
         FiguraVec3 vec = LuaUtils.parseVec3("setPos", x, y, z);
-        particle.setPos(vec.x, vec.y, vec.z);
+        particle.setPosition(vec.x, vec.y, vec.z);
 
-        ParticleAccessor p = (ParticleAccessor) particle;
+        org.figuramc.figura.mixin.particle.ParticleAccessor p = (org.figuramc.figura.mixin.particle.ParticleAccessor) particle;
         p.setXo(vec.x);
         p.setYo(vec.y);
         p.setZo(vec.z);
@@ -104,7 +103,7 @@ public class LuaParticle {
     @LuaWhitelist
     @LuaMethodDoc("particle.get_velocity")
     public FiguraVec3 getVelocity() {
-        ParticleAccessor p = (ParticleAccessor) particle;
+        org.figuramc.figura.mixin.particle.ParticleAccessor p = (org.figuramc.figura.mixin.particle.ParticleAccessor) particle;
         return FiguraVec3.of(p.getXd(), p.getYd(), p.getZd());
     }
 
@@ -136,7 +135,7 @@ public class LuaParticle {
     @LuaWhitelist
     @LuaMethodDoc("particle.get_color")
     public FiguraVec4 getColor() {
-        ParticleAccessor p = (ParticleAccessor) particle;
+        org.figuramc.figura.mixin.particle.ParticleAccessor p = (org.figuramc.figura.mixin.particle.ParticleAccessor) particle;
         return FiguraVec4.of(p.getRCol(), p.getGCol(), p.getBCol(), p.getAlpha());
     }
 
@@ -160,8 +159,8 @@ public class LuaParticle {
             value = "particle.set_color")
     public LuaParticle setColor(Object r, Double g, Double b, Double a) {
         FiguraVec4 vec = LuaUtils.parseVec4("setColor", r, g, b, a, 1, 1, 1, 1);
-        particle.setColor((float) vec.x, (float) vec.y, (float) vec.z);
-        ((ParticleAccessor) particle).setParticleAlpha((float) vec.w);
+        particle.setRBGColorF((float) vec.x, (float) vec.y, (float) vec.z);
+        ((org.figuramc.figura.mixin.particle.ParticleAccessor) particle).setParticleAlpha((float) vec.w);
         return this;
     }
 
@@ -173,7 +172,7 @@ public class LuaParticle {
     @LuaWhitelist
     @LuaMethodDoc("particle.get_lifetime")
     public int getLifetime() {
-        return particle.getLifetime();
+        return (((org.figuramc.figura.mixin.particle.ParticleAccessor)particle).getLifetime());
     }
 
     @LuaWhitelist
@@ -185,7 +184,7 @@ public class LuaParticle {
             aliases = "lifetime",
             value = "particle.set_lifetime")
     public LuaParticle setLifetime(int age) {
-        particle.setLifetime(Math.max(particle instanceof WakeParticle ? Math.min(age, 60) : age, 0));
+        particle.setMaxAge(Math.max(particle instanceof ParticleWaterWake ? Math.min(age, 60) : age, 0));
         return this;
     }
 
@@ -209,7 +208,7 @@ public class LuaParticle {
             aliases = "power",
             value = "particle.set_power")
     public LuaParticle setPower(float power) {
-        particle.setPower(power);
+        particle.multiplyVelocity(power);
         this.power = power;
         return this;
     }
@@ -222,7 +221,7 @@ public class LuaParticle {
     @LuaWhitelist
     @LuaMethodDoc(aliases = "getSize", value = "particle.get_scale")
     public float getScale() {
-        return ((ParticleAccessor) particle).getBbWidth() / 0.2f;
+        return ((org.figuramc.figura.mixin.particle.ParticleAccessor) particle).getBbWidth() / 0.2f;
     }
 
     @LuaWhitelist
@@ -239,11 +238,12 @@ public class LuaParticle {
             aliases = {"scale", "setSize", "size"},
             value = "particle.set_scale")
     public LuaParticle setScale(float scale) {
-        if (particle instanceof SingleQuadParticle) {
-            SingleQuadParticle quadParticle = (SingleQuadParticle) particle;
-            ((SingleQuadParticleAccessor) quadParticle).figura$fixQuadSize();
+        //TODO :suspicious, check particles work
+        if (particle instanceof ParticleSimpleAnimated) {
+            ParticleSimpleAnimated quadParticle = (ParticleSimpleAnimated) particle;
+            ((ParticleAccessor) quadParticle).figura$fixQuadSize();
         }
-        particle.scale(scale);
+        ((ParticleAccessor) particle).figura$setParticleSize(scale);
         return this;
     }
 
@@ -265,7 +265,7 @@ public class LuaParticle {
     @LuaWhitelist
     @LuaMethodDoc("particle.get_gravity")
     public float getGravity() {
-        return ((ParticleAccessor) particle).getGravity();
+        return ((org.figuramc.figura.mixin.particle.ParticleAccessor) particle).getGravity();
     }
 
     @LuaWhitelist
@@ -277,7 +277,7 @@ public class LuaParticle {
             aliases = "gravity",
             value = "particle.set_gravity")
     public LuaParticle setGravity(float gravity) {
-        ((ParticleAccessor) particle).setGravity(gravity);
+        ((org.figuramc.figura.mixin.particle.ParticleAccessor) particle).setGravity(gravity);
         return this;
     }
 
@@ -289,7 +289,7 @@ public class LuaParticle {
     @LuaWhitelist
     @LuaMethodDoc("particle.has_physics")
     public boolean hasPhysics() {
-        return ((ParticleAccessor) particle).getHasPhysics();
+        return ((org.figuramc.figura.mixin.particle.ParticleAccessor) particle).getHasPhysics();
     }
 
     @LuaWhitelist
@@ -301,7 +301,7 @@ public class LuaParticle {
             aliases = "physics",
             value = "particle.set_physics")
     public LuaParticle setPhysics(boolean physics) {
-        ((ParticleAccessor) particle).setHasPhysics(physics);
+        ((org.figuramc.figura.mixin.particle.ParticleAccessor) particle).setHasPhysics(physics);
         return this;
     }
 

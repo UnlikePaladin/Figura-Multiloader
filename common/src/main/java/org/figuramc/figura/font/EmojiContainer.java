@@ -3,10 +3,14 @@ package org.figuramc.figura.font;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import net.minecraft.ChatFormatting;
-import net.minecraft.network.chat.*;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.text.TextFormatting;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.Style;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.event.HoverEvent;
 import org.figuramc.figura.FiguraMod;
+import org.figuramc.figura.ducks.extensions.StyleExtension;
 import org.figuramc.figura.utils.FiguraIdentifier;
 import org.figuramc.figura.utils.FiguraText;
 import org.figuramc.figura.utils.JsonUtils;
@@ -29,7 +33,7 @@ public class EmojiContainer {
 
     private static final String ERROR_MSG = "Invalid emoji metadata \"{}\" @ \"{}\", Reason: Field '{}' {}";
 
-    private static final Style STYLE = Style.EMPTY.withColor(ChatFormatting.WHITE);
+    private static final Style STYLE = new Style().setColor(TextFormatting.WHITE);
 
     public final String name;
     private final ResourceLocation font;
@@ -109,36 +113,36 @@ public class EmojiContainer {
         }
     }
 
-    public Component getEmojiComponent(String key) {
-        return getEmojiComponent(key, new TextComponent(DELIMITER + key + DELIMITER));
+    public ITextComponent getEmojiComponent(String key) {
+        return getEmojiComponent(key, new TextComponentString(DELIMITER + key + DELIMITER));
     }
 
-    public Component getEmojiComponent(String key, MutableComponent hover) {
+    public ITextComponent getEmojiComponent(String key, ITextComponent hover) {
         String unicode = lookup.getUnicode(key);
         if (unicode == null)
             return null;
         return makeComponent(unicode, hover);
     }
 
-    public Component getShortcutComponent(String shortcut) {
+    public ITextComponent getShortcutComponent(String shortcut) {
         String unicode = lookup.getUnicodeForShortcut(shortcut);
         if (unicode == null)
             return null;
-        return makeComponent(unicode, new TextComponent(shortcut));
+        return makeComponent(unicode, new TextComponentString(shortcut));
     }
 
-    private Component makeComponent(String unicode, MutableComponent hover) {
-        return new TextComponent(unicode).withStyle(STYLE.withFont(font).withHoverEvent(
+    private ITextComponent makeComponent(String unicode, ITextComponent hover) {
+        return new TextComponentString(unicode).setStyle(((StyleExtension)STYLE).setFont(font).setHoverEvent(
                 new HoverEvent(HoverEvent.Action.SHOW_TEXT, hover
-                        .append("\n")
-                        .append(new FiguraText("emoji." + name).withStyle(ChatFormatting.DARK_GRAY)))
+                        .appendText("\n")
+                        .appendSibling(new FiguraText("emoji." + name).setStyle(new Style().setColor(TextFormatting.DARK_GRAY))))
         ));
     }
 
-    public Component blacklist(Component text) {
+    public ITextComponent blacklist(ITextComponent text) {
         if (blacklist.trim().isEmpty())
             return text;
-        return TextUtils.replaceInText(text, "[" + blacklist + "]", TextUtils.UNKNOWN, (s, style) -> style.getFont().equals(font), Integer.MAX_VALUE);
+        return TextUtils.replaceInText(text, "[" + blacklist + "]", TextUtils.UNKNOWN, (s, style) -> ((StyleExtension)style).getFont().equals(font), Integer.MAX_VALUE);
     }
 
     public ResourceLocation getFont() {

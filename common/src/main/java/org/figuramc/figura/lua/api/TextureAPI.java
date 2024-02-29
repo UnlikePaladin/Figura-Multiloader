@@ -2,9 +2,8 @@ package org.figuramc.figura.lua.api;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.packs.resources.Resource;
+import net.minecraft.util.ResourceLocation;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.lua.LuaNotNil;
 import org.figuramc.figura.lua.LuaWhitelist;
@@ -13,17 +12,16 @@ import org.figuramc.figura.lua.docs.LuaMethodOverload;
 import org.figuramc.figura.lua.docs.LuaTypeDoc;
 import org.figuramc.figura.mixin.render.MissingTextureAtlasSpriteAccessor;
 import org.figuramc.figura.model.rendering.texture.FiguraTexture;
-import org.figuramc.figura.permissions.Permissions;
 import org.figuramc.figura.utils.ColorUtils;
 import org.figuramc.figura.utils.LuaUtils;
 import org.luaj.vm2.LuaError;
 import org.luaj.vm2.LuaTable;
 
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
-import java.util.Optional;
 
 @LuaWhitelist
 @LuaTypeDoc(
@@ -44,7 +42,7 @@ public class TextureAPI {
             throw new LuaError("Avatar have no active renderer!");
     }
 
-    public FiguraTexture register(String name, NativeImage image, boolean ignoreSize) {
+    public FiguraTexture register(String name, BufferedImage image, boolean ignoreSize) {
         return owner.registerTexture(name, image, ignoreSize);
     }
 
@@ -151,9 +149,9 @@ public class TextureAPI {
         check();
         ResourceLocation resourcePath = LuaUtils.parsePath(path);
         try {
-            NativeImage image;
+            BufferedImage image;
             try {
-                image = NativeImage.read(Minecraft.getInstance().getResourceManager().getResource(resourcePath).getInputStream());
+                image = BufferedImage.read(Minecraft.getInstance().getResourceManager().getResource(resourcePath).getInputStream());
             } catch (Exception ignored) {
                 // if the string is a valid resourceLocation but does not point to a valid resource, missingno
                 image = MissingTextureAtlasSpriteAccessor.getImageData().get();

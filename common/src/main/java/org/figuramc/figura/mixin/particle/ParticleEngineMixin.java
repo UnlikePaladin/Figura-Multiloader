@@ -1,30 +1,32 @@
 package org.figuramc.figura.mixin.particle;
 
 import net.minecraft.client.particle.Particle;
-import net.minecraft.client.particle.ParticleEngine;
-import net.minecraft.client.particle.SpriteSet;
-import net.minecraft.core.particles.ParticleOptions;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.client.particle.ParticleManager;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.client.renderer.texture.TextureManager;
+import net.minecraft.util.EnumParticleTypes;
+import net.minecraft.util.ResourceLocation;
 import org.figuramc.figura.ducks.ParticleEngineAccessor;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.*;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.callback.LocalCapture;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.UUID;
 
-@Mixin(ParticleEngine.class)
+@Mixin(ParticleManager.class)
 public abstract class ParticleEngineMixin implements ParticleEngineAccessor {
 
-    @Final @Shadow private Map<ResourceLocation, SpriteSet> spriteSets;
 
-    @Shadow @Nullable protected abstract <T extends ParticleOptions> Particle makeParticle(T parameters, double x, double y, double z, double velocityX, double velocityY, double velocityZ);
 
-    @Shadow public abstract void add(Particle particle);
+    @Shadow public abstract void addEffect(Particle particle);
 
+    @Shadow public abstract @Nullable Particle spawnEffectParticle(int i, double d, double e, double f, double xSpeed, double h, double j, int... is);
+
+    @Shadow @Final private TextureManager renderer;
     @Unique private final HashMap<Particle, UUID> particleMap = new HashMap<>();
 
     // This fixes a conflict with Optifine having slightly different args + it should be more stable in general, capturing Locals is bad practice
@@ -35,14 +37,14 @@ public abstract class ParticleEngineMixin implements ParticleEngineAccessor {
     }
 
     @Override @Intrinsic
-    public <T extends ParticleOptions> Particle figura$makeParticle(T parameters, double x, double y, double z, double velocityX, double velocityY, double velocityZ) {
-        return this.makeParticle(parameters, x, y, z, velocityX, velocityY, velocityZ);
+    public Particle figura$makeParticle(EnumParticleTypes type, double x, double y, double z, double velocityX, double velocityY, double velocityZ) {
+        return spawnEffectParticle(type.getParticleID(), x, y, z, velocityX, velocityY, velocityZ);
     }
 
     @Override @Intrinsic
     public void figura$spawnParticle(Particle particle, UUID owner) {
         particleMap.put(particle, owner);
-        this.add(particle);
+        this.addEffect(particle);
     }
 
     @Override @Intrinsic
@@ -52,14 +54,14 @@ public abstract class ParticleEngineMixin implements ParticleEngineAccessor {
             Map.Entry<Particle, UUID> entry = iterator.next();
             if ((owner == null || entry.getValue().equals(owner))) {
                 if (entry.getKey() != null)
-                    entry.getKey().remove();
+                    entry.getKey().setExpired();
                 iterator.remove();
             }
         }
     }
 
     @Override @Intrinsic
-    public SpriteSet figura$getParticleSprite(ResourceLocation particleID) {
-        return spriteSets.get(particleID);
+    public TextureAtlasSprite figura$getParticleSprite(ResourceLocation particleID) {
+        return renderer.getTexture(particleID);
     }
 }

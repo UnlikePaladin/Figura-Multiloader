@@ -3,14 +3,12 @@ package org.figuramc.figura.avatar;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
-import com.mojang.datafixers.util.Pair;
 import net.minecraft.client.Minecraft;
-import net.minecraft.core.Registry;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.chat.TextComponent;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.player.Player;
+import net.minecraft.entity.EntityList;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.player.EntityPlayer;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.local.LocalAvatarLoader;
 import org.figuramc.figura.backend2.NetworkStuff;
@@ -18,10 +16,7 @@ import org.figuramc.figura.gui.FiguraToast;
 import org.figuramc.figura.gui.widgets.lists.AvatarList;
 import org.figuramc.figura.lua.api.particle.ParticleAPI;
 import org.figuramc.figura.lua.api.sound.SoundAPI;
-import org.figuramc.figura.utils.EntityUtils;
-import org.figuramc.figura.utils.FiguraClientCommandSource;
-import org.figuramc.figura.utils.FiguraResourceListener;
-import org.figuramc.figura.utils.FiguraText;
+import org.figuramc.figura.utils.*;
 
 import java.nio.file.Path;
 import java.util.*;
@@ -78,7 +73,7 @@ public class AvatarManager {
         Set<Entity> toBeRemoved = new HashSet<>();
 
         for (Entity entity : LOADED_CEM.keySet())
-            if (entity.removed)
+            if (entity != null && !Minecraft.getMinecraft().world.loadedEntityList.contains(entity))
                 toBeRemoved.add(entity);
 
         for (Entity entity : toBeRemoved)
@@ -124,7 +119,7 @@ public class AvatarManager {
 
     // player will also attempt to load from network, if possible
     public static Avatar getAvatarForPlayer(UUID player) {
-        if (panic || Minecraft.getInstance().level == null)
+        if (panic || Minecraft.getMinecraft().world == null)
             return null;
 
         fetchBackend(player);
@@ -140,20 +135,20 @@ public class AvatarManager {
             return loaded;
 
         // new avatar
-        ResourceLocation type = Registry.ENTITY_TYPE.getKey(entity.getType());
-        CompoundTag nbt = LocalAvatarLoader.CEM_AVATARS.get(type);
+        ResourceLocation type = EntityList.getKey(entity);
+        NBTTagCompound nbt = LocalAvatarLoader.CEM_AVATARS.get(type);
         return nbt == null ? null : loadEntityAvatar(entity, nbt);
     }
 
     // tries to get data from an entity
     public static Avatar getAvatar(Entity entity) {
-        if (panic || Minecraft.getInstance().level == null || entity == null)
+        if (panic || Minecraft.getMinecraft().world == null || entity == null)
             return null;
 
-        UUID uuid = entity.getUUID();
+        UUID uuid = entity.getUniqueID();
 
         // load from player (fetch backend) if is a player
-        if (entity instanceof Player){
+        if (entity instanceof EntityPlayer){
             Avatar avatar = getAvatarForPlayer(uuid);
             if (avatar != null)
                 return avatar;
@@ -165,7 +160,7 @@ public class AvatarManager {
 
     // get a loaded avatar without fetching backend or creating a new one
     public static Avatar getLoadedAvatar(UUID owner) {
-        if (panic || Minecraft.getInstance().level == null)
+        if (panic || Minecraft.getMinecraft().world == null)
             return null;
 
         UserData user = LOADED_USERS.get(owner);
@@ -242,7 +237,7 @@ public class AvatarManager {
     }
 
     // load CEM avatar
-    public static Avatar loadEntityAvatar(Entity entity, CompoundTag nbt) {
+    public static Avatar loadEntityAvatar(Entity entity, NBTTagCompound nbt) {
         Avatar targetAvatar = new Avatar(entity);
         targetAvatar.load(nbt);
         LOADED_CEM.put(entity, targetAvatar);
@@ -250,7 +245,7 @@ public class AvatarManager {
     }
 
     // set an user's avatar
-    public static void setAvatar(UUID id, CompoundTag nbt) {
+    public static void setAvatar(UUID id, NBTTagCompound nbt) {
         try {
             UserData user = LOADED_USERS.computeIfAbsent(id, UserData::new);
             user.clear();

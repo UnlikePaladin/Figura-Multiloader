@@ -1,31 +1,27 @@
 package org.figuramc.figura.mixin.gui;
 
 import com.google.common.collect.Ordering;
-import net.minecraft.client.gui.components.PlayerTabOverlay;
-import net.minecraft.client.multiplayer.PlayerInfo;
-import net.minecraft.network.chat.Component;
+import net.minecraft.client.gui.GuiPlayerTabOverlay;
+import net.minecraft.client.network.NetworkPlayerInfo;
+import net.minecraft.util.text.ITextComponent;
 import org.spongepowered.asm.mixin.Intrinsic;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
-import org.spongepowered.asm.mixin.gen.Invoker;
 
-import java.util.Comparator;
-import java.util.List;
-
-@Mixin(PlayerTabOverlay.class)
+@Mixin(GuiPlayerTabOverlay.class)
 public interface PlayerTabOverlayAccessor {
 
     @Intrinsic
     @Accessor("header")
-    Component getHeader();
+    ITextComponent getHeader();
 
     @Intrinsic
     @Accessor("footer")
-    Component getFooter();
+    ITextComponent getFooter();
 
     @Intrinsic
-    @Accessor("PLAYER_ORDERING")
-    static Ordering<PlayerInfo> getPlayerOrdering() {
+    @Accessor("ENTRY_ORDERING")
+    static Ordering<NetworkPlayerInfo> getPlayerOrdering() {
         throw new AssertionError();
     }
 }
