@@ -1,18 +1,19 @@
 package org.figuramc.figura.gui.widgets;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.datafixers.util.Pair;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.Style;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextFormatting;
 import org.figuramc.figura.FiguraMod;
-import org.figuramc.figura.config.Configs;
 import org.figuramc.figura.entries.FiguraScreen;
 import org.figuramc.figura.gui.screens.*;
 import org.figuramc.figura.utils.FiguraIdentifier;
+import org.figuramc.figura.utils.Pair;
 import org.figuramc.figura.utils.ui.UIHelper;
+import org.lwjgl.input.Keyboard;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -24,7 +25,7 @@ public class PanelSelectorWidget extends AbstractContainerElement {
 
     public static final ResourceLocation BACKGROUND = new FiguraIdentifier("textures/gui/panels_background.png");
 
-    private static final List<Function<Screen, Pair<Screen, PanelIcon>>> PANELS = new ArrayList<Function<Screen, Pair<Screen, PanelIcon>>>() {{
+    private static final List<Function<GuiScreen, Pair<GuiScreen, PanelIcon>>> PANELS = new ArrayList<Function<GuiScreen, Pair<GuiScreen, PanelIcon>>>() {{
         add(s -> Pair.of(new ProfileScreen(s), PanelIcon.PROFILE));
         add(s -> Pair.of(new BrowserScreen(s), PanelIcon.BROWSER));
         add(s -> Pair.of(new WardrobeScreen(s), PanelIcon.WARDROBE));
@@ -40,7 +41,7 @@ public class PanelSelectorWidget extends AbstractContainerElement {
 
     private PanelButton selected;
 
-    public PanelSelectorWidget(Screen parentScreen, int x, int y, int width, Class<? extends Screen> selected) {
+    public PanelSelectorWidget(GuiScreen parentScreen, int x, int y, int width, Class<? extends GuiScreen> selected) {
         super(x, y, width, 28);
 
         // buttons
@@ -56,8 +57,8 @@ public class PanelSelectorWidget extends AbstractContainerElement {
                 continue;
 
             // get button data
-            Pair<Screen, PanelIcon> panel = PANELS.get(i).apply(parentScreen);
-            Screen s = panel.getFirst();
+            Pair<GuiScreen, PanelIcon> panel = PANELS.get(i).apply(parentScreen);
+            GuiScreen s = panel.getFirst();
             PanelIcon icon = panel.getSecond();
             int buttonX = 4 + buttonWidth * buttons.size() + spacing;
 
@@ -69,7 +70,7 @@ public class PanelSelectorWidget extends AbstractContainerElement {
         if (FiguraMod.debugModeEnabled()) {
             for (int i : PANELS_BLACKLIST) {
                 PanelButton button = buttons.get(i);
-                button.setMessage(button.getMessage().copy().withStyle(ChatFormatting.RED));
+                button.setMessage(button.getMessage().createCopy().setStyle(new Style().setColor(TextFormatting.RED)));
             }
         }
     }
@@ -81,9 +82,9 @@ public class PanelSelectorWidget extends AbstractContainerElement {
         }
     }
 
-    private void createPanelButton(Screen panel, PanelIcon icon, boolean toggled, int x, int width) {
+    private void createPanelButton(GuiScreen panel, PanelIcon icon, boolean toggled, int x, int width) {
         // create button
-        PanelButton button = new PanelButton(x, getY(), width, getHeight() - 4, panel.getTitle(), icon, this, bx -> Minecraft.getInstance().setScreen(panel));
+        PanelButton button = new PanelButton(x, getY(), width, getHeight() - 4, (panel instanceof AbstractPanelScreen ? ((AbstractPanelScreen) panel).getTitle() : new TextComponentString("")), icon, this, bx -> Minecraft.getMinecraft().displayGuiScreen(panel));
         button.shouldHaveBackground(false);
         if (toggled) this.selected = button;
 
@@ -93,14 +94,14 @@ public class PanelSelectorWidget extends AbstractContainerElement {
     }
 
     @Override
-    public void render(PoseStack stack, int mouseX, int mouseY, float delta) {
-        UIHelper.renderSliced(stack, getX(), getY(), selected.getX() - getX(), getHeight() - 4, BACKGROUND);
-        UIHelper.renderSliced(stack, selected.getX() + selected.getWidth(), getY(), getWidth() - selected.getX() - selected.getWidth(), getHeight() - 4, BACKGROUND);
-        super.render(stack, mouseX, mouseY, delta);
+    public void draw(Minecraft minecraft, int mouseX, int mouseY, float delta) {
+        UIHelper.renderSliced(getX(), getY(), selected.getX() - getX(), getHeight() - 4, BACKGROUND);
+        UIHelper.renderSliced(selected.getX() + selected.getWidth(), getY(), getWidth() - selected.getX() - selected.getWidth(), getHeight() - 4, BACKGROUND);
+        super.draw(minecraft, mouseX, mouseY, delta);
     }
 
     public boolean cycleTab(int keyCode) {
-        if (Screen.hasControlDown()) {
+        if (GuiScreen.isCtrlKeyDown()) {
             int i = this.getNextPanel(keyCode);
             if (i >= 0 && i < buttons.size()) {
                 PanelButton button = buttons.get(i);
@@ -114,15 +115,15 @@ public class PanelSelectorWidget extends AbstractContainerElement {
 
     private int getNextPanel(int keyCode) {
         // numbers
-        if (keyCode >= 49 && keyCode <= 57)
-            return keyCode - 49;
+        if (keyCode >= Keyboard.KEY_1 && keyCode <= Keyboard.KEY_9)
+            return keyCode - Keyboard.KEY_1;
 
         // tab
-        if (keyCode == 258) {
+        if (keyCode == Keyboard.KEY_TAB) {
             // get current button
             int index = buttons.indexOf(selected);
 
-            int i = Screen.hasShiftDown() ? index - 1 : index + 1;
+            int i = GuiScreen.isShiftKeyDown() ? index - 1 : index + 1;
             return Math.floorMod(i, buttons.size());
         }
 
@@ -152,38 +153,38 @@ public class PanelSelectorWidget extends AbstractContainerElement {
 
         private final PanelSelectorWidget parent;
 
-        public PanelButton(int x, int y, int width, int height, Component text, PanelIcon icon, PanelSelectorWidget parent, OnPress pressAction) {
+        public PanelButton(int x, int y, int width, int height, ITextComponent text, PanelIcon icon, PanelSelectorWidget parent, ButtonAction pressAction) {
             super(x, y, width, height, 20 * icon.uv, 0, 20, ICONS, 140, 20, text, null, pressAction);
             this.parent = parent;
         }
 
         @Override
-        public void renderButton(PoseStack stack, int mouseX, int mouseY, float delta) {
-            super.renderButton(stack, mouseX, mouseY, delta);
+        public void drawWidget(Minecraft minecraft, int mouseX, int mouseY, float delta) {
+            super.drawWidget(minecraft, mouseX, mouseY, delta);
             boolean iconOnly = iconsOnly();
 
-            if (iconOnly && this.isMouseOver(mouseX, mouseY))
+            if (iconOnly && this.mouseOver(mouseX, mouseY))
                 UIHelper.setTooltip(getMessage());
         }
 
         @Override
-        protected void renderTexture(PoseStack stack, float delta) {
-            UIHelper.renderSliced(stack, this.x, this.y, getWidth(), getHeight(), isSelected() ? 24f : 0f, (this.isFocused() || this.isHovered()) ? 24f : 0f, 24, 24, 48, 48, TEXTURE);
+        protected void renderTexture(Minecraft mc, float delta) {
+            UIHelper.renderSliced(this.x, this.y, getWidth(), getHeight(), isSelected() ? 24f : 0f, (this.isHovered()) ? 24f : 0f, 24, 24, 48, 48, TEXTURE);
 
             UIHelper.setupTexture(texture);
             int size = getTextureSize();
-            blit(stack, this.x + (iconsOnly() ? (getWidth() - size) / 2 : 2), this.y + (getHeight() - size) / 2 + (!isSelected() ? 2 : 0), size, size, u, v, regionSize, regionSize, textureWidth, textureHeight);
+            UIHelper.blit(this.x + (iconsOnly() ? (getWidth() - size) / 2 : 2), this.y + (getHeight() - size) / 2 + (!isSelected() ? 2 : 0), size, size, u, v, regionSize, regionSize, textureWidth, textureHeight);
         }
 
         @Override
-        protected void renderText(PoseStack stack, float delta) {
+        protected void renderText(Minecraft mc, float delta) {
             if (iconsOnly())
                 return;
 
             int size = getTextureSize();
             int offset = !isSelected() ? 3 : 0;
-            Component message = isSelected() ? getMessage().copy().withStyle(ChatFormatting.UNDERLINE) : getMessage();
-            UIHelper.renderCenteredScrollingText(stack, message, this.x + 4 + size, this.y + offset, getWidth() - 6 - size, getHeight(), getTextColor());
+            ITextComponent message = isSelected() ? getMessage().createCopy().setStyle(new Style().setUnderlined(true)) : getMessage();
+            UIHelper.renderCenteredScrollingText(message, this.x + 4 + size, this.y + offset, getWidth() - 6 - size, getHeight(), getTextColor());
         }
 
         private boolean iconsOnly() {

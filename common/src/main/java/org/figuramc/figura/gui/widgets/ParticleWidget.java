@@ -1,18 +1,18 @@
 package org.figuramc.figura.gui.widgets;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.particle.Particle;
 import net.minecraft.client.particle.SpriteSet;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.core.Registry;
+import net.minecraft.client.renderer.texture.ITextureObject;
 import net.minecraft.core.particles.ParticleType;
-import net.minecraft.util.Mth;
+import net.minecraft.util.EnumParticleTypes;
 import org.figuramc.figura.ducks.ParticleEngineAccessor;
+import org.figuramc.figura.utils.MathUtils;
 import org.figuramc.figura.utils.ui.UIHelper;
 
 public class ParticleWidget implements FiguraWidget, FiguraTickable, FiguraRemovable {
 
-    private final TextureAtlasSprite sprite;
+    private final SpriteSet sprite;
 
     private final int x;
     private float lastY, y;
@@ -21,7 +21,7 @@ public class ParticleWidget implements FiguraWidget, FiguraTickable, FiguraRemov
     private boolean visible = true;
     private boolean removed;
 
-    public ParticleWidget(int x, int y, ParticleType<?> particle) {
+    public ParticleWidget(int x, int y, EnumParticleTypes particle) {
         this.x = x;
         this.lastY = this.y = y;
         this.sprite = getParticle(particle);
@@ -43,17 +43,17 @@ public class ParticleWidget implements FiguraWidget, FiguraTickable, FiguraRemov
     }
 
     @Override
-    public void render(PoseStack poseStack, int mouseX, int mouseY, float delta) {
+    public void draw(Minecraft minecraft, int mouseX, int mouseY, float delta) {
         if (!visible || removed)
             return;
 
-        float size = Mth.lerp(delta, lastSize, this.size);
-        float y = Mth.lerp(delta, lastY, this.y);
-        UIHelper.renderSprite((int) (x - size / 2f), (int) (y - size / 2f), 0, (int) size, (int) size, sprite.g((int) (initialSize - size), (int) initialSize));
+        float size = (float) MathUtils.lerp(delta, lastSize, this.size);
+        float y = (float) MathUtils.lerp(delta, lastY, this.y);
+        UIHelper.renderSprite((int) (x - size / 2f), (int) (y - size / 2f), 0, (int) size, (int) size, sprite.get((int) (initialSize - size), (int) initialSize));
     }
 
-    private static SpriteSet getParticle(ParticleType<?> particleType) {
-        return ((ParticleEngineAccessor) Minecraft.getInstance().particleEngine).figura$getParticleSprite(Registry.PARTICLE_TYPE.getKey(particleType));
+    private static ITextureObject getParticle(EnumParticleTypes enumParticleType) {
+        return ((ParticleEngineAccessor) Minecraft.getMinecraft().effectRenderer).figura$getParticleSprite(enumParticleType);
     }
 
     @Override

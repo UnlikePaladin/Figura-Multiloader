@@ -107,7 +107,7 @@ public class NetworkingAPI {
                 new TextComponentString(String.format("[networking:%s:%s] ", source.name().toLowerCase(),owner.entityName))
                         .setStyle(ColorUtils.Colors.LUA_PING.style)
                         .appendSibling(text.createCopy().setStyle(new Style().setColor(TextFormatting.WHITE)));
-        String logTextString = finalText.getUnformattedText();
+        String logTextString = finalText.getFormattedText();
         switch (log) {
             case 2:
                 FiguraMod.sendChatMessage(finalText);
@@ -120,7 +120,7 @@ public class NetworkingAPI {
         try {
             LocalTime t = LocalTime.now();
             writeToLogStream(String.format("[%02d:%02d:%02d] [INFO] %s\n", t.getHour(), t.getMinute(),
-                    t.getSecond(), finalText.getUnformattedText()));
+                    t.getSecond(), finalText.getFormattedText()));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -134,7 +134,7 @@ public class NetworkingAPI {
                 new TextComponentString(String.format("[networking:%s:%s] ", source.name().toLowerCase(),owner.entityName))
                         .setStyle(ColorUtils.Colors.LUA_ERROR.style)
                         .appendSibling(text.createCopy().setStyle(new Style().setColor(TextFormatting.WHITE)));
-        String logTextString = finalText.getUnformattedText();
+        String logTextString = finalText.getFormattedText();
         switch (log) {
             case 2:
                 FiguraMod.sendChatMessage(finalText);
@@ -147,7 +147,7 @@ public class NetworkingAPI {
         try {
             LocalTime t = LocalTime.now();
             writeToLogStream(String.format("[%02d:%02d:%02d] [ERROR] %s\n", t.getHour(), t.getMinute(),
-                    t.getSecond(), finalText.getUnformattedText()));
+                    t.getSecond(), finalText.getFormattedText()));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

@@ -1,12 +1,11 @@
 package org.figuramc.figura.utils;
 
-import dev.architectury.injectables.annotations.ExpectPlatform;
 import net.minecraft.client.resources.IResourceManager;
 
 import java.util.Objects;
 import java.util.function.Consumer;
 
-public class FiguraResourceListener {
+public abstract class FiguraResourceListener {
     private final String id;
     private final Consumer<IResourceManager> reloadConsumer;
     protected FiguraResourceListener(String id, Consumer<IResourceManager> reloadConsumer) {
@@ -14,10 +13,7 @@ public class FiguraResourceListener {
         this.reloadConsumer = reloadConsumer;
     }
 
-    @ExpectPlatform
-    public static FiguraResourceListener createResourceListener(String id, Consumer<IResourceManager> reloadConsumer) {
-        throw new AssertionError();
-    }
+    public abstract FiguraResourceListener createResourceListener(String id, Consumer<IResourceManager> reloadConsumer);
 
     public String id() {
         return id;

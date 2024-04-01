@@ -1,71 +1,67 @@
 package org.figuramc.figura.mixin.render.renderers;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.math.Matrix4f;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.model.PlayerModel;
-import net.minecraft.client.model.geom.ModelPart;
-import net.minecraft.client.player.AbstractClientPlayer;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
-import net.minecraft.client.renderer.entity.LivingEntityRenderer;
-import net.minecraft.client.renderer.entity.player.PlayerRenderer;
-import net.minecraft.network.chat.Component;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.network.chat.TextComponent;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.scores.Objective;
-import net.minecraft.world.scores.Score;
-import net.minecraft.world.scores.Scoreboard;
-import org.figuramc.figura.ducks.extensions.FontExtension;
-import org.figuramc.figura.lua.api.nameplate.EntityNameplateCustomization;
-import org.figuramc.figura.lua.api.vanilla_model.VanillaPart;
-import org.figuramc.figura.math.vector.FiguraVec3;
+import net.minecraft.client.entity.AbstractClientPlayer;
+import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.client.model.ModelBase;
+import net.minecraft.client.model.ModelPlayer;
+import net.minecraft.client.renderer.BufferBuilder;
+import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.client.renderer.Tessellator;
+import net.minecraft.client.renderer.entity.RenderLivingBase;
+import net.minecraft.client.renderer.entity.RenderManager;
+import net.minecraft.client.renderer.entity.RenderPlayer;
+import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
+import net.minecraft.scoreboard.Score;
+import net.minecraft.scoreboard.ScoreObjective;
+import net.minecraft.scoreboard.Scoreboard;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.TextComponentString;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.avatar.AvatarManager;
 import org.figuramc.figura.avatar.Badges;
-import org.figuramc.figura.compat.SimpleVCCompat;
 import org.figuramc.figura.config.Configs;
+import org.figuramc.figura.ducks.extensions.FontExtension;
 import org.figuramc.figura.lua.api.ClientAPI;
 import org.figuramc.figura.lua.api.nameplate.EntityNameplateCustomization;
 import org.figuramc.figura.lua.api.vanilla_model.VanillaPart;
 import org.figuramc.figura.math.vector.FiguraVec3;
+import org.figuramc.figura.model.rendering.texture.RenderTypes;
 import org.figuramc.figura.permissions.Permissions;
 import org.figuramc.figura.utils.RenderUtils;
 import org.figuramc.figura.utils.TextUtils;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.util.List;
 import java.util.regex.Pattern;
 
-@Mixin(PlayerRenderer.class)
-public abstract class PlayerRendererMixin extends LivingEntityRenderer<AbstractClientPlayer, PlayerModel<AbstractClientPlayer>> {
+@Mixin(RenderPlayer.class)
+public abstract class PlayerRendererMixin extends RenderLivingBase<AbstractClientPlayer> {
 
-    public PlayerRendererMixin(EntityRenderDispatcher dispatcher, PlayerModel<AbstractClientPlayer> entityModel, float shadowRadius) {
+    @Shadow public abstract ModelPlayer getMainModel();
+
+    public PlayerRendererMixin(RenderManager dispatcher, ModelBase entityModel, float shadowRadius) {
         super(dispatcher, entityModel, shadowRadius);
     }
 
     @Unique
     private Avatar avatar;
 
-    @Inject(method = "renderNameTag(Lnet/minecraft/client/player/AbstractClientPlayer;Lnet/minecraft/network/chat/Component;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;I)V", at = @At("HEAD"), cancellable = true)
-    private void renderNameTag(AbstractClientPlayer player, Component text, PoseStack stack, MultiBufferSource multiBufferSource, int light, CallbackInfo ci) {
+    @Inject(method = "renderEntityName(Lnet/minecraft/client/entity/AbstractClientPlayer;DDDLjava/lang/String;D)V", at = @At("HEAD"), cancellable = true)
+    private void renderNameTag(AbstractClientPlayer player, double ogX, double ogY, double z, String string, double distanceSq, CallbackInfo ci) {
         // return on config or high entity distance
         int config = Configs.ENTITY_NAMEPLATE.value;
-        if (config == 0 || AvatarManager.panic || this.entityRenderDispatcher.distanceToSqr(player) > 4096)
+        if (config == 0 || AvatarManager.panic || player.getDistanceSq(renderManager.renderViewEntity) > 4096)
             return;
 
         // get customizations
-        Avatar avatar = AvatarManager.getAvatarForPlayer(player.getUUID());
+        Avatar avatar = AvatarManager.getAvatarForPlayer(player.getUniqueID());
         EntityNameplateCustomization custom = avatar == null || avatar.luaRuntime == null ? null : avatar.luaRuntime.nameplate.ENTITY;
 
         // customization boolean, which also is the permission check
@@ -83,29 +79,33 @@ public abstract class PlayerRendererMixin extends LivingEntityRenderer<AbstractC
         }
 
         FiguraMod.pushProfiler(FiguraMod.MOD_ID);
-        FiguraMod.pushProfiler(player.getName().getString());
+        FiguraMod.pushProfiler(player.getName());
         FiguraMod.pushProfiler("nameplate");
 
-        stack.pushPose();
+        GlStateManager.pushMatrix();
 
         // pivot
         FiguraMod.pushProfiler("pivot");
         FiguraVec3 pivot;
-        if (hasCustom && custom.getPivot() != null)
-            pivot = custom.getPivot();
-        else
-            pivot = FiguraVec3.of(0f, player.getBbHeight() + 0.5f, 0f);
+        float height = player.height - (player.isSneaking() ? 0.25F : 0.0F);
 
-        stack.translate(pivot.x, pivot.y, pivot.z);
+        if (hasCustom && custom.getPivot() != null)
+            pivot = FiguraVec3.of(ogX + custom.getPivot().x, ogY + custom.getPivot().y, z + custom.getPivot().z);
+        else
+            pivot = FiguraVec3.of(ogX, ogY + height + 0.5f, z);
+
+        GlStateManager.translate(pivot.x, pivot.y, pivot.z);
+        GlStateManager.glNormal3f(0.0F, 1.0F, 0.0F);
 
         // rotation
-        stack.mulPose(this.entityRenderDispatcher.cameraOrientation());
+        GlStateManager.rotate(-renderManager.playerViewY, 0.0F, 1.0F, 0.0F);
+        GlStateManager.rotate((float)(this.renderManager.options.thirdPersonView == 2 ? -1 : 1) * renderManager.playerViewX, 1.0F, 0.0F, 0.0F);
 
         // pos
         FiguraMod.popPushProfiler("position");
         if (hasCustom && custom.getPos() != null) {
             FiguraVec3 pos = custom.getPos();
-            stack.translate(pos.x, pos.y, pos.z);
+            GlStateManager.translate(pos.x, pos.y, pos.z);
         }
 
         // scale
@@ -115,113 +115,170 @@ public abstract class PlayerRendererMixin extends LivingEntityRenderer<AbstractC
         if (hasCustom && custom.getScale() != null)
             scaleVec.multiply(custom.getScale());
 
-        stack.scale((float) scaleVec.x, (float) scaleVec.y, (float) scaleVec.z);
+        GlStateManager.scale((float) scaleVec.x, (float) scaleVec.y, (float) scaleVec.z);
 
         // text
-        Component name = new TextComponent(player.getName().getString());
+        ITextComponent name = new TextComponentString(player.getName());
         FiguraMod.popPushProfiler("text");
-        Component replacement = hasCustom && custom.getJson() != null ? custom.getJson().copy() : name;
+        ITextComponent replacement = hasCustom && custom.getJson() != null ? custom.getJson().createCopy() : name;
 
         // name
         replacement = TextUtils.replaceInText(replacement, "\\$\\{name\\}", name);
 
         // badges
         FiguraMod.popPushProfiler("badges");
-        replacement = Badges.appendBadges(replacement, player.getUUID(), config > 1);
+        replacement = Badges.appendBadges(replacement, player.getUniqueID(), config > 1);
 
         FiguraMod.popPushProfiler("applyName");
-        text = TextUtils.replaceInText(text, "\\b" + Pattern.quote(player.getName().getString()) + "\\b", replacement);
+        ITextComponent text = new TextComponentString(string);
+        text = TextUtils.replaceInText(text, "\\b" + Pattern.quote(player.getName()) + "\\b", replacement);
 
         // * variables * //
         FiguraMod.popPushProfiler("colors");
-        boolean notSneaking = !player.isDiscrete();
-        boolean deadmau = text.getString().equals("deadmau5");
-
-        int bgColor = hasCustom && custom.background != null ? custom.background : (int) (Minecraft.getInstance().options.getBackgroundOpacity(0.25f) * 0xFF) << 24;
+        boolean notSneaking = !player.isSneaking();
+        boolean deadmau = text.getFormattedText().equals("deadmau5");
+// TODO : opacity bg option
+        int bgColor = hasCustom && custom.background != null ? custom.background : (int) (0.25f * 0xFF) << 24;
         int outlineColor = hasCustom && custom.outlineColor != null ? custom.outlineColor : 0x202020;
 
         boolean outline = hasCustom && custom.outline;
         boolean shadow = hasCustom && custom.shadow;
 
-        light = hasCustom && custom.light != null ? custom.light : light;
+        Integer light = hasCustom && custom.light != null ? custom.light : null;
 
-        Font font = this.getFont();
-        Matrix4f matrix4f = stack.last().pose();
-        Matrix4f textMatrix = matrix4f;
-        if (shadow) {
-            stack.pushPose();
-            stack.scale(1, 1, -1);
-            textMatrix = stack.last().pose();
-            stack.popPose();
+        // Referenced from EntityRenderer drawNameplate
+        FontRenderer font = this.getFontRendererFromRenderManager();
+        if (!player.isSneaking()) {
+            GlStateManager.disableDepth();
         }
-
+        GlStateManager.disableLighting();
+        GlStateManager.enableBlend();
+        GlStateManager.tryBlendFuncSeparate(
+                GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA, GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ZERO
+        );
+//TODO investigate why depthMask is set to false only sometimes
         // render scoreboard
         FiguraMod.popPushProfiler("render");
         FiguraMod.pushProfiler("scoreboard");
         boolean hasScore = false;
-        if (this.entityRenderDispatcher.distanceToSqr(player) < 100) {
+        if (distanceSq < 100) {
             // get scoreboard
-            Scoreboard scoreboard = player.getScoreboard();
-            Objective scoreboardObjective = scoreboard.getDisplayObjective(2);
+            Scoreboard scoreboard = player.getWorldScoreboard();
+            ScoreObjective scoreboardObjective = scoreboard.getObjectiveInDisplaySlot(2);
             if (scoreboardObjective != null) {
                 hasScore = true;
 
                 // render scoreboard
-                Score score = scoreboard.getOrCreatePlayerScore(player.getScoreboardName(), scoreboardObjective);
+                Score score = scoreboard.getOrCreateScore(player.getName(), scoreboardObjective);
 
-                Component text1 = new TextComponent(Integer.toString(score.getScore())).append(" ").append(scoreboardObjective.getDisplayName());
-                float x = -font.width(text1) / 2f;
+                ITextComponent text1 = new TextComponentString(Integer.toString(score.getScorePoints())).appendText(" ").appendText(scoreboardObjective.getDisplayName());
+                float x = -font.getStringWidth(text1.getFormattedText()) / 2f;
                 float y = deadmau ? -10f : 0f;
 
-                font.drawInBatch(text1, x, y, 0x20FFFFFF, false, matrix4f, multiBufferSource, notSneaking, bgColor, light);
+                GlStateManager.disableTexture2D();
+                Tessellator tessellator = Tessellator.getInstance();
+                BufferBuilder bufferbuilder = tessellator.getBuffer();
+                bufferbuilder.begin(7, DefaultVertexFormats.POSITION_COLOR);
+                bufferbuilder.pos(x - 1, -1 + y, 0.0).color((float)(bgColor >> 16) / 255.0F, (float)(bgColor >> 8 & 0xFF) / 255.0F, (float)(bgColor & 0xFF) / 255.0F, (float)(bgColor >> 24 & 0xFF) / 255.0f).endVertex();
+                bufferbuilder.pos(x - 1, 8 + y, 0.0).color((float)(bgColor >> 16) / 255.0F, (float)(bgColor >> 8 & 0xFF) / 255.0F, (float)(bgColor & 0xFF) / 255.0F, (float)(bgColor >> 24 & 0xFF) / 255.0f).endVertex();
+                bufferbuilder.pos(-x + 1, 8 + y, 0.0).color((float)(bgColor >> 16) / 255.0F, (float)(bgColor >> 8 & 0xFF) / 255.0F, (float)(bgColor & 0xFF) / 255.0F, (float)(bgColor >> 24 & 0xFF) / 255.0f).endVertex();
+                bufferbuilder.pos(-x + 1, -1 + y, 0.0).color((float)(bgColor >> 16) / 255.0F, (float)(bgColor >> 8 & 0xFF) / 255.0F, (float)(bgColor & 0xFF) / 255.0F, (float)(bgColor >> 24 & 0xFF) / 255.0f).endVertex();
+                tessellator.draw();
+                GlStateManager.enableTexture2D();
+
+
+                font.drawString(text1.getFormattedText(), x, y, 0x20FFFFFF, false);
                 if (notSneaking) {
                     if (outline)
-                        ((FontExtension)font).figura$drawInBatch8xOutline(text1.getVisualOrderText(), x, y, -1, outlineColor, matrix4f, multiBufferSource, light);
-                    else
-                        font.drawInBatch(text1, x, y, -1, shadow, textMatrix, multiBufferSource, false, 0, light);
+                        ((FontExtension)font).figura$drawInBatch8xOutline(text1, x, y, -1, outlineColor);
+                    else {
+                        if (shadow) {
+                            GlStateManager.pushMatrix();
+                            GlStateManager.scale(1, 1, -1);
+                        }
+                        font.drawString(text1.getFormattedText(), x, y, -1, shadow);
+                        if (shadow)
+                            GlStateManager.popMatrix();
+                    }
                 }
             }
         }
 
         // render name
         FiguraMod.popPushProfiler("name");
-        List<Component> textList = TextUtils.splitText(text, "\n");
+        List<ITextComponent> textList = TextUtils.splitText(text, "\n");
 
         for (int i = 0; i < textList.size(); i++) {
-            Component text1 = textList.get(i);
+            ITextComponent text1 = textList.get(i);
 
-            if (text1.getString().isEmpty())
+            if (text1.getFormattedText().isEmpty())
                 continue;
 
             int line = i - textList.size() + (hasScore ? 0 : 1);
 
-            float x = -font.width(text1) / 2f;
-            float y = (deadmau ? -10f : 0f) + (font.lineHeight + 1) * line;
+            float x = -font.getStringWidth(text1.getFormattedText()) / 2f;
+            float y = (deadmau ? -10f : 0f) + (font.FONT_HEIGHT + 1) * line;
 
-            font.drawInBatch(text1, x, y, 0x20FFFFFF, false, matrix4f, multiBufferSource, notSneaking, bgColor, light);
+            GlStateManager.disableTexture2D();
+            Tessellator tessellator = Tessellator.getInstance();
+            BufferBuilder bufferbuilder = tessellator.getBuffer();
+            bufferbuilder.begin(7, DefaultVertexFormats.POSITION_COLOR); // TODO: Change this so it obeys the color in the nameplate customization
+            bufferbuilder.pos(x - 1, -1 + y, 0.0).color((float)(bgColor >> 16) / 255.0F, (float)(bgColor >> 8 & 0xFF) / 255.0F, (float)(bgColor & 0xFF) / 255.0F, (float)(bgColor >> 24 & 0xFF) / 255.0f).endVertex();
+            bufferbuilder.pos(x - 1, 8 + y, 0.0).color((float)(bgColor >> 16) / 255.0F, (float)(bgColor >> 8 & 0xFF) / 255.0F, (float)(bgColor & 0xFF) / 255.0F, (float)(bgColor >> 24 & 0xFF) / 255.0f).endVertex();
+            bufferbuilder.pos(-x + 1, 8 + y, 0.0).color((float)(bgColor >> 16) / 255.0F, (float)(bgColor >> 8 & 0xFF) / 255.0F, (float)(bgColor & 0xFF) / 255.0F, (float)(bgColor >> 24 & 0xFF) / 255.0f).endVertex();
+            bufferbuilder.pos(-x + 1, -1 + y, 0.0).color((float)(bgColor >> 16) / 255.0F, (float)(bgColor >> 8 & 0xFF) / 255.0F, (float)(bgColor & 0xFF) / 255.0F, (float)(bgColor >> 24 & 0xFF) / 255.0f).endVertex();
+            tessellator.draw();
+            GlStateManager.enableTexture2D();
+
+
+            font.drawString(text1.getFormattedText(), x, y, 0x20FFFFFF, false);
             if (notSneaking) {
                 if (outline)
-                    ((FontExtension)font).figura$drawInBatch8xOutline(text1.getVisualOrderText(), x, y, -1, outlineColor, matrix4f, multiBufferSource, light);
-                else
-                    font.drawInBatch(text1, x, y, -1, shadow, textMatrix, multiBufferSource, false, 0, light);
+                    ((FontExtension)font).figura$drawInBatch8xOutline(text1, x, y, -1, outlineColor);
+                else {
+                    if (shadow) {
+                        GlStateManager.pushMatrix();
+                        GlStateManager.scale(1, 1, -1);
+                    }
+                    font.drawString(text1.getFormattedText(), x, y, -1, shadow);
+                    if (shadow)
+                        GlStateManager.popMatrix();
+                }
             }
 
             // Renders Simple VC icons at the end of the nameplate
-            if (ClientAPI.isModLoaded("voicechat") && textList.get(i) == textList.get(textList.size()-1))
-                SimpleVCCompat.renderSimpleVCIcon(player, text1, stack, multiBufferSource, light);
+            if (ClientAPI.isModLoaded("voicechat") && textList.get(i) == textList.get(textList.size()-1));
+               // SimpleVCCompat.renderSimpleVCIcon(player, text1, stack, multiBufferSource, light);
         }
-
+        GlStateManager.disableBlend();
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
         FiguraMod.popProfiler(5);
-        stack.popPose();
+        GlStateManager.popMatrix();
+        GlStateManager.enableLighting();
         ci.cancel();
     }
 
-    @Inject(at = @At(value = "INVOKE", shift = At.Shift.AFTER, target = "Lnet/minecraft/client/model/PlayerModel;setupAnim(Lnet/minecraft/world/entity/LivingEntity;FFFFF)V"), method = "renderHand")
-    private void onRenderHand(PoseStack stack, MultiBufferSource multiBufferSource, int light, AbstractClientPlayer player, ModelPart arm, ModelPart sleeve, CallbackInfo ci) {
-        avatar = AvatarManager.getAvatarForPlayer(player.getUUID());
+    @Inject(at = @At(value = "INVOKE", shift = At.Shift.AFTER, target = "Lnet/minecraft/client/model/ModelPlayer;setRotationAngles(FFFFFFLnet/minecraft/entity/Entity;)V"), method = "renderLeftArm")
+    private void onRenderHandLeft(AbstractClientPlayer player, CallbackInfo ci) {
+        avatar = AvatarManager.getAvatarForPlayer(player.getUniqueID());
         if (avatar != null && avatar.luaRuntime != null) {
             VanillaPart part = avatar.luaRuntime.vanilla_model.PLAYER;
-            PlayerModel<AbstractClientPlayer> model = this.getModel();
+            ModelPlayer model = this.getMainModel();
+
+            part.save(model);
+
+            if (avatar.permissions.get(Permissions.VANILLA_MODEL_EDIT) == 1) {
+                part.preTransform(model);
+                part.posTransform(model);
+            }
+        }
+    }
+    @Inject(at = @At(value = "INVOKE", shift = At.Shift.AFTER, target = "Lnet/minecraft/client/model/ModelPlayer;setRotationAngles(FFFFFFLnet/minecraft/entity/Entity;)V"), method = "renderRightArm")
+    private void onRenderRight(AbstractClientPlayer player, CallbackInfo ci) {
+        avatar = AvatarManager.getAvatarForPlayer(player.getUniqueID());
+        if (avatar != null && avatar.luaRuntime != null) {
+            VanillaPart part = avatar.luaRuntime.vanilla_model.PLAYER;
+            ModelPlayer model = this.getMainModel();
 
             part.save(model);
 
@@ -232,22 +289,36 @@ public abstract class PlayerRendererMixin extends LivingEntityRenderer<AbstractC
         }
     }
 
-    @Inject(at = @At("RETURN"), method = "renderHand")
-    private void postRenderHand(PoseStack stack, MultiBufferSource multiBufferSource, int light, AbstractClientPlayer player, ModelPart arm, ModelPart sleeve, CallbackInfo ci) {
+    @Inject(at = @At("RETURN"), method = "renderRightArm")
+    private void postRenderHandRight(AbstractClientPlayer player, CallbackInfo ci) {
         if (avatar == null)
             return;
 
-        float delta = Minecraft.getInstance().getFrameTime();
-        avatar.firstPersonRender(stack, multiBufferSource, player, (PlayerRenderer) (Object) this, arm, light, delta);
+        float delta = Minecraft.getMinecraft().getRenderPartialTicks();
+        avatar.firstPersonRender(RenderTypes.FiguraBufferSource.INSTANCE, player, (RenderPlayer) (Object) this, getMainModel().bipedRightArm, player.getBrightnessForRender(), delta);
 
         if (avatar.luaRuntime != null)
-            avatar.luaRuntime.vanilla_model.PLAYER.restore(this.getModel());
+            avatar.luaRuntime.vanilla_model.PLAYER.restore(this.getMainModel());
 
         avatar = null;
     }
 
-    @Inject(method = "setupRotations", at = @At("HEAD"), cancellable = true)
-    private void setupRotations(AbstractClientPlayer entity, PoseStack poseStack, float f, float f2, float f3, CallbackInfo cir) {
+    @Inject(at = @At("RETURN"), method = "renderRightArm")
+    private void postRenderHandLeft(AbstractClientPlayer player, CallbackInfo ci) {
+        if (avatar == null)
+            return;
+
+        float delta = Minecraft.getMinecraft().getRenderPartialTicks();
+        avatar.firstPersonRender(RenderTypes.FiguraBufferSource.INSTANCE, player, (RenderPlayer) (Object) this, getMainModel().bipedLeftArm, player.getBrightnessForRender(), delta);
+
+        if (avatar.luaRuntime != null)
+            avatar.luaRuntime.vanilla_model.PLAYER.restore(this.getMainModel());
+
+        avatar = null;
+    }
+
+    @Inject(method = "applyRotations(Lnet/minecraft/client/entity/AbstractClientPlayer;FFF)V", at = @At("HEAD"), cancellable = true)
+    private void setupRotations(AbstractClientPlayer entity, float f, float g, float partialTicks, CallbackInfo cir) {
         Avatar avatar = AvatarManager.getAvatar(entity);
         if (RenderUtils.vanillaModelAndScript(avatar) && !avatar.luaRuntime.renderer.getRootRotationAllowed()) {
             cir.cancel();

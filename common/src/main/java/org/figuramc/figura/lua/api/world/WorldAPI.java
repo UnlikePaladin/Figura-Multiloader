@@ -1,36 +1,15 @@
 package org.figuramc.figura.lua.api.world;
 
-import com.mojang.brigadier.StringReader;
-import com.mojang.datafixers.util.Pair;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.WorldClient;
-import net.minecraft.commands.arguments.blocks.BlockStateArgument;
-import net.minecraft.commands.arguments.item.ItemArgument;
-import net.minecraft.core.BlockPos;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Blocks;
 import net.minecraft.item.ItemStack;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.core.RegistryAccess;
-import net.minecraft.util.EnumFacing;
+import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.EnumSkyBlock;
 import net.minecraft.world.World;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.entity.projectile.ProjectileUtil;
-import net.minecraft.world.item.CompassItem;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LightLayer;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.LevelData;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.EntityHitResult;
-import net.minecraft.world.phys.HitResult;
-import net.minecraft.world.level.levelgen.Heightmap;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.avatar.AvatarManager;
 import org.figuramc.figura.lua.LuaNotNil;
@@ -44,6 +23,7 @@ import org.figuramc.figura.lua.docs.LuaTypeDoc;
 import org.figuramc.figura.math.vector.FiguraVec2;
 import org.figuramc.figura.math.vector.FiguraVec3;
 import org.figuramc.figura.utils.EntityUtils;
+import org.figuramc.figura.utils.FiguraFlattenerUtils;
 import org.figuramc.figura.utils.LuaUtils;
 import org.figuramc.figura.utils.Pair;
 import org.luaj.vm2.LuaError;
@@ -193,8 +173,7 @@ public class WorldAPI {
         BlockPos blockPos = pos.asBlockPos();
         if (getCurrentWorld().getChunkFromBlockCoords(blockPos) == null)
             return 0;
-        //TODO: Check if this introduces issues, it has no args on modern
-        return getCurrentWorld().getRedstonePower(blockPos, EnumFacing.NORTH);
+        return getCurrentWorld().getStrongPower(blockPos);
     }
 
     @LuaWhitelist
@@ -214,9 +193,9 @@ public class WorldAPI {
     public static int getStrongRedstonePower(Object x, Double y, Double z) {
         FiguraVec3 pos = LuaUtils.parseVec3("getStrongRedstonePower", x, y, z);
         BlockPos blockPos = pos.asBlockPos();
-        if (getCurrentWorld().getChunkAt(blockPos) == null)
+        if (getCurrentWorld().getChunkFromBlockCoords(blockPos) == null)
             return 0;
-        return getCurrentWorld().getDirectSignalTo(blockPos);
+        return getCurrentWorld().getStrongPower(blockPos);
     }
 
     @LuaWhitelist
@@ -402,7 +381,7 @@ public class WorldAPI {
     @LuaMethodDoc("world.get_dimension")
     public static String getDimension() {
         World world = getCurrentWorld();
-        return world.dimension().location().toString();
+        return world.provider.getDimensionType().getName();
     }
 
     @LuaWhitelist
@@ -463,7 +442,7 @@ public class WorldAPI {
         BlockPos pos = LuaUtils.parseVec3("newBlock", x, y, z).asBlockPos();
         try {
             World level = getCurrentWorld();
-            IBlockState block = new BlockStateArgument().parse(new StringReader(string)).getState();
+            IBlockState block = FiguraFlattenerUtils.stateUnflattinator2000(new ResourceLocation(string));
             return new BlockStateAPI(block, pos);
         } catch (Exception e) {
             throw new LuaError("Could not parse block state from string: " + string);
@@ -491,7 +470,7 @@ public class WorldAPI {
     public static ItemStackAPI newItem(@LuaNotNil String string, Integer count, Integer damage) {
         try {
             World level = getCurrentWorld();
-            ItemStack item = new ItemArgument().parse(new StringReader(string)).createItemStack(1, false);
+            ItemStack item = FiguraFlattenerUtils.theStackUnflattinator2000(new ResourceLocation(string));
             if (count != null)
                 item.setCount(count);
             if (damage != null)
@@ -519,7 +498,6 @@ public class WorldAPI {
     @LuaMethodDoc("world.get_spawn_point")
     public static FiguraVec3 getSpawnPoint() {
         World world = getCurrentWorld();
-        LevelData levelData = world.getSpawnPoint();
         return FiguraVec3.fromBlockPos(new BlockPos(world.getSpawnPoint().getX(), world.getSpawnPoint().getY(), world.getSpawnPoint().getZ()));
     }
 

@@ -1,10 +1,13 @@
 package org.figuramc.figura.gui.widgets;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.Mth;
+import net.minecraft.client.Minecraft;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.math.MathHelper;
 import org.figuramc.figura.utils.FiguraIdentifier;
+import org.figuramc.figura.utils.MathUtils;
 import org.figuramc.figura.utils.ui.UIHelper;
+import org.lwjgl.input.Keyboard;
+import org.lwjgl.input.Mouse;
 
 public class SliderWidget extends ScrollBarWidget {
 
@@ -32,7 +35,7 @@ public class SliderWidget extends ScrollBarWidget {
 
     // -- methods -- //
 
-    @Override
+
     public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
         if (!this.isActive()) return false;
         scroll(stepSize * Math.signum(-amount) * (getWidth() - headWidth + 2d));
@@ -40,15 +43,37 @@ public class SliderWidget extends ScrollBarWidget {
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    public boolean pressedKey(char keyCode, int scanCode) {
         if (!this.isActive()) return false;
 
-        if (keyCode > 261 && keyCode < 266) {
-            scroll(stepSize * (keyCode % 2 == 0 ? 1 : -1) * Math.max(modifiers * 10, 1) * (getWidth() - headWidth + 2d));
-            return true;
+        int modifiers = 0;
+        if (Keyboard.isKeyDown(Keyboard.KEY_LSHIFT) || Keyboard.isKeyDown(Keyboard.KEY_RSHIFT)) {
+            modifiers = modifiers | 0x0001;
+        }
+        if (Keyboard.isKeyDown(Keyboard.KEY_LCONTROL) || Keyboard.isKeyDown(Keyboard.KEY_RCONTROL)) {
+            modifiers = modifiers | 0x0002;
+        }
+        if (Keyboard.isKeyDown(Keyboard.KEY_LMENU) || Keyboard.isKeyDown(Keyboard.KEY_RMENU)) {
+            modifiers = modifiers | 0x0004;
+        }
+        if (Keyboard.isKeyDown(Keyboard.KEY_LMENU) || Keyboard.isKeyDown(Keyboard.KEY_RMENU)) {
+            modifiers = modifiers | 0x0004;
         }
 
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        switch (scanCode) {
+            case Keyboard.KEY_DOWN:
+            case Keyboard.KEY_RIGHT: {
+                scroll(stepSize * 1 * Math.max(modifiers * 10, 1) * (getWidth() - headWidth + 2d));
+                return true;
+            }
+            case Keyboard.KEY_LEFT:
+            case Keyboard.KEY_UP: {
+                scroll(stepSize * -1 * Math.max(modifiers * 10, 1) * (getWidth() - headWidth + 2d));
+                return true;
+            }
+        }
+
+        return super.pressedKey(keyCode, scanCode);
     }
 
     @Override
@@ -74,36 +99,36 @@ public class SliderWidget extends ScrollBarWidget {
     }
 
     @Override
-    public void render(PoseStack poseStack, int mouseX, int mouseY, float delta) {
+    public void draw(Minecraft minecraft, int mouseX, int mouseY, float delta) {
         if (this.isVisible()) {
             // set hovered
-            this.isHovered = this.isMouseOver(mouseX, mouseY);
+            this.isHovered = this.mouseOver(mouseX, mouseY);
 
             // render button
-            this.renderButton(poseStack, mouseX, mouseY, delta);
+            this.drawWidget(minecraft, mouseX, mouseY, delta);
         }
     }
 
     @Override
-    public void renderButton(PoseStack poseStack, int mouseX, int mouseY, float delta) {
+    public void drawWidget(Minecraft mc, int mouseX, int mouseY, float delta) {
         UIHelper.setupTexture(SLIDER_TEXTURE);
         int x = getX();
         int y = getY();
         int width = getWidth();
 
         // draw bar
-        blit(poseStack, x, y + 3, width, 5, isScrolling ? 10f : 0f, 0f, 5, 5, 33, 16);
+        UIHelper.blit(x, y + 3, width, 5, isScrolling ? 10f : 0f, 0f, 5, 5, 33, 16);
 
         // draw steps
         if (showSteps) {
             for (int i = 0; i < max; i++) {
-                blit(poseStack, (int) Math.floor(x + 3 + stepSize * i * (width - 11)), y + 3, 5, 5, isScrolling ? 15f : 5f, 0f, 5, 5, 33, 16);
+                UIHelper.blit((int) Math.floor(x + 3 + stepSize * i * (width - 11)), y + 3, 5, 5, isScrolling ? 15f : 5f, 0f, 5, 5, 33, 16);
             }
         }
 
         // draw header
         lerpPos(delta);
-        blit(poseStack, (int) (x + Math.round(Mth.lerp(scrollPos, 0, width - headWidth))), y, isActive() ? ((this.isFocused() || this.isHovered()) || isScrolling ? headWidth * 2 : headWidth) : 0f, 5f, headWidth, headHeight, 33, 16);
+        UIHelper.blit((int) (x + Math.round(MathUtils.lerp(scrollPos, 0, width - headWidth))), y, isActive() ? ((this.isHovered() || this.isFocused()) || isScrolling ? headWidth * 2 : headWidth) : 0f, 5f, headWidth, headHeight, 33, 16);
     }
 
     // -- getters and setters -- //
@@ -115,7 +140,7 @@ public class SliderWidget extends ScrollBarWidget {
 
     @Override
     public void setScrollProgress(double amount, boolean force) {
-        steppedPos = force ? amount : Mth.clamp(amount, 0d, 1d);
+        steppedPos = force ? amount : MathHelper.clamp(amount, 0d, 1d);
         super.setScrollProgress(amount, force);
     }
 

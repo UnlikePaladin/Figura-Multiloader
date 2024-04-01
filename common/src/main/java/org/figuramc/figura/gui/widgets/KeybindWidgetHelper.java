@@ -1,34 +1,30 @@
 package org.figuramc.figura.gui.widgets;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.ChatFormatting;
-import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.network.chat.TextComponent;
-import net.minecraft.network.chat.TranslatableComponent;
+import net.minecraft.client.settings.KeyBinding;
+import net.minecraft.util.text.*;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.lua.api.keybind.FiguraKeybind;
+import org.figuramc.figura.mixin.font.FontRendererAccessor;
 import org.figuramc.figura.utils.FiguraText;
 import org.figuramc.figura.utils.ui.UIHelper;
+import org.lwjgl.input.Keyboard;
 
 import java.util.List;
 
 public class KeybindWidgetHelper {
-
-    private Component tooltip;
+    private ITextComponent tooltip;
     private boolean vanillaConflict, avatarConflict;
 
-    public void renderConflictBars(PoseStack poseStack, int x, int y, int width, int height) {
+    public void renderConflictBars(int x, int y, int width, int height) {
         // conflict bars
         if (vanillaConflict || avatarConflict) {
             if (avatarConflict) {
-                UIHelper.fill(poseStack, x, y, x + width, y + height, ChatFormatting.YELLOW.getColor() | 0xFF000000);
+                UIHelper.fill(x, y, x + width, y + height, ((FontRendererAccessor)Minecraft.getMinecraft().fontRenderer).getColors()[TextFormatting.YELLOW.getColorIndex()] | 0xFF000000);
                 x -= width + 4;
             }
             if (vanillaConflict) {
-                UIHelper.fill(poseStack, x, y, x + width, y + height, ChatFormatting.RED.getColor() | 0xFF000000);
+                UIHelper.fill(x, y, x + width, y + height, ((FontRendererAccessor)Minecraft.getMinecraft().fontRenderer).getColors()[TextFormatting.RED.getColorIndex()] | 0xFF000000);
             }
         }
     }
@@ -45,39 +41,39 @@ public class KeybindWidgetHelper {
 
     // must be called before getText()
     public void setTooltip(FiguraKeybind keybind, List<FiguraKeybind> keyBindings) {
-        MutableComponent text = TextComponent.EMPTY.copy();
+        ITextComponent text = new TextComponentString("");
 
         // avatar conflicts
-        Component avatar = checkForAvatarConflicts(keybind, keyBindings);
-        boolean hasAvatarConflict = avatar != null && !avatar.getString().trim().isEmpty();
+        ITextComponent avatar = checkForAvatarConflicts(keybind, keyBindings);
+        boolean hasAvatarConflict = avatar != null && !avatar.getFormattedText().trim().isEmpty();
         if (hasAvatarConflict)
-            text.append(avatar);
+            text.appendSibling(avatar);
 
         // vanilla conflicts
-        Component vanilla = checkForVanillaConflicts(keybind);
-        if (vanilla != null && !vanilla.getString().trim().isEmpty()) {
+        ITextComponent vanilla = checkForVanillaConflicts(keybind);
+        if (vanilla != null && !vanilla.getFormattedText().trim().isEmpty()) {
             if (hasAvatarConflict)
-                text.append("\n");
-            text.append(vanilla);
+                text.appendText("\n");
+            text.appendSibling(vanilla);
         }
 
         // set tooltip
         setTooltipTail(text);
     }
 
-    public void setTooltip(KeyMapping keybind) {
-        MutableComponent text = TextComponent.EMPTY.copy();
+    public void setTooltip(KeyBinding keybind) {
+        ITextComponent text = new TextComponentString("");
 
         // vanilla conflicts
-        Component vanilla = checkForVanillaConflicts(keybind);
-        if (vanilla != null && !vanilla.getString().trim().isEmpty())
-            text.append(vanilla);
+        ITextComponent vanilla = checkForVanillaConflicts(keybind);
+        if (vanilla != null && !vanilla.getFormattedText().trim().isEmpty())
+            text.appendSibling(vanilla);
 
         // set tooltip
         setTooltipTail(text);
     }
 
-    private void setTooltipTail(Component text) {
+    private void setTooltipTail(ITextComponent text) {
         if (vanillaConflict || avatarConflict) {
             this.tooltip = new FiguraText("gui.duplicate_keybind", text);
         } else {
@@ -85,23 +81,23 @@ public class KeybindWidgetHelper {
         }
     }
 
-    public Component getText(boolean isDefault, boolean isSelected, Component initialMessage) {
+    public ITextComponent getText(boolean isDefault, boolean isSelected, ITextComponent initialMessage) {
         // button message
-        MutableComponent message = initialMessage.copy();
-        if (isDefault || isSelected) message.withStyle(ChatFormatting.WHITE);
-        else message.withStyle(FiguraMod.getAccentColor());
+        ITextComponent message = initialMessage.createCopy();
+        if (isDefault || isSelected) message.setStyle(new Style().setColor(TextFormatting.WHITE));
+        else message.setStyle(FiguraMod.getAccentColor());
 
-        if (isSelected) message.withStyle(ChatFormatting.UNDERLINE);
+        if (isSelected) message.setStyle(new Style().setUnderlined(true));
 
         if (this.avatarConflict || this.vanillaConflict) {
-            MutableComponent left = new TextComponent("[ ").withStyle(this.vanillaConflict ? ChatFormatting.RED : ChatFormatting.YELLOW);
-            MutableComponent right = new TextComponent(" ]").withStyle(this.avatarConflict ? ChatFormatting.YELLOW : ChatFormatting.RED);
-            message = left.append(message).append(right);
+            ITextComponent left = new TextComponentString("[ ").setStyle(new Style().setColor(this.vanillaConflict ? TextFormatting.RED : TextFormatting.YELLOW));
+            ITextComponent right = new TextComponentString(" ]").setStyle(new Style().setColor(this.avatarConflict ? TextFormatting.YELLOW : TextFormatting.RED));
+            message = left.appendSibling(message).appendSibling(right);
         }
 
         // selected
         if (isSelected)
-            message = new TextComponent("> ").append(message).append(" <").withStyle(FiguraMod.getAccentColor());
+            message = new TextComponentString("> ").appendSibling(message).appendText(" <").setStyle(FiguraMod.getAccentColor());
 
         return message;
     }
@@ -110,18 +106,18 @@ public class KeybindWidgetHelper {
     // -- avatar conflict -- //
 
 
-    public Component checkForAvatarConflicts(FiguraKeybind keybind, List<FiguraKeybind> keyBindings) {
+    public ITextComponent checkForAvatarConflicts(FiguraKeybind keybind, List<FiguraKeybind> keyBindings) {
         this.avatarConflict = false;
 
         int id = keybind.getID();
         if (id == -1)
             return null;
 
-        MutableComponent message = TextComponent.EMPTY.copy();
+        ITextComponent message = new TextComponentString("");
         for (FiguraKeybind keyBinding : keyBindings) {
             if (keyBinding != keybind && keyBinding.getID() == id) {
                 this.avatarConflict = true;
-                message.append(new TextComponent("\n• ").withStyle(ChatFormatting.YELLOW).append(keyBinding.getName()));
+                message.appendSibling(new TextComponentString("\n• ").setStyle(new Style().setColor(TextFormatting.YELLOW)).appendText(keyBinding.getName()));
             }
         }
 
@@ -132,20 +128,20 @@ public class KeybindWidgetHelper {
     // -- vanilla conflict -- //
 
 
-    public Component checkForVanillaConflicts(FiguraKeybind keybind) {
+    public ITextComponent checkForVanillaConflicts(FiguraKeybind keybind) {
         this.vanillaConflict = false;
         if (keybind.getID() == -1)
             return null;
 
         String keyName = keybind.getKey();
-        MutableComponent message = TextComponent.EMPTY.copy();
-        for (KeyMapping key : Minecraft.getInstance().options.keyMappings) {
-            if (key.saveString().equals(keyName)) {
+        ITextComponent message = new TextComponentString("");
+        for (KeyBinding key : Minecraft.getMinecraft().gameSettings.keyBindings) {
+            if (key.getKeyDescription().equals(keyName)) {
                 this.vanillaConflict = true;
-                message.append(new TextComponent("\n• ").withStyle(ChatFormatting.RED)
-                        .append(new TranslatableComponent(key.getCategory()))
-                        .append(": ")
-                        .append(new TranslatableComponent(key.getName()))
+                message.appendSibling(new TextComponentString("\n• ").setStyle(new Style().setColor(TextFormatting.RED))
+                        .appendSibling(new TextComponentTranslation(key.getKeyCategory()))
+                        .appendText(": ")
+                        .appendSibling(new TextComponentTranslation(key.getKeyDescription()))
                 );
             }
         }
@@ -153,20 +149,20 @@ public class KeybindWidgetHelper {
         return message;
     }
 
-    public Component checkForVanillaConflicts(KeyMapping keybind) {
+    public ITextComponent checkForVanillaConflicts(KeyBinding keybind) {
         this.vanillaConflict = false;
-        if (keybind.isUnbound())
+        if (keybind.getKeyCode() == Keyboard.KEY_NONE)
             return null;
 
-        String keyName = keybind.saveString();
-        MutableComponent message = TextComponent.EMPTY.copy();
-        for (KeyMapping key : Minecraft.getInstance().options.keyMappings) {
-            if (key != keybind && key.saveString().equals(keyName)) {
+        int keyCode = keybind.getKeyCode();
+        ITextComponent message = new TextComponentString("");
+        for (KeyBinding key : Minecraft.getMinecraft().gameSettings.keyBindings) {
+            if (key != keybind && key.getKeyCode() == keyCode) {
                 this.vanillaConflict = true;
-                message.append(new TextComponent("\n• ").withStyle(ChatFormatting.RED)
-                        .append(new TranslatableComponent(key.getCategory()))
-                        .append(": ")
-                        .append(new TranslatableComponent(key.getName()))
+                message.appendSibling(new TextComponentString("\n• ").setStyle(new Style().setColor(TextFormatting.RED))
+                        .appendSibling(new TextComponentTranslation(key.getKeyCategory()))
+                        .appendText(": ")
+                        .appendSibling(new TextComponentTranslation(key.getKeyDescription()))
                 );
             }
         }

@@ -1,17 +1,16 @@
 package org.figuramc.figura.gui.widgets.config;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.network.chat.TranslatableComponent;
+import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.TextComponentTranslation;
+import net.minecraft.util.text.TextFormatting;
 import org.figuramc.figura.config.ConfigType;
 import org.figuramc.figura.gui.widgets.AbstractContainerElement;
-import org.figuramc.figura.gui.widgets.ParentedButton;
 import org.figuramc.figura.gui.widgets.Button;
+import org.figuramc.figura.gui.widgets.ParentedButton;
 import org.figuramc.figura.gui.widgets.lists.ConfigList;
+import org.figuramc.figura.mixin.font.FontRendererAccessor;
 import org.figuramc.figura.utils.ui.UIHelper;
 
 import java.util.Objects;
@@ -36,35 +35,35 @@ public abstract class AbstractConfigElement extends AbstractContainerElement {
         this.initValue = config.value;
 
         // reset button
-        children.add(resetButton = new ParentedButton(0, 0, 60, 20, new TranslatableComponent("controls.reset"), this, button -> config.resetTemp()));
+        children.add(resetButton = new ParentedButton(0, 0, 60, 20, new TextComponentTranslation("controls.reset"), this, button -> config.resetTemp()));
     }
 
     @Override
-    public void render(PoseStack poseStack, int mouseX, int mouseY, float delta) {
+    public void draw(Minecraft mc, int mouseX, int mouseY, float delta) {
         if (!this.isVisible()) return;
 
         // vars
-        Font font = Minecraft.getInstance().font;
-        int textY = getY() + getHeight() / 2 - font.lineHeight / 2;
+        FontRenderer font = Minecraft.getMinecraft().fontRenderer;
+        int textY = getY() + getHeight() / 2 - font.FONT_HEIGHT / 2;
 
         // hovered arrow
-        setHovered(isMouseOver(mouseX, mouseY));
-        if (isHovered()) font.draw(poseStack, HOVERED_ARROW, (int) (getX() + 8 - font.width(HOVERED_ARROW) / 2f), textY, 0xFFFFFF);
+        setHovered(mouseOver(mouseX, mouseY));
+        if (isHovered()) font.drawString(HOVERED_ARROW.getFormattedText(), (int) (getX() + 8 - font.getStringWidth(HOVERED_ARROW.getFormattedText()) / 2f), textY, 0xFFFFFF);
 
         // render name
-        renderTitle(poseStack, font, textY);
+        renderTitle(font, textY);
 
         // render children
-        super.render(poseStack, mouseX, mouseY, delta);
+        super.draw(mc, mouseX, mouseY, delta);
     }
 
-    public void renderTitle(PoseStack poseStack, Font font, int y) {
-        font.draw(poseStack, config.name, getX() + 16, y, (config.disabled ? ChatFormatting.DARK_GRAY : ChatFormatting.WHITE).getColor());
+    public void renderTitle(FontRenderer font, int y) {
+        font.drawString(config.name.getFormattedText(), getX() + 16, y, ((FontRendererAccessor)font).getColors()[(config.disabled ? TextFormatting.DARK_GRAY : TextFormatting.WHITE).getColorIndex()]);
     }
 
     @Override
-    public boolean isMouseOver(double mouseX, double mouseY) {
-        boolean over = this.parentList.isInsideScissors(mouseX, mouseY) && super.isMouseOver(mouseX, mouseY);
+    public boolean mouseOver(double mouseX, double mouseY) {
+        boolean over = this.parentList.isInsideScissors(mouseX, mouseY) && super.mouseOver(mouseX, mouseY);
 
         if (over && mouseX < this.getX() + this.getWidth() - 158)
             UIHelper.setTooltip(getTooltip());
@@ -72,8 +71,8 @@ public abstract class AbstractConfigElement extends AbstractContainerElement {
         return over;
     }
 
-    public MutableComponent getTooltip() {
-        return config.tooltip.copy();
+    public ITextComponent getTooltip() {
+        return config.tooltip.createCopy();
     }
 
     public boolean isDefault() {
@@ -106,6 +105,6 @@ public abstract class AbstractConfigElement extends AbstractContainerElement {
     }
 
     public boolean matchesFilter() {
-        return config.name.getString().toLowerCase().contains(filter) || config.tooltip.getString().toLowerCase().contains(filter);
+        return config.name.getFormattedText().toLowerCase().contains(filter) || config.tooltip.getFormattedText().toLowerCase().contains(filter);
     }
 }

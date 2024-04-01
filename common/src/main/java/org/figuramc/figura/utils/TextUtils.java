@@ -1,12 +1,7 @@
 package org.figuramc.figura.utils;
 
 import com.google.gson.JsonParser;
-import net.minecraft.ChatFormatting;
-import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.FontRenderer;
-import net.minecraft.locale.Language;
-import net.minecraft.network.chat.*;
-import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.Style;
 import net.minecraft.util.text.TextComponentString;
@@ -18,7 +13,6 @@ import org.figuramc.figura.mixin.font.TextFormattingAccessor;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
@@ -28,7 +22,7 @@ public class TextUtils {
 
     public static final ITextComponent TAB = new FiguraText("tab");
     public static final ITextComponent ELLIPSIS = new FiguraText("ellipsis");
-    public static final ITextComponent UNKNOWN = new TextComponentString("�").setStyle(new Style().withFont(Style.DEFAULT_FONT));
+    public static final ITextComponent UNKNOWN = new TextComponentString("�").setStyle(((StyleExtension)new Style()).setFont(null));
 
     public static boolean allowScriptEvents;
 
@@ -40,12 +34,7 @@ public class TextUtils {
         ITextComponent[] currentText = {new TextComponentString("")};
 
         // iterate over the text
-
-        List<ITextComponent> components = new ArrayList<>();
-        components.add(text);
-        components.addAll(text.getSiblings());
-
-        for (ITextComponent textComponent : components) {
+        for (ITextComponent textComponent : text) {
             String string = textComponent.getUnformattedComponentText();
             Style style = textComponent.getStyle();
             // split text based on regex
@@ -76,11 +65,7 @@ public class TextUtils {
     public static ITextComponent removeClickableObjects(ITextComponent text, Predicate<ClickEvent> pred) {
         ITextComponent ret = new TextComponentString("");
 
-        List<ITextComponent> components = new ArrayList<>();
-        components.add(text);
-        components.addAll(text.getSiblings());
-
-        for (ITextComponent textComponent : components) {
+        for (ITextComponent textComponent : text) {
             String string = textComponent.getUnformattedComponentText();
             Style style = textComponent.getStyle();
             ret.appendSibling(new TextComponentString(string).setStyle(style.getClickEvent() != null && pred.test(style.getClickEvent()) ? style.setClickEvent(null) : style));
@@ -129,12 +114,8 @@ public class TextUtils {
         ITextComponent ret = new TextComponentString("");
 
         int[] ints = {beginIndex, times};
-        List<ITextComponent> components = new ArrayList<>();
-        components.add(text);
-        components.addAll(text.getSiblings());
-
-        for (ITextComponent textComponent : components) {
-            String string = textComponent.getUnformattedComponentText();
+        for (ITextComponent textComponent : text) {
+            String string = textComponent.getUnformattedText();
             Style style = textComponent.getStyle();
             // test predicate
 
@@ -166,7 +147,7 @@ public class TextUtils {
 
     public static ITextComponent trimToWidthEllipsis(FontRenderer font, ITextComponent text, int width, ITextComponent ellipsis) {
         // return text without changes if it is not larger than width
-        if (font.getStringWidth(text.getUnformattedText()) <= width)
+        if (font.getStringWidth(text.getFormattedText()) <= width) // TODO: Check with 1.16 for parity, idk if formatted or unformatted text is the right one
             return text;
 
         // add ellipsis
@@ -175,8 +156,8 @@ public class TextUtils {
 
     public static ITextComponent addEllipsis(FontRenderer font, ITextComponent text, int width, ITextComponent ellipsis) {
         // trim with the ellipsis size and return the modified text
-        ITextComponent trimmed = font.substrByWidth(text, width - font.width(ellipsis));
-        return formattedTextToText(trimmed).copy().append(ellipsis);
+        ITextComponent trimmed = new TextComponentString(font.trimStringToWidth(text.getUnformattedText(), width - font.getStringWidth(ellipsis.getUnformattedText())));
+        return formattedTextToText(trimmed).createCopy().appendSibling(ellipsis);
     }
 
     public static ITextComponent replaceTabs(ITextComponent text) {
@@ -234,10 +215,8 @@ public class TextUtils {
 
     public static ITextComponent replaceStyle(ITextComponent text, Style newStyle, Predicate<Style> predicate) {
         ITextComponent ret = new TextComponentString("");
-        List<ITextComponent> components = new ArrayList<>();
-        components.add(text);
-        components.addAll(text.getSiblings());
-        for (ITextComponent textComponent : components) {
+
+        for (ITextComponent textComponent : text) {
             String string = textComponent.getUnformattedComponentText();
             Style style = textComponent.getStyle();
             ret.appendSibling(new TextComponentString(string).setStyle(predicate.test(style) ? ((StyleExtension)newStyle).applyStyleToStyle(style) : style));
@@ -247,27 +226,22 @@ public class TextUtils {
 
     public static ITextComponent setStyleAtWidth(ITextComponent text, int width, FontRenderer font, Style newStyle) {
         ITextComponent ret = new TextComponentString("");
-        List<ITextComponent> components = new ArrayList<>();
-        components.add(text);
-        components.addAll(text.getSiblings());
-        for (ITextComponent textComponent : components) {
-            String string = textComponent.getUnformattedComponentText();
-            Style style = textComponent.getStyle();
-            ITextComponent current = new TextComponentString(string).setStyle(style);
 
-            int prevWidth = font.getStringWidth(ret.getFormattedText());
-            int currentWidth = font.getStringWidth(current.getFormattedText());
+        for (ITextComponent textComponent : text) {
+            int prevWidth = font.getStringWidth(ret.getUnformattedComponentText());
+            int currentWidth = font.getStringWidth(textComponent.getUnformattedComponentText());
             if (prevWidth <= width && prevWidth + currentWidth > width)
-                current.setStyle(newStyle);
+                textComponent.setStyle(newStyle);
 
-            ret.appendSibling(current);
+            ret.appendSibling(textComponent);
         }
         return ret;
     }
 
     public static List<ITextComponent> wrapText(ITextComponent text, int width, FontRenderer font) {
         List<ITextComponent> warp = new ArrayList<>();
-        font.getSplitter().splitLines(text, width, Style.EMPTY, (formattedText, aBoolean) -> warp.add(Language.getInstance().getVisualOrder(formattedText)));
+        for (String str : font.listFormattedStringToWidth(text.getFormattedText(), width))
+            warp.add(new TextComponentString(str)); // TODO :check if this preserves style
         return warp;
     }
 
@@ -275,7 +249,8 @@ public class TextUtils {
         ITextComponent builder = new TextComponentString("");
         StringBuilder buffer = new StringBuilder();
         Style[] lastStyle = new Style[1];
-
+        //TODO : check what this actually did
+/*
         charSequence.accept((index, style, codePoint) -> {
             if (!style.equals(lastStyle[0])) {
                 if (buffer.length() > 0) {
@@ -290,99 +265,108 @@ public class TextUtils {
         });
 
         if (buffer.length() > 0)
-            builder.append(new TextComponent(buffer.toString()).withStyle(lastStyle[0]));
-
-        return builder;
+            builder.appendSibling(new TextComponentString(buffer.toString()).setStyle(lastStyle[0]));
+*/
+        return charSequence;
     }
 
-    public static ITextComponent formattedTextToText(ITextComponent formattedText) {
+    public static ITextComponent formattedTextToText(Object formattedText) {
         if (formattedText instanceof ITextComponent) {
-            ITextComponent c = (ITextComponent) formattedText;
-            return c;
+            return (ITextComponent) formattedText;
         }
 
-        ITextComponent builder = new TextComponentString("");
+        if (formattedText instanceof String) {
+            ITextComponent builder = new TextComponentString("");
+            ITextComponent cont = new TextComponentString((String) formattedText);
 
-        String string = formattedText.getUnformattedComponentText();
-        Style style = formattedText.getStyle();
-        builder.appendSibling(new TextComponentString(string).setStyle(style));
+            for (ITextComponent component : cont) {
+                String string = component.getUnformattedComponentText();
+                Style style = component.getStyle();
+                builder.appendSibling(new TextComponentString(string).setStyle(style));
+            }
 
-        return builder;
+            return builder;
+        }
+        // This should never happen
+        return new TextComponentString("");
     }
 
     public static ITextComponent substring(ITextComponent text, int beginIndex, int endIndex) {
         StringBuilder counter = new StringBuilder();
         ITextComponent builder = new TextComponentString("");
 
-        String string = text.getUnformattedComponentText();
-        Style style = text.getStyle();
-        int index = counter.length();
-        int len = string.length();
+        for (ITextComponent textComponent : text) {
+            String string = textComponent.getUnformattedComponentText();
+            Style style = textComponent.getStyle();
+            int index = counter.length();
+            int len = string.length();
 
-        if (index <= endIndex && index + len >= beginIndex) {
-            int sub = Math.max(beginIndex - index, 0);
-            int top = Math.min(endIndex - index, len);
-            builder.appendSibling(new TextComponentString(string.substring(sub, top)).setStyle(style));
+            if (index <= endIndex && index + len >= beginIndex) {
+                int sub = Math.max(beginIndex - index, 0);
+                int top = Math.min(endIndex - index, len);
+                builder.appendSibling(new TextComponentString(string.substring(sub, top)).setStyle(style));
+            }
+
+            counter.append(string);
         }
-
-        counter.append(string);
-
         return builder;
     }
 
     public static ITextComponent parseLegacyFormatting(ITextComponent text) {
         ITextComponent builder = new TextComponentString("");
 
-        String string = text.getUnformattedComponentText();
-        Style style = text.getStyle();
+        for (ITextComponent textComponent : text) {
+            String string = textComponent.getUnformattedComponentText();
+            Style style = textComponent.getStyle();
 
+            formatting:
+            {
+                // check for the string have the formatting char
+                if (!string.contains("§"))
+                    break formatting;
 
-        formatting: {
-            // check for the string have the formatting char
-            if (!string.contains("§"))
-                break formatting;
+                // split the string at the special char
+                String[] split = string.split("§");
+                if (split.length < 2)
+                    break formatting;
 
-            // split the string at the special char
-            String[] split = string.split("§");
-            if (split.length < 2)
-                break formatting;
+                // creates a new text with the left part of the string
+                ITextComponent newText = new TextComponentString(split[0]).setStyle(style);
 
-            // creates a new text with the left part of the string
-            ITextComponent newText = new TextComponentString(split[0]).setStyle(style);
+                // if right part has text
+                for (int i = 1; i < split.length; i++) {
+                    String s = split[i];
 
-            // if right part has text
-            for (int i = 1; i < split.length; i++) {
-                String s = split[i];
+                    if (s.length() == 0)
+                        continue;
 
-                if (s.length() == 0)
-                    continue;
+                    // get the formatting code and apply to the style
+                    TextFormatting formatting = getByCode(s.charAt(0));
+                    if (formatting != null)
+                        style = style.setColor(formatting);
 
-                // get the formatting code and apply to the style
-                TextFormatting formatting = getByCode(s.charAt(0));
-                if (formatting != null)
-                    style = style.applyLegacyFormat(formatting);
+                    // create right text, and yeet the formatting code
+                    newText.appendSibling(new TextComponentString(s.substring(1)).setStyle(style));
+                }
 
-                // create right text, and yeet the formatting code
-                newText.append(new TextComponent(s.substring(1)).withStyle(style));
+                builder.appendSibling(newText);
             }
 
-            builder.append(newText);
-            return Optional.empty();
+            builder.appendSibling(new TextComponentString(string).setStyle(style));
         }
-
-        builder.append(new TextComponent(string).withStyle(style));
-
         return builder;
     }
 
     public static ITextComponent reverse(ITextComponent text) {
         ITextComponent[] builder = {new TextComponentString("")};
-        String string = text.getUnformattedComponentText();
-        Style style = text.getStyle();
 
-        StringBuilder str = new StringBuilder(string).reverse();
-        builder[0] = new TextComponentString(str.toString()).setStyle(style).appendSibling(builder[0]);
+        for (ITextComponent component : text) {
+            String string = component.getUnformattedComponentText();
+            Style style = component.getStyle();
 
+            StringBuilder str = new StringBuilder(string).reverse();
+            builder[0] = new TextComponentString(str.toString()).setStyle(style).appendSibling(builder[0]);
+        }
         return builder[0];
     }
 
@@ -404,16 +388,16 @@ public class TextUtils {
     public static List<ITextComponent> formatInBounds(ITextComponent text, FontRenderer font, int maxWidth, boolean wrap) {
         if (maxWidth > 0) {
             if (wrap) {
-                List<FormattedCharSequence> warped = wrapText(text, maxWidth, font);
-                List<Component> newList = new ArrayList<>();
-                for (FormattedCharSequence charSequence : warped)
+                List<ITextComponent> warped = wrapText(text, maxWidth, font);
+                List<ITextComponent> newList = new ArrayList<>();
+                for (ITextComponent charSequence : warped)
                     newList.add(charSequenceToText(charSequence));
                 return newList;
             } else {
-                List<Component> list = splitText(text, "\n");
-                List<Component> newList = new ArrayList<>();
-                for (Component component : list)
-                    newList.add(formattedTextToText(font.substrByWidth(component, maxWidth)));
+                List<ITextComponent> list = splitText(text, "\n");
+                List<ITextComponent> newList = new ArrayList<>();
+                for (ITextComponent component : list)
+                    newList.add(formattedTextToText(font.trimStringToWidth(component.getUnformattedComponentText(), maxWidth)));
                 return newList;
             }
         } else {

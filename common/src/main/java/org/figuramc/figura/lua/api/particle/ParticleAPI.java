@@ -1,16 +1,8 @@
 package org.figuramc.figura.lua.api.particle;
 
-import com.mojang.brigadier.StringReader;
-import com.mojang.datafixers.util.Pair;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.particle.Particle;
-import net.minecraft.commands.arguments.ParticleArgument;
-import net.minecraft.core.particles.ParticleOptions;
-import net.minecraft.core.Registry;
 import net.minecraft.util.EnumParticleTypes;
-import org.figuramc.figura.lua.LuaNotNil;
-import org.figuramc.figura.lua.LuaWhitelist;
-import org.luaj.vm2.LuaError;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.ducks.ParticleEngineAccessor;
 import org.figuramc.figura.lua.LuaNotNil;
@@ -20,6 +12,7 @@ import org.figuramc.figura.lua.docs.LuaMethodOverload;
 import org.figuramc.figura.lua.docs.LuaTypeDoc;
 import org.figuramc.figura.math.vector.FiguraVec3;
 import org.figuramc.figura.utils.LuaUtils;
+import org.figuramc.figura.utils.Pair;
 import org.luaj.vm2.LuaError;
 
 @LuaWhitelist
@@ -41,8 +34,7 @@ public class ParticleAPI {
 
     private LuaParticle generate(String id, double x, double y, double z, double w, double t, double h) {
         try {
-            EnumParticleTypes particleType = EnumParticleTypes.getByName(id);
-            ParticleOptions options = ParticleArgument.readParticle(new StringReader(id));
+            EnumParticleTypes particleType = EnumParticleTypes.getByName(id); // TODO : Implement a particle parser for flattening
             Particle p = getParticleEngine().figura$makeParticle(particleType, x, y, z, w, t, h);
             if (p == null) throw new LuaError("Could not parse particle \"" + id + "\"");
             return new LuaParticle(id, p, owner);
@@ -111,7 +103,7 @@ public class ParticleAPI {
     )
     public boolean isPresent(String id) {
         try {
-            ParticleOptions options = ParticleArgument.readParticle(new StringReader(id));
+            EnumParticleTypes options = EnumParticleTypes.getByName(id); // todo : implement flattening here too
             return getParticleEngine().figura$makeParticle(options, 0, 0, 0, 0, 0, 0) != null;
         } catch (Exception ignored) {
             return false;

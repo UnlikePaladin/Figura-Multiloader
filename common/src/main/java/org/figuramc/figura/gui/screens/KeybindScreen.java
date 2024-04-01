@@ -1,8 +1,6 @@
 package org.figuramc.figura.gui.screens;
 
-import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.gui.GuiScreen;
-import net.minecraft.client.gui.screens.Screen;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.avatar.AvatarManager;
@@ -10,6 +8,7 @@ import org.figuramc.figura.gui.widgets.Button;
 import org.figuramc.figura.gui.widgets.lists.KeybindList;
 import org.figuramc.figura.lua.api.keybind.FiguraKeybind;
 import org.figuramc.figura.utils.FiguraText;
+import org.lwjgl.input.Keyboard;
 
 public class KeybindScreen extends AbstractPanelScreen {
 
@@ -48,7 +47,7 @@ public class KeybindScreen extends AbstractPanelScreen {
         reset.setActive(false);
 
         // back
-        addRenderableWidget(new Button(width / 2 + 4, height - 24, 120, 20, new FiguraText("gui.done"), null, bx -> onClose()));
+        addRenderableWidget(new Button(width / 2 + 4, height - 24, 120, 20, new FiguraText("gui.done"), null, bx -> onGuiClosed()));
 
         // -- list -- //
 
@@ -62,12 +61,18 @@ public class KeybindScreen extends AbstractPanelScreen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        return list.updateKey(InputConstants.Type.MOUSE.getOrCreate(button)) || super.mouseClicked(mouseX, mouseY, button);
+    public void mouseClicked(int mouseX, int mouseY, int button) {
+        if(list.updateKey(-100+button))
+            return;
+
+        super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        return list.updateKey(keyCode == 256 ? InputConstants.UNKNOWN : InputConstants.getKey(keyCode, scanCode)) || super.keyPressed(keyCode, scanCode, modifiers);
+    public void keyTyped(char c, int scanCode) {
+        if (list.updateKey(scanCode == Keyboard.KEY_ESCAPE ? 0 : scanCode))
+            return;
+
+        super.keyTyped(c, scanCode);
     }
 }

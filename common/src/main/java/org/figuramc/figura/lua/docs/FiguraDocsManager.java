@@ -2,27 +2,33 @@ package org.figuramc.figura.lua.docs;
 
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
-import com.mojang.brigadier.arguments.BoolArgumentType;
-import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import com.mojang.brigadier.builder.RequiredArgumentBuilder;
-import com.mojang.brigadier.context.CommandContext;
-import net.minecraft.ChatFormatting;
-import net.minecraft.network.chat.*;
+import net.minecraft.command.CommandBase;
+import net.minecraft.command.CommandException;
+import net.minecraft.command.ICommandSender;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.Style;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextFormatting;
+import net.minecraft.util.text.event.ClickEvent;
+import net.minecraft.util.text.event.HoverEvent;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.animation.Animation;
+import org.figuramc.figura.commands.FiguraCommands;
 import org.figuramc.figura.entries.FiguraAPI;
 import org.figuramc.figura.lua.api.*;
 import org.figuramc.figura.lua.api.action_wheel.Action;
 import org.figuramc.figura.lua.api.action_wheel.ActionWheelAPI;
 import org.figuramc.figura.lua.api.action_wheel.Page;
 import org.figuramc.figura.lua.api.data.*;
-import org.figuramc.figura.lua.api.json.*;
 import org.figuramc.figura.lua.api.entity.EntityAPI;
 import org.figuramc.figura.lua.api.entity.LivingEntityAPI;
 import org.figuramc.figura.lua.api.entity.PlayerAPI;
 import org.figuramc.figura.lua.api.entity.ViewerAPI;
 import org.figuramc.figura.lua.api.event.EventsAPI;
 import org.figuramc.figura.lua.api.event.LuaEvent;
+import org.figuramc.figura.lua.api.json.*;
 import org.figuramc.figura.lua.api.keybind.FiguraKeybind;
 import org.figuramc.figura.lua.api.keybind.KeybindAPI;
 import org.figuramc.figura.lua.api.math.MatricesAPI;
@@ -63,6 +69,7 @@ import org.figuramc.figura.model.rendering.texture.FiguraTexture;
 import org.figuramc.figura.model.rendertasks.*;
 import org.figuramc.figura.utils.FiguraClientCommandSource;
 import org.figuramc.figura.utils.FiguraText;
+import org.jetbrains.annotations.Nullable;
 import org.luaj.vm2.*;
 
 import java.io.OutputStream;
@@ -324,56 +331,84 @@ public class FiguraDocsManager {
         });
     }
 
-    public static MutableComponent getClassText(Class<?> clazz) {
+    public static ITextComponent getClassText(Class<?> clazz) {
         String name = getNameFor(clazz);
         String doc = CLASS_COMMAND_MAP.get(clazz);
 
-        MutableComponent text = new TextComponent(name);
+        ITextComponent text = new TextComponentString(name);
         if (doc == null)
             return text;
 
         text.setStyle(
-                Style.EMPTY.withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, doc))
-                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new FiguraText("command.docs_type_hover", new TextComponent(name).withStyle(ChatFormatting.DARK_PURPLE))))
-                .withUnderlined(true));
+                new Style().setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, doc))
+                .setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new FiguraText("command.docs_type_hover", new TextComponentString(name).setStyle(new Style().setColor(TextFormatting.DARK_PURPLE)))))
+                .setUnderlined(true));
         return text;
     }
 
     // -- commands -- // 
 
-    public static LiteralArgumentBuilder<FiguraClientCommandSource> getCommand() {
-        // root
-        LiteralArgumentBuilder<FiguraClientCommandSource> root = LiteralArgumentBuilder.literal("docs");
-        root.executes(context -> FiguraDoc.printRoot());
+    public static class DocsCommand extends FiguraCommands.FiguraSubCommand {
 
-        // globals
-        LiteralArgumentBuilder<FiguraClientCommandSource> globals = global == null ? LiteralArgumentBuilder.literal("globals") : global.getCommand();
-        root.then(globals);
+        public DocsCommand() {
+            super("docs");
 
-        // library overrides
-        for (FiguraDoc figuraDoc : GENERATED_LIB_OVERRIDES)
-            root.then(figuraDoc.getCommand());
+            // globals
+            subSubCommand.put("globals", global.getCommand());
 
-        // list docs
-        root.then(FiguraListDocs.getCommand());
+            // library overrides
+            for (FiguraDoc figuraDoc : GENERATED_LIB_OVERRIDES)
+                subSubCommand.put(figuraDoc.name, figuraDoc.getCommand());
 
-        return root;
+            // list docs
+            subSubCommand.put("enums", FiguraListDocs.getCommand());
+        }
+
+        public static Map<String, FiguraCommands.FiguraSubCommand> subSubCommand = new HashMap<>();
+        @Override
+        public void execute(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] args) throws CommandException {
+            if (args.length == 0) {
+                FiguraDoc.printRoot();
+                return;
+            }
+            if (subSubCommand.containsKey(args[0])) {
+                subSubCommand.get(args[0]).execute(minecraftServer, iCommandSender, Arrays.copyOfRange(args, 1, args.length));
+            }
+        }
+
+        @Override
+        public List<String> getTabCompletions(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] strings, @Nullable BlockPos targetPos) {
+            if (strings.length > 0 && subSubCommand.containsKey(strings[0]))
+                return subSubCommand.get(strings[0]).getTabCompletions(minecraftServer, iCommandSender, Arrays.copyOfRange(strings, 1, strings.length), targetPos);
+            return CommandBase.getListOfStringsMatchingLastWord(strings, subSubCommand.keySet());
+        }
     }
 
-    public static LiteralArgumentBuilder<FiguraClientCommandSource> getExportCommand() {
-        LiteralArgumentBuilder<FiguraClientCommandSource> root = LiteralArgumentBuilder.literal("docs");
-        root.executes(context -> exportDocsFunction(context, true));
+    public static class ExportCommand extends FiguraCommands.FiguraSubCommand {
 
-        RequiredArgumentBuilder<FiguraClientCommandSource, Boolean> e = RequiredArgumentBuilder.argument("translate", BoolArgumentType.bool());
-        e.executes(context -> exportDocsFunction(context, BoolArgumentType.getBool(context, "translate")));
-        root.then(e);
+        public ExportCommand() {
+            super("docs");
+        }
 
-        return root;
+        @Override
+        public void execute(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] args) throws CommandException {
+            if (args.length == 0) {
+                exportDocsFunction(iCommandSender, true);
+                return;
+            }
+            boolean translate = CommandBase.parseBoolean(args[0]);
+            exportDocsFunction(iCommandSender, translate);
+        }
+
+        @Override
+        public List<String> getTabCompletions(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] strings, @Nullable BlockPos targetPos) {
+            return CommandBase.getListOfStringsMatchingLastWord(strings, "true", "false");
+        }
     }
 
     // -- export -- // 
 
-    private static int exportDocsFunction(CommandContext<FiguraClientCommandSource> context, boolean translate) {
+    private static int exportDocsFunction(ICommandSender context, boolean translate) {
         try {
             // get path
             Path targetPath = FiguraMod.getFiguraDirectory().resolve("exported_docs.json");
@@ -388,16 +423,16 @@ public class FiguraDocsManager {
             fs.close();
 
             // feedback
-            context.getSource().figura$sendFeedback(
+            ((FiguraClientCommandSource)context).figura$sendFeedback(
                     new FiguraText("command.docs_export.success")
-                            .append(" ")
-                            .append(new FiguraText("command.click_to_open")
-                                    .setStyle(Style.EMPTY.withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_FILE, targetPath.toString())).withUnderlined(true))
+                            .appendText(" ")
+                            .appendSibling(new FiguraText("command.click_to_open")
+                                    .setStyle(new Style().setClickEvent(new ClickEvent(ClickEvent.Action.OPEN_FILE, targetPath.toString())).setUnderlined(true))
                             )
             );
             return 1;
         } catch (Exception e) {
-            context.getSource().figura$sendError(new FiguraText("command.docs_export.error"));
+            ((FiguraClientCommandSource)context).figura$sendError(new FiguraText("command.docs_export.error"));
             FiguraMod.LOGGER.error("Failed to export docs!", e);
             return 0;
         }

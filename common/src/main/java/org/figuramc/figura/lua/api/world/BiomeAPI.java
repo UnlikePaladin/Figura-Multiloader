@@ -1,5 +1,6 @@
 package org.figuramc.figura.lua.api.world;
 
+import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.biome.Biome;
 import org.figuramc.figura.lua.LuaWhitelist;
@@ -77,13 +78,14 @@ public class BiomeAPI {
     public List<String> getTags() {
         List<String> list = new ArrayList<>();
 
-        Registry<Biome> registry = WorldAPI.getCurrentWorld().registryAccess().registryOrThrow(Registry.BIOME_REGISTRY);
+       /* Registry<Biome> registry = WorldAPI.getCurrentWorld().registryAccess().registryOrThrow(Registry.BIOME_REGISTRY);
         Optional<ResourceKey<Biome>> key = registry.getResourceKey(biome);
 
         if (key.isPresent())
             return list;
 
-        list.add(biome.getTempCategory().name());
+        list.add(biome.getTempCategory().name());*/
+        // TODO : see what i can do for biome tags
         return list;
     }
 
@@ -102,7 +104,7 @@ public class BiomeAPI {
     @LuaWhitelist
     @LuaMethodDoc("biome.get_sky_color")
     public FiguraVec3 getSkyColor() {
-        return ColorUtils.intToRGB(biome.getSkyColorByTemp());
+        return ColorUtils.intToRGB(biome.getSkyColorByTemp(biome.getTemperature(pos)));
     }
 
     @LuaWhitelist
@@ -115,13 +117,14 @@ public class BiomeAPI {
     @LuaMethodDoc("biome.get_grass_color")
     public FiguraVec3 getGrassColor() {
         BlockPos pos = getBlockPos();
-        return ColorUtils.intToRGB(biome.getGrassColor(pos.getX(), pos.getY()));
+        return ColorUtils.intToRGB(biome.getGrassColorAtPos(pos));
     }
 
     @LuaWhitelist
     @LuaMethodDoc("biome.get_fog_color")
     public FiguraVec3 getFogColor() {
-        return ColorUtils.intToRGB(biome.getFogColor());
+        ResourceLocation biomeID = RegistryUtils.getResourceLocationForRegistryObj(Biome.class, biome);
+        return ColorUtils.intToRGB(biomeID.getResourcePath().contains("hell") || biomeID.getResourcePath().contains("nether") ? 0x330808 : biomeID.getResourcePath().contains("sky") || biomeID.getResourcePath().contains("end") ? 0xA080A0 : 12638463);
     }
 
     @LuaWhitelist
@@ -133,7 +136,7 @@ public class BiomeAPI {
     @LuaWhitelist
     @LuaMethodDoc("biome.get_water_fog_color")
     public FiguraVec3 getWaterFogColor() {
-        return ColorUtils.intToRGB(biome.getWaterFogColor());
+        return ColorUtils.intToRGB(329011);
     }
 
     @LuaWhitelist

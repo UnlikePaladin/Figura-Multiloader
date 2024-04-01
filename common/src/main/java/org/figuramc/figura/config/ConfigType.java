@@ -4,12 +4,11 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
-import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.Minecraft;
-import net.minecraft.network.chat.Component;
 import net.minecraft.util.text.ITextComponent;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.gui.screens.NetworkFilterScreen;
+import org.figuramc.figura.lua.api.keybind.FiguraKeybind;
 import org.figuramc.figura.lua.api.net.NetworkingAPI;
 import org.figuramc.figura.math.vector.FiguraVec3;
 import org.figuramc.figura.utils.ColorUtils;
@@ -303,7 +302,7 @@ public abstract class ConfigType<T> {
 
         public KeybindConfig(String name, Category category, String defaultValue) {
             super(name, category, defaultValue);
-            this.keyBind = new ConfigKeyBinding(this.name.getUnformattedText(), InputConstants.getKey(defaultValue), this);
+            this.keyBind = new ConfigKeyBinding(this.name.getFormattedText(), FiguraKeybind.parseStringKey(defaultValue), this);
         }
 
         @Override

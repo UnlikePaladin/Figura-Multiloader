@@ -7,6 +7,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.*;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import net.minecraft.client.renderer.entity.EntityRenderer;
+import net.minecraft.client.renderer.entity.RenderManager;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -27,10 +28,10 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(LevelRenderer.class)
+@Mixin(RenderGlobal.class)
 public abstract class LevelRendererMixin {
 
-    @Shadow @Final private EntityRenderDispatcher entityRenderDispatcher;
+    @Shadow @Final private RenderManager entityRenderDispatcher;
     @Shadow @Final private RenderBuffers renderBuffers;
     @Shadow @Final private Minecraft minecraft;
 

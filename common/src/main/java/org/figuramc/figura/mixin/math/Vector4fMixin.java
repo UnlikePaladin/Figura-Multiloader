@@ -42,4 +42,16 @@ public abstract class Vector4fMixin implements Vector4fExtension {
         Quaternion.mul(quaternion, quaternion2, quaternion);
         this.set(quaternion.getX(), quaternion.getY(), quaternion.getZ(), this.w);
     }
+
+    @Override
+    public Quaternion figura$rotationDegrees(float angle) {
+        Quaternion quat = new Quaternion((Vector4f)(Object)this);
+        angle *= (float)Math.PI / 180;
+        float f = (float) Math.sin(angle / 2.0f);
+        quat.x = quat.x *f;
+        quat.y = quat.y *f;
+        quat.z = quat.z *f;
+        quat.w = quat.w *f;
+        return quat;
+    }
 }

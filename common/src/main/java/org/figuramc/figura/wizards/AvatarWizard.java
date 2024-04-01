@@ -12,6 +12,7 @@ import org.figuramc.figura.exporters.BlockBenchModel;
 import org.figuramc.figura.exporters.BlockBenchModel.Cube;
 import org.figuramc.figura.exporters.BlockBenchModel.Group;
 import org.figuramc.figura.math.vector.FiguraVec3;
+import org.figuramc.figura.platform.Services;
 import org.figuramc.figura.utils.*;
 
 import java.io.IOException;
@@ -35,7 +36,7 @@ public class AvatarWizard {
         return bytes != null ? Base64.encodeBase64String(bytes) : "";
     };
 
-    public static final FiguraResourceListener RESOURCE_LISTENER = FiguraResourceListener.createResourceListener("avatar_wizard", manager -> {
+    public static final FiguraResourceListener RESOURCE_LISTENER = Services.FIGURA_RESOURCE_LISTENER.createResourceListener("avatar_wizard", manager -> {
         playerTexture = GET_TEXTURE_DATA.apply(manager, "textures/avatar_wizard/texture.png");
         playerTextureSlim = GET_TEXTURE_DATA.apply(manager, "textures/avatar_wizard/texture_slim.png");
         capeTexture = GET_TEXTURE_DATA.apply(manager, "textures/avatar_wizard/cape.png");

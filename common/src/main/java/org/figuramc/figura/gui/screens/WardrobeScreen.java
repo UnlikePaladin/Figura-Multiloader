@@ -1,9 +1,14 @@
 package org.figuramc.figura.gui.screens;
 
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.network.chat.*;
+import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.settings.GameSettings;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.Style;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextFormatting;
+import net.minecraft.util.text.event.ClickEvent;
+import net.minecraft.util.text.event.HoverEvent;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.avatar.AvatarManager;
@@ -11,6 +16,7 @@ import org.figuramc.figura.avatar.local.LocalAvatarFetcher;
 import org.figuramc.figura.avatar.local.LocalAvatarLoader;
 import org.figuramc.figura.backend2.NetworkStuff;
 import org.figuramc.figura.config.Configs;
+import org.figuramc.figura.ducks.extensions.StyleExtension;
 import org.figuramc.figura.gui.FiguraToast;
 import org.figuramc.figura.gui.widgets.*;
 import org.figuramc.figura.gui.widgets.lists.AvatarList;
@@ -24,21 +30,21 @@ import java.nio.file.Path;
 import java.util.List;
 
 public class WardrobeScreen extends AbstractPanelScreen {
-    private static final Component DEBUG_MOTD_FALLBACK = new TextComponent("No motd could be loaded.\n\n")
-            .append("Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.\n")
-                    .withStyle(ChatFormatting.GRAY)
-            .append(new TextComponent("(This is some text you can hover)\n")
-                    .withStyle(Style.EMPTY.withColor(TextColor.fromRgb(0xFFF311A0)).withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new TextComponent("hi chat")))))
-            .append(new TextComponent("(This is some text you can click on)\n")
-                    .withStyle(Style.EMPTY.withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, "https://github.com/FiguraMC/Figura"))))
-            .append(new TextComponent("(This is only visible in debug mode)")
-                    .withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.ITALIC));
+    private static final ITextComponent DEBUG_MOTD_FALLBACK = new TextComponentString("No motd could be loaded.\n\n")
+            .appendText("Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.\n")
+                    .setStyle(new Style().setColor(TextFormatting.GRAY))
+            .appendSibling(new TextComponentString("(This is some text you can hover)\n")
+                    .setStyle(((StyleExtension)new Style()).setRGBColor(0xFFF311A0).setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new TextComponentString("hi chat")))))
+            .appendSibling(new TextComponentString("(This is some text you can click on)\n")
+                    .setStyle(new Style().setClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, "https://github.com/FiguraMC/Figura"))))
+            .appendSibling(new TextComponentString("(This is only visible in debug mode)")
+                    .setStyle(new Style().setColor(TextFormatting.DARK_GRAY).setItalic(true)));
 
     private Label panic;
 
     private Button upload, delete, back;
 
-    public WardrobeScreen(Screen parentScreen) {
+    public WardrobeScreen(GuiScreen parentScreen) {
         super(parentScreen, new FiguraText("gui.panels.title.wardrobe"));
     }
 
@@ -46,11 +52,11 @@ public class WardrobeScreen extends AbstractPanelScreen {
     private BackendMotdWidget motdWidget;
 
     @Override
-    protected void init() {
-        super.init();
+    public void initGui() {
+        super.initGui();
 
         // screen
-        Minecraft minecraft = Minecraft.getInstance();
+        Minecraft minecraft = Minecraft.getMinecraft();
         int middle = width / 2;
         int panels = getPanels();
 
@@ -112,24 +118,24 @@ public class WardrobeScreen extends AbstractPanelScreen {
         // -- bottom -- //
 
         // version
-        MutableComponent versionText = new FiguraText().append(" " + FiguraMod.VERSION.noBuildString()).withStyle(ChatFormatting.ITALIC);
+        ITextComponent versionText = new FiguraText().appendText(" " + FiguraMod.VERSION.noBuildString()).setStyle(new Style().setItalic(true));
         int versionStatus = NetworkStuff.latestVersion != null ? NetworkStuff.latestVersion.compareTo(FiguraMod.VERSION) : 0;
         boolean oldVersion = versionStatus > 0;
         if (oldVersion) {
             versionText
-                    .append(" ")
-                    .append(new TextComponent("=")
-                            .withStyle(Style.EMPTY
-                                    .withFont(UIHelper.UI_FONT)
-                                    .withItalic(false)
-                                    .applyLegacyFormat(ChatFormatting.WHITE)
+                    .appendText(" ")
+                    .appendSibling(new TextComponentString("=")
+                            .setStyle(((StyleExtension)new Style())
+                                    .setFont(UIHelper.UI_FONT)
+                                    .setItalic(false)
+                                    .setColor(TextFormatting.WHITE)
                             ))
-                    .withStyle(Style.EMPTY
-                            .applyFormat(ChatFormatting.AQUA)
-                            .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                                    new FiguraText("gui.new_version.tooltip", new TextComponent(NetworkStuff.latestVersion.toString()).withStyle(ChatFormatting.GREEN))
+                    .setStyle(new Style()
+                            .setColor(TextFormatting.AQUA)
+                            .setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                                    new FiguraText("gui.new_version.tooltip", new TextComponentString(NetworkStuff.latestVersion.toString()).setStyle(new Style().setColor(TextFormatting.GREEN)))
                             ))
-                            .withClickEvent(new TextUtils.FiguraClickEvent(UIHelper.openURL(
+                            .setClickEvent(new TextUtils.FiguraClickEvent(UIHelper.openURL(
                                 NetworkStuff.latestVersion.pre==null ? 
                                     (FiguraMod.Links.Modrinth.url + "/versions") : 
                                     (FiguraMod.Links.Github.url + "/releases")
@@ -137,8 +143,8 @@ public class WardrobeScreen extends AbstractPanelScreen {
                             )
                     );
         } else if (versionStatus < 0) {
-            versionText.withStyle(Style.EMPTY.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                    new FiguraText("gui.old_version.tooltip", new TextComponent(NetworkStuff.latestVersion.toString()).withStyle(ChatFormatting.LIGHT_PURPLE))
+            versionText.setStyle(new Style().setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                    new FiguraText("gui.old_version.tooltip", new TextComponentString(NetworkStuff.latestVersion.toString()).setStyle(new Style().setColor(TextFormatting.LIGHT_PURPLE)))
             )));
         }
 
@@ -150,7 +156,7 @@ public class WardrobeScreen extends AbstractPanelScreen {
         int rightSide = Math.min(panels, 134);
 
         // back
-        back = new Button(width - rightSide - 4, height - 24, rightSide, 20, new FiguraText("gui.done"), null, bx -> onClose());
+        back = new Button(width - rightSide - 4, height - 24, rightSide, 20, new FiguraText("gui.done"), null, bx -> onGuiClosed());
         addRenderableWidget(back);
 
         // -- right side -- //
@@ -164,20 +170,20 @@ public class WardrobeScreen extends AbstractPanelScreen {
                 0, 0, 24,
                 new FiguraIdentifier("textures/gui/avatar_settings.png"),
                 72, 24,
-                new FiguraText("gui.avatar_settings.tooltip").append("\n").append(new FiguraText("gui.not_available_yet").withStyle(ChatFormatting.RED)),
+                new FiguraText("gui.avatar_settings.tooltip").appendText("\n").appendSibling(new FiguraText("gui.not_available_yet").setStyle(new Style().setColor(TextFormatting.RED))),
                 bx -> {}
         ));
         avatarSettings.setActive(false);
 
         // sounds
         Button sounds = new Button(this.width - rightSide + 36, 28, 24, 24, 0, 0, 24, new FiguraIdentifier("textures/gui/sound.png"), 72, 24, new FiguraText("gui.wardrobe.sound.tooltip"),
-                button -> Minecraft.getInstance().setScreen(new SoundScreen(this))
+                button -> Minecraft.getMinecraft().displayGuiScreen(new SoundScreen(this))
         );
         addRenderableWidget(sounds);
 
         // keybinds
         Button keybinds = new Button(this.width - rightSide + 72, 28, 24, 24, 0, 0, 24, new FiguraIdentifier("textures/gui/keybind.png"), 72, 24, new FiguraText("gui.wardrobe.keybind.tooltip"),
-                button -> Minecraft.getInstance().setScreen(new KeybindScreen(this))
+                button -> Minecraft.getMinecraft().displayGuiScreen(new KeybindScreen(this))
         );
         addRenderableWidget(keybinds);
 
@@ -193,7 +199,7 @@ public class WardrobeScreen extends AbstractPanelScreen {
 
         // panic warning - always added last, on top
         addRenderableWidget(panic = new Label(
-                new FiguraText("gui.panic", Configs.PANIC_BUTTON.keyBind.getTranslatedKeyMessage()).withStyle(ChatFormatting.YELLOW),
+                new FiguraText("gui.panic", new TextComponentString(GameSettings.getKeyDisplayString(Configs.PANIC_BUTTON.keyBind.getKeyCode()))).setStyle(new Style().setColor(TextFormatting.YELLOW)),
                 middle, version.getRawY(), TextUtils.Alignment.CENTER, 0)
         );
         panic.setY(panic.getRawY() - panic.getHeight());
@@ -216,16 +222,16 @@ public class WardrobeScreen extends AbstractPanelScreen {
 
         infoWidget.tick();
         if (motdWidget == null) {
-            Component motd = NetworkStuff.motd == null ? DEBUG_MOTD_FALLBACK : NetworkStuff.motd;
+            ITextComponent motd = NetworkStuff.motd == null ? DEBUG_MOTD_FALLBACK : NetworkStuff.motd;
             if (!FiguraMod.debugModeEnabled() && motd == DEBUG_MOTD_FALLBACK) {
                 return;
             }
-            motdWidget = addRenderableWidget(new BackendMotdWidget(x, y, width, height, motd, font));
+            motdWidget = addRenderableWidget(new BackendMotdWidget(x, y, width, height, motd, fontRenderer));
         }  else {
             motdWidget.setPosition(x, y);
             motdWidget.setWidth(width);
             motdWidget.setHeight(height);
-            Component motd = NetworkStuff.motd == null ? DEBUG_MOTD_FALLBACK : NetworkStuff.motd;
+            ITextComponent motd = NetworkStuff.motd == null ? DEBUG_MOTD_FALLBACK : NetworkStuff.motd;
             if (!FiguraMod.debugModeEnabled() && motd == DEBUG_MOTD_FALLBACK) {
                 return;
             }
@@ -252,14 +258,13 @@ public class WardrobeScreen extends AbstractPanelScreen {
     }
 
     @Override
-    public void removed() {
-        super.removed();
+    public void onGuiClosed() {
+        super.onGuiClosed();
         LocalAvatarFetcher.save();
     }
 
-    @Override
     public void onFilesDrop(List<Path> paths) {
-        super.onFilesDrop(paths);
+        //super.onFilesDrop(paths);
 
         StringBuilder packs = new StringBuilder();
         for (int i = 0; i < paths.size(); i++) {
@@ -268,7 +273,7 @@ public class WardrobeScreen extends AbstractPanelScreen {
             packs.append(IOUtils.getFileNameOrEmpty(paths.get(i)));
         }
 
-        this.minecraft.setScreen(new FiguraConfirmScreen(confirmed -> {
+        this.mc.displayGuiScreen(new FiguraConfirmScreen(confirmed -> {
             if (confirmed) {
                 try {
                     LocalAvatarFetcher.loadExternal(paths);
@@ -278,7 +283,8 @@ public class WardrobeScreen extends AbstractPanelScreen {
                     FiguraMod.LOGGER.error("Failed to copy files", e);
                 }
             }
-            this.minecraft.setScreen(this);
+            this.mc.displayGuiScreen(this);
+            return null;
         }, new FiguraText("gui.wardrobe.drop_files"), packs.toString(), this));
     }
 }

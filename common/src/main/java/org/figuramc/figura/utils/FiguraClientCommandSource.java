@@ -1,29 +1,28 @@
 package org.figuramc.figura.utils;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.commands.SharedSuggestionProvider;
-import net.minecraft.network.chat.Component;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.phys.Vec2;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.client.entity.EntityPlayerSP;
+import net.minecraft.client.multiplayer.WorldClient;
+import net.minecraft.command.ICommand;
+import net.minecraft.entity.Entity;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.text.ITextComponent;
 
 
-public interface FiguraClientCommandSource extends SharedSuggestionProvider {
+public interface FiguraClientCommandSource extends ICommand {
     /**
      * Sends a feedback message to the player.
      *
      * @param message the feedback message
      */
-    void figura$sendFeedback(Component message);
+    void figura$sendFeedback(ITextComponent message);
 
     /**
      * Sends an error message to the player.
      *
      * @param message the error message
      */
-    void figura$sendError(Component message);
+    void figura$sendError(ITextComponent message);
 
     /**
      * Gets the client instance used to run the command.
@@ -37,7 +36,7 @@ public interface FiguraClientCommandSource extends SharedSuggestionProvider {
      *
      * @return the player
      */
-    LocalPlayer figura$getPlayer();
+    EntityPlayerSP figura$getPlayer();
 
     /**
      * Gets the entity that used the command.
@@ -53,17 +52,8 @@ public interface FiguraClientCommandSource extends SharedSuggestionProvider {
      *
      * @return the position
      */
-    default Vec3 figura$getPosition() {
-        return figura$getPlayer().position();
-    }
-
-    /**
-     * Gets the rotation of the entity that used the command.
-     *
-     * @return the rotation
-     */
-    default Vec2 figura$getRotation() {
-        return figura$getPlayer().getRotationVector();
+    default Vec3d figura$getPosition() {
+        return figura$getPlayer().getPositionVector();
     }
 
     /**
@@ -71,7 +61,7 @@ public interface FiguraClientCommandSource extends SharedSuggestionProvider {
      *
      * @return the world
      */
-    ClientLevel figura$getWorld();
+    WorldClient figura$getWorld();
 
     /**
      * Gets the meta property under {@code key} that was assigned to this source.

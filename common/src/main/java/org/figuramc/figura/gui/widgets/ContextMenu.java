@@ -1,15 +1,15 @@
 package org.figuramc.figura.gui.widgets;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.components.AbstractWidget;
-import net.minecraft.client.gui.components.events.GuiEventListener;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.Style;
-import net.minecraft.network.chat.TextComponent;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.client.gui.ScaledResolution;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.Style;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextFormatting;
+import org.figuramc.figura.ducks.extensions.StyleExtension;
+import org.figuramc.figura.mixin.font.FontRendererAccessor;
 import org.figuramc.figura.utils.FiguraIdentifier;
 import org.figuramc.figura.utils.ui.UIHelper;
 
@@ -23,18 +23,18 @@ public class ContextMenu extends AbstractContainerElement {
     private final int minWidth;
     private final List<ContextButton> entries = new ArrayList<>();
 
-    public GuiEventListener parent;
+    public FiguraGuiEventListener parent;
 
     private ContextMenu nestedContext;
 
-    public ContextMenu(GuiEventListener parent, int minWidth) {
+    public ContextMenu(FiguraGuiEventListener parent, int minWidth) {
         super(0, 0, minWidth, 2);
         this.minWidth = minWidth;
         this.parent = parent;
         this.setVisible(false);
     }
 
-    public ContextMenu(GuiEventListener parent) {
+    public ContextMenu(FiguraGuiEventListener parent) {
         this(parent, 0);
     }
 
@@ -43,26 +43,26 @@ public class ContextMenu extends AbstractContainerElement {
     }
 
     @Override
-    public void render(PoseStack poseStack, int mouseX, int mouseY, float delta) {
+    public void draw(Minecraft minecraft, int mouseX, int mouseY, float delta) {
         if (!isVisible()) return;
 
         // outline
-        UIHelper.renderSliced(poseStack, getX(), getY(), getWidth(), getHeight(), 0f, 0f, 16, 16, 48, 16, BACKGROUND);
+        UIHelper.renderSliced(getX(), getY(), getWidth(), getHeight(), 0f, 0f, 16, 16, 48, 16, BACKGROUND);
 
         for (int i = 0, y = getY() + 1; i < entries.size(); i++) {
             int height = entries.get(i).getHeight();
 
             // background
-            UIHelper.renderSliced(poseStack, getX() + 1, y, getWidth() - 2, height, i % 2 == 1 ? 32f : 16f, 0f, 16, 16, 48, 16, BACKGROUND);
+            UIHelper.renderSliced(getX() + 1, y, getWidth() - 2, height, i % 2 == 1 ? 32f : 16f, 0f, 16, 16, 48, 16, BACKGROUND);
 
             // button
-            entries.get(i).render(poseStack, mouseX, mouseY, delta);
+            entries.get(i).drawWidget(minecraft, mouseX, mouseY, delta);
 
             y += height;
         }
 
         if (nestedContext != null) {
-            nestedContext.render(poseStack, mouseX, mouseY, delta);
+            nestedContext.draw(minecraft, mouseX, mouseY, delta);
             if (nestedContext.parent instanceof Button) {
                 Button button = (Button) nestedContext.parent;
                 button.setHovered(true);
@@ -70,7 +70,7 @@ public class ContextMenu extends AbstractContainerElement {
         }
     }
 
-    public void addAction(Component name, Component tooltip, Button.OnPress action) {
+    public void addAction(ITextComponent name, ITextComponent tooltip, Button.ButtonAction action) {
         addElement(new ContextButton(getX(), getY() + getHeight(), name, tooltip, this, action));
     }
 
@@ -78,7 +78,7 @@ public class ContextMenu extends AbstractContainerElement {
         addElement(new ContextDivisor(getX(), getY() + getHeight()));
     }
 
-    public void addTab(Component name, Component tooltip, ContextMenu context) {
+    public void addTab(ITextComponent name, ITextComponent tooltip, ContextMenu context) {
         // button
         ContextButton button = new TabButton(getX(), getY() + getHeight(), name, tooltip, this, context);
         addElement(button);
@@ -128,7 +128,7 @@ public class ContextMenu extends AbstractContainerElement {
     public void setX(int x) {
         // fix out of screen
         int realWidth = x + getWidth();
-        int clientWidth = Minecraft.getInstance().getWindow().getGuiScaledWidth();
+        int clientWidth = new ScaledResolution(Minecraft.getMinecraft()).getScaledWidth();
         if (realWidth > clientWidth)
             x -= (realWidth - clientWidth);
 
@@ -149,7 +149,7 @@ public class ContextMenu extends AbstractContainerElement {
     public void setY(int y) {
         // fix out of screen
         int realHeight = y + getHeight();
-        int clientHeight = Minecraft.getInstance().getWindow().getGuiScaledHeight();
+        int clientHeight = new ScaledResolution(Minecraft.getMinecraft()).getScaledHeight();
         if (realHeight > clientHeight)
             y -= (realHeight - clientHeight);
 
@@ -169,13 +169,13 @@ public class ContextMenu extends AbstractContainerElement {
         }
     }
 
-    public List<? extends AbstractWidget> getEntries() {
+    public List<? extends AbstractFiguraWidget> getEntries() {
         return entries;
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        boolean result = super.mouseClicked(mouseX, mouseY, button);
+    public boolean mouseButtonClicked(int mouseX, int mouseY, int button) {
+        boolean result = super.mouseButtonClicked(mouseX, mouseY, button);
         setFocused(null);
         return result;
     }
@@ -184,31 +184,31 @@ public class ContextMenu extends AbstractContainerElement {
 
         protected final ContextMenu parent;
 
-        public ContextButton(int x, int y, Component text, Component tooltip, ContextMenu parent, OnPress pressAction) {
+        public ContextButton(int x, int y, ITextComponent text, ITextComponent tooltip, ContextMenu parent, ButtonAction pressAction) {
             super(x, y, 0, 16, text, tooltip, pressAction);
             this.shouldHaveBackground(false);
             this.parent = parent;
         }
 
         protected ContextButton(int x, int y, int height) {
-            super(x, y, 0, height, TextComponent.EMPTY.copy(), null, button -> {});
+            super(x, y, 0, height, new TextComponentString(""), null, button -> {});
             this.shouldHaveBackground(false);
             this.parent = null;
         }
 
         @Override
-        protected void renderText(PoseStack pose, float delta) {
+        protected void renderText(Minecraft minecraft, float delta) {
             // draw text
-            Font font = Minecraft.getInstance().font;
-            font.drawShadow(
-                    pose, getMessage(),
-                    this.getX() + 3, (int) (this.getY() + this.getHeight() / 2f - font.lineHeight / 2f),
+            FontRenderer font = Minecraft.getMinecraft().fontRenderer;
+            font.drawStringWithShadow(
+                    getMessage().getFormattedText(),
+                    this.getX() + 3, (int) (this.getY() + this.getHeight() / 2f - font.FONT_HEIGHT / 2f),
                     getTextColor()
             );
         }
 
         @Override
-        public boolean isMouseOver(double mouseX, double mouseY) {
+        public boolean mouseOver(double mouseX, double mouseY) {
             if (UIHelper.isMouseOver(getX(), getY(), getWidth(), getHeight(), mouseX, mouseY, true)) {
                 UIHelper.setTooltip(this.tooltip);
                 parent.clearNest();
@@ -219,7 +219,7 @@ public class ContextMenu extends AbstractContainerElement {
         }
 
         public int getTrueWidth() {
-            return Minecraft.getInstance().font.width(getMessage());
+            return Minecraft.getMinecraft().fontRenderer.getStringWidth(getMessage().getFormattedText());
         }
     }
 
@@ -230,44 +230,45 @@ public class ContextMenu extends AbstractContainerElement {
         }
 
         @Override
-        public void renderButton(PoseStack pose, int mouseX, int mouseY, float delta) {
+        public void drawWidget(Minecraft minecraft, int mouseX, int mouseY, float delta) {
             // draw line
-            UIHelper.fill(pose,this.getX() + 4, getY() + 4, this.getX() + this.getWidth() - 4, getY() + 5, 0xFF000000 + ChatFormatting.DARK_GRAY.getColor());
+            UIHelper.fill(this.getX() + 4, getY() + 4, this.getX() + this.getWidth() - 4, getY() + 5, 0xFF000000 + ((FontRendererAccessor)minecraft.fontRenderer).getColors()[TextFormatting.DARK_GRAY.getColorIndex()]);
         }
 
         @Override
-        public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        public boolean mouseButtonClicked(int mouseX, int mouseY, int mouseButton) {
             return false;
         }
     }
 
     private static class TabButton extends ContextButton {
 
-        private static final Component ARROW = new TextComponent(">").setStyle(Style.EMPTY.withFont(UIHelper.UI_FONT));
+        private static final ITextComponent ARROW = new TextComponentString(">").setStyle(((StyleExtension)new Style()).setFont(UIHelper.UI_FONT));
         private final ContextMenu context;
 
-        public TabButton(int x, int y, Component text, Component tooltip, ContextMenu parent, ContextMenu context) {
+        public TabButton(int x, int y, ITextComponent text, ITextComponent tooltip, ContextMenu parent, ContextMenu context) {
             super(x, y, text, tooltip, parent, button -> {});
             this.context = context;
             this.context.setVisible(true);
         }
 
+
         @Override
-        public void renderButton(PoseStack poseStack, int mouseX, int mouseY, float delta) {
+        public void drawWidget(Minecraft minecraft, int mouseX, int mouseY, float delta) {
             // super
-            super.renderButton(poseStack, mouseX, mouseY, delta);
+            super.drawWidget(minecraft, mouseX, mouseY, delta);
 
             // draw arrow
-            Font font = Minecraft.getInstance().font;
-            font.drawShadow(
-                    poseStack, ARROW,
-                    this.getX() + this.getWidth() - font.width(ARROW) - 3, (int) (this.getY() + this.getHeight() / 2f - font.lineHeight / 2f),
+            FontRenderer font = Minecraft.getMinecraft().fontRenderer;
+            font.drawStringWithShadow(
+                    ARROW.getFormattedText(),
+                    this.getX() + this.getWidth() - font.getStringWidth(ARROW.getFormattedText()) - 3, (int) (this.getY() + this.getHeight() / 2f - font.FONT_HEIGHT / 2f),
                     getTextColor()
             );
         }
 
         @Override
-        public boolean isMouseOver(double mouseX, double mouseY) {
+        public boolean mouseOver(double mouseX, double mouseY) {
             boolean mouseOver = UIHelper.isMouseOver(getX(), getY(), getWidth(), getHeight(), mouseX, mouseY, true);
             if (mouseOver || parent.nestedContext == context) {
                 UIHelper.setTooltip(this.tooltip);
@@ -281,7 +282,7 @@ public class ContextMenu extends AbstractContainerElement {
 
         @Override
         public int getTrueWidth() {
-            return super.getTrueWidth() + Minecraft.getInstance().font.width(new TextComponent(" ").append(ARROW));
+            return super.getTrueWidth() + Minecraft.getMinecraft().fontRenderer.getStringWidth(new TextComponentString(" ").appendSibling(ARROW).getFormattedText());
         }
     }
 }

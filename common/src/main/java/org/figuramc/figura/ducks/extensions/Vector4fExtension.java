@@ -7,4 +7,7 @@ public interface Vector4fExtension {
     void figura$transform(Matrix4f matrix);
 
     void figura$transform(Quaternion rotation);
+
+    Quaternion figura$rotationDegrees(float value);
+
 }

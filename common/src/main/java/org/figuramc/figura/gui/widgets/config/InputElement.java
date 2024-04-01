@@ -1,23 +1,17 @@
 package org.figuramc.figura.gui.widgets.config;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TextColor;
-import net.minecraft.network.chat.TranslatableComponent;
-import org.figuramc.figura.gui.widgets.ParentedButton;
-import org.figuramc.figura.gui.widgets.TextField;
-import org.figuramc.figura.gui.widgets.lists.ConfigList;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiPageButtonList;
+import net.minecraft.util.text.TextComponentTranslation;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.config.ConfigType;
-import org.figuramc.figura.config.Configs;
 import org.figuramc.figura.config.InputType;
+import org.figuramc.figura.ducks.extensions.StyleExtension;
 import org.figuramc.figura.gui.widgets.ParentedButton;
 import org.figuramc.figura.gui.widgets.TextField;
 import org.figuramc.figura.gui.widgets.lists.ConfigList;
 import org.figuramc.figura.utils.ColorUtils;
 import org.figuramc.figura.utils.ui.UIHelper;
-
-import java.util.function.Consumer;
 
 public class InputElement extends AbstractConfigElement {
 
@@ -31,27 +25,40 @@ public class InputElement extends AbstractConfigElement {
         this.inputType = config.inputType;
 
         // text field
-        textField = new InputField(0, 0, 90, 20, inputType.hint, this, text -> {
-            // only write config value if it's valid
-            if (inputType.validator.test(text))
-                config.setTempValue(text);
+        textField = new InputField(0, 0, 90, 20, inputType.hint, this, new GuiPageButtonList.GuiResponder() {
+            @Override
+            public void setEntryValue(int i, boolean value) {
+
+            }
+
+            @Override
+            public void setEntryValue(int i, float value) {
+
+            }
+
+            @Override
+            public void setEntryValue(int i, String value) {
+                // only write config value if it's valid
+                if (inputType.validator.test(value))
+                    config.setTempValue(value);
+            }
         });
         updateTextFieldText(formatText(config.tempValue));
-        textField.getField().moveCursorToStart();
+        textField.getField().setCursorPositionZero();
         textField.setEnabled(FiguraMod.debugModeEnabled() || !config.disabled);
 
         children.add(0, textField);
 
         // overwrite reset button to update the text field
         children.remove(resetButton);
-        children.add(resetButton = new ParentedButton(getX() + width - 60, getY(), 60, 20, new TranslatableComponent("controls.reset"), this, button -> {
+        children.add(resetButton = new ParentedButton(getX() + width - 60, getY(), 60, 20, new TextComponentTranslation("controls.reset"), this, button -> {
             config.resetTemp();
             updateTextFieldText(formatText(config.tempValue));
         }));
     }
 
     @Override
-    public void render(PoseStack poseStack, int mouseX, int mouseY, float delta) {
+    public void draw(Minecraft mc, int mouseX, int mouseY, float delta) {
         if (!this.isVisible()) return;
 
         // reset enabled
@@ -61,14 +68,14 @@ public class InputElement extends AbstractConfigElement {
         int color = 0xFFFFFF;
 
         // invalid config
-        String text = textField.getField().getValue();
+        String text = textField.getField().getText();
         if (!inputType.validator.test(text)) {
             color = 0xFF5555;
         }
         // config was changed
         else if (!text.equals(formatText(initValue))) {
-            TextColor textColor = FiguraMod.getAccentColor().getColor();
-            color = textColor == null ? ColorUtils.Colors.AWESOME_BLUE.hex : textColor.getValue();
+            Integer textColor = ((StyleExtension)(FiguraMod.getAccentColor())).getRGBColor();
+            color = textColor == null ? ColorUtils.Colors.AWESOME_BLUE.hex : textColor;
         }
 
         // set text colour
@@ -76,7 +83,7 @@ public class InputElement extends AbstractConfigElement {
         textField.setBorderColour(0xFF000000 + color);
 
         // super render
-        super.render(poseStack, mouseX, mouseY, delta);
+        super.draw(mc, mouseX, mouseY, delta);
 
         // hex colour preview
         if (inputType == InputType.HEX_COLOR) {
@@ -85,12 +92,12 @@ public class InputElement extends AbstractConfigElement {
 
             // border
             if (getTextField().isFocused())
-                UIHelper.fillRounded(poseStack, x, y, 20, 20, getTextField().getBorderColour());
+                UIHelper.fillRounded(x, y, 20, 20, getTextField().getBorderColour());
             else
-                UIHelper.renderSliced(poseStack, x, y, 20, 20, UIHelper.OUTLINE);
+                UIHelper.renderSliced(x, y, 20, 20, UIHelper.OUTLINE);
 
             // inside
-            UIHelper.fillRounded(poseStack, x + 1, y + 1, 18, 18, (int) config.tempValue + (0xFF << 24));
+            UIHelper.fillRounded(x + 1, y + 1, 18, 18, (int) config.tempValue + (0xFF << 24));
         }
     }
 
@@ -108,12 +115,12 @@ public class InputElement extends AbstractConfigElement {
 
     @Override
     public boolean isDefault() {
-        return textField.getField().getValue().equals(formatText(config.defaultValue));
+        return textField.getField().getText().equals(formatText(config.defaultValue));
     }
 
     @Override
     public boolean isChanged() {
-        return !textField.getField().getValue().equals(formatText(initValue));
+        return !textField.getField().getText().equals(formatText(initValue));
     }
 
     public TextField getTextField() {
@@ -121,7 +128,7 @@ public class InputElement extends AbstractConfigElement {
     }
 
     public void updateTextFieldText(String text) {
-        textField.getField().setValue(text);
+        textField.getField().setText(text);
     }
 
     private String formatText(Object configValue) {
@@ -132,14 +139,14 @@ public class InputElement extends AbstractConfigElement {
 
         private final InputElement parent;
 
-        public InputField(int x, int y, int width, int height, HintType hint, InputElement parent, Consumer<String> changedListener) {
+        public InputField(int x, int y, int width, int height, HintType hint, InputElement parent, GuiPageButtonList.GuiResponder changedListener) {
             super(x, y, width, height, hint, changedListener);
             this.parent = parent;
         }
 
         @Override
-        public boolean isMouseOver(double mouseX, double mouseY) {
-            return this.parent.isHovered() && super.isMouseOver(mouseX, mouseY);
+        public boolean mouseOver(double mouseX, double mouseY) {
+            return this.parent.isHovered() && super.mouseOver(mouseX, mouseY);
         }
     }
 }

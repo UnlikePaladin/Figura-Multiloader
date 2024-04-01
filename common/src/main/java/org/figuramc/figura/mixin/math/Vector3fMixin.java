@@ -43,4 +43,9 @@ public abstract class Vector3fMixin implements Vector3fExtension {
     public Quaternion figura$rotationDegrees(float f) {
         return MathUtils.Quaternion(((Vector3f)(Object)this), f, true);
     }
+
+    @Override
+    public Quaternion figura$rotation(float f) {
+        return MathUtils.Quaternion(((Vector3f)(Object)this), f, false);
+    }
 }

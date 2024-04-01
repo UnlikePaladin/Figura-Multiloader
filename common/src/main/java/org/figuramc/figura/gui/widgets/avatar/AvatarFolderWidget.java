@@ -1,7 +1,6 @@
 package org.figuramc.figura.gui.widgets.avatar;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import org.figuramc.figura.gui.widgets.ContainerButton;
+import net.minecraft.client.Minecraft;
 import org.figuramc.figura.avatar.local.LocalAvatarFetcher;
 import org.figuramc.figura.gui.widgets.ContainerButton;
 import org.figuramc.figura.gui.widgets.lists.AvatarList;
@@ -25,7 +24,7 @@ public class AvatarFolderWidget extends AbstractAvatarWidget {
             parent.updateScroll();
         }) {
             @Override
-            protected void renderText(PoseStack poseStack, float delta) {
+            protected void renderText(Minecraft mc, float delta) {
                 //ugly hack
                 int x = getX();
                 int width = getWidth();
@@ -35,7 +34,7 @@ public class AvatarFolderWidget extends AbstractAvatarWidget {
                 setX(x + space);
                 setWidth(width - space);
 
-                super.renderText(poseStack, delta);
+                super.renderText(mc, delta);
 
                 setX(x);
                 setWidth(width);
@@ -67,7 +66,7 @@ public class AvatarFolderWidget extends AbstractAvatarWidget {
     }
 
     @Override
-    public void render(PoseStack poseStack, int mouseX, int mouseY, float delta) {
+    public void draw(Minecraft minecraft, int mouseX, int mouseY, float delta) {
         if (!isVisible() || !this.button.isVisible())
             return;
 
@@ -78,12 +77,11 @@ public class AvatarFolderWidget extends AbstractAvatarWidget {
             for (AbstractAvatarWidget value : entries.values())
                 value.button.setVisible(value.getY() < y1 && value.getY() + value.getHeight() > y0);
 
-            super.render(poseStack, mouseX, mouseY, delta);
-
+            super.draw(minecraft, mouseX, mouseY, delta);
             for (AbstractAvatarWidget value : entries.values())
                 value.button.setVisible(true);
         } else {
-            super.render(poseStack, mouseX, mouseY, delta);
+            super.draw(minecraft, mouseX, mouseY, delta);
         }
     }
 

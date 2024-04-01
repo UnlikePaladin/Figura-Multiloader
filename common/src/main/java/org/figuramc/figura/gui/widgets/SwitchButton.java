@@ -1,19 +1,19 @@
 package org.figuramc.figura.gui.widgets;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.ChatFormatting;
-import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.Mth;
+import net.minecraft.client.Minecraft;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.Style;
 import org.figuramc.figura.utils.FiguraIdentifier;
 import org.figuramc.figura.utils.FiguraText;
+import org.figuramc.figura.utils.MathUtils;
 import org.figuramc.figura.utils.ui.UIHelper;
 
 public class SwitchButton extends Button {
 
     public static final ResourceLocation SWITCH_TEXTURE = new FiguraIdentifier("textures/gui/switch.png");
-    public static final Component ON = new FiguraText("gui.on");
-    public static final Component OFF = new FiguraText("gui.off");
+    public static final ITextComponent ON = new FiguraText("gui.on");
+    public static final ITextComponent OFF = new FiguraText("gui.off");
 
     protected boolean toggled = false;
     private boolean defaultTexture = false;
@@ -21,17 +21,17 @@ public class SwitchButton extends Button {
     private float headPos = 0f;
 
     // text constructor
-    public SwitchButton(int x, int y, int width, int height, Component text, Component tooltip, OnPress pressAction) {
+    public SwitchButton(int x, int y, int width, int height, ITextComponent text, ITextComponent tooltip, ButtonAction pressAction) {
         super(x, y, width, height, text, tooltip, pressAction);
     }
 
     // texture constructor
-    public SwitchButton(int x, int y, int width, int height, int u, int v, int interactionOffset, ResourceLocation texture, int textureWidth, int textureHeight, Component tooltip, OnPress pressAction) {
+    public SwitchButton(int x, int y, int width, int height, int u, int v, int interactionOffset, ResourceLocation texture, int textureWidth, int textureHeight, ITextComponent tooltip, ButtonAction pressAction) {
         super(x, y, width, height, u, v, interactionOffset, texture, textureWidth, textureHeight, tooltip, pressAction);
     }
 
     // default texture constructor
-    public SwitchButton(int x, int y, int width, int height, Component text, boolean toggled) {
+    public SwitchButton(int x, int y, int width, int height, ITextComponent text, boolean toggled) {
         super(x, y, width, height, text, null, button -> {});
         this.toggled = toggled;
         this.headPos = toggled ? 20f : 0f;
@@ -39,15 +39,15 @@ public class SwitchButton extends Button {
     }
 
     @Override
-    public void onPress() {
+    public void widgetPressed(int mouseX, int mouseY) {
         this.toggled = !this.toggled;
-        super.onPress();
+        super.widgetPressed(mouseX, mouseY);
     }
 
     @Override
-    protected void renderText(PoseStack stack, float delta) {
+    protected void renderText(Minecraft mc, float delta) {
         // draw text
-        Component text = this.toggled && underline ? getMessage().copy().withStyle(ChatFormatting.UNDERLINE) : getMessage();
+        ITextComponent text = this.toggled && underline ? getMessage().createCopy().setStyle(new Style().setUnderlined(true)) : getMessage();
         int x = this.x + 1;
         int width = getWidth() - 2;
 
@@ -56,13 +56,13 @@ public class SwitchButton extends Button {
             width -= 31;
         }
 
-        UIHelper.renderCenteredScrollingText(stack, text, x, this.y, width, getHeight(), getTextColor());
+        UIHelper.renderCenteredScrollingText(text, x, this.y, width, getHeight(), getTextColor());
     }
 
     @Override
-    protected void renderDefaultTexture(PoseStack stack, float delta) {
+    protected void renderDefaultTexture(Minecraft mc, float delta) {
         if (!defaultTexture) {
-            super.renderDefaultTexture(stack, delta);
+            super.renderDefaultTexture(mc, delta);
             return;
         }
 
@@ -72,11 +72,11 @@ public class SwitchButton extends Button {
         int y = getY();
 
         // render switch
-        blit(stack, x + 5, y + 5, 20, 10, 10f, (this.toggled ? 20f : 0f) + ((this.isFocused() || this.isHovered()) ? 10f : 0f), 20, 10, 30, 40);
+        UIHelper.blit(x + 5, y + 5, 20, 10, 10f, (this.toggled ? 20f : 0f) + ((this.isHovered()) ? 10f : 0f), 20, 10, 30, 40);
 
         // render head
-        headPos = (float) Mth.lerp(1f - Math.pow(0.2f, delta), headPos, this.toggled ? 20f : 0f);
-        blit(stack, Math.round(x + headPos), y, 10, 20, 0f, (this.isFocused() || this.isHovered()) ? 20f : 0f, 10, 20, 30, 40);
+        headPos = (float) MathUtils.lerp(1f - Math.pow(0.2f, delta), headPos, this.toggled ? 20f : 0f);
+        UIHelper.blit(Math.round(x + headPos), y, 10, 20, 0f, (this.isHovered()) ? 20f : 0f, 10, 20, 30, 40);
     }
 
     @Override

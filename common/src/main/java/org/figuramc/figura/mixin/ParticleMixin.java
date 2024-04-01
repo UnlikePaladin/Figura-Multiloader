@@ -7,16 +7,16 @@ import org.spongepowered.asm.mixin.Shadow;
 
 @Mixin(Particle.class)
 public class ParticleMixin implements ParticleExtension {
-    @Shadow protected double xd;
+    @Shadow protected double motionX;
 
-    @Shadow protected double yd;
+    @Shadow protected double motionY;
 
-    @Shadow protected double zd;
+    @Shadow protected double motionZ;
 
     @Override
     public void figura$setParticleSpeed(double velocityX, double velocityY, double velocityZ) {
-        this.xd = velocityX;
-        this.yd = velocityY;
-        this.zd = velocityZ;
+        this.motionX = velocityX;
+        this.motionY = velocityY;
+        this.motionZ = velocityZ;
     }
 }

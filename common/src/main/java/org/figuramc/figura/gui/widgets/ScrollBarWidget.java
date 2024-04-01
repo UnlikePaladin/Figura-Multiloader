@@ -1,16 +1,15 @@
 package org.figuramc.figura.gui.widgets;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.components.AbstractWidget;
-import net.minecraft.network.chat.TextComponent;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.Mth;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.text.TextComponentString;
 import org.figuramc.figura.utils.FiguraIdentifier;
 import org.figuramc.figura.utils.MathUtils;
 import org.figuramc.figura.utils.ui.UIHelper;
+import org.lwjgl.input.Keyboard;
 
-public class ScrollBarWidget extends AbstractWidget implements FiguraWidget {
+public class ScrollBarWidget extends AbstractFiguraWidget implements FiguraWidget {
 
     // -- fields -- //
 
@@ -31,21 +30,22 @@ public class ScrollBarWidget extends AbstractWidget implements FiguraWidget {
     // -- constructors -- //
 
     public ScrollBarWidget(int x, int y, int width, int height, double initialValue) {
-        super(x, y, width, height, TextComponent.EMPTY.copy());
+        super(x, y, width, height, new TextComponentString(""));
         scrollPrecise = initialValue;
         scrollPos = initialValue;
     }
 
     // -- methods -- //
 
+
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (!this.isActive() || !(this.isFocused() || this.isHovered()) || !this.isMouseOver(mouseX, mouseY))
+    public boolean mouseButtonClicked(int mouseX, int mouseY, int button) {
+        if (!this.isActive() || !(this.isHovered()) || !this.mouseOver(mouseX, mouseY))
             return false;
 
         if (button == 0) {
             // jump to pos when not clicking on head
-            double scrollPos = Mth.lerp(scrollPrecise, 0d, (vertical ? getHeight() - headHeight : getWidth() - headWidth) + 2d);
+            double scrollPos = MathUtils.lerp(scrollPrecise, 0d, (vertical ? getHeight() - headHeight : getWidth() - headWidth) + 2d);
 
             if (vertical && mouseY < y + scrollPos || mouseY > y + scrollPos + headHeight)
                 scroll(-(y + scrollPos + headHeight / 2d - mouseY));
@@ -53,15 +53,15 @@ public class ScrollBarWidget extends AbstractWidget implements FiguraWidget {
                 scroll(-(x + scrollPos + headWidth / 2d - mouseX));
 
             isScrolling = true;
-            playDownSound(Minecraft.getInstance().getSoundManager());
+            playPressedSound(Minecraft.getMinecraft().getSoundHandler());
             return true;
         }
 
-        return super.mouseClicked(mouseX, mouseY, button);
+        return false;
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    public boolean mouseButtonReleased(int mouseX, int mouseY, int button) {
         if (button == 0 && isScrolling) {
             isScrolling = false;
             return true;
@@ -71,57 +71,63 @@ public class ScrollBarWidget extends AbstractWidget implements FiguraWidget {
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+    public void mouseDragged(Minecraft minecraft, int mouseX, int mouseY, int button, double deltaX, double deltaY) {
         if (isScrolling) {
             // vertical drag
             if (vertical) {
                 if (Math.signum(deltaY) == -1) {
                     if (mouseY <= this.getY() + this.getHeight()) {
                         scroll(deltaY);
-                        return true;
+                        return;
                     }
 
                 } else if (mouseY >= this.y) {
                     scroll(deltaY);
-                    return true;
+                    return;
                 }
             }
             // horizontal drag
             else if (Math.signum(deltaX) == -1) {
                 if (mouseX <= this.getX() + this.getWidth()) {
                     scroll(deltaX);
-                    return true;
+                    return;
                 }
             } else if (mouseX >= this.x) {
                 scroll(deltaX);
-                return true;
+                return;
             }
         }
 
-        return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+        super.mouseDragged(minecraft, mouseX, mouseY, button, deltaX, deltaY);
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
+    public boolean mouseScroll(double mouseX, double mouseY, double amount) {
         if (!this.isActive()) return false;
         scroll(-amount * (vertical ? getHeight() : getWidth()) * 0.05d * scrollRatio);
         return true;
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    public boolean pressedKey(char keyCode, int scanCode) {
         if (!this.isActive()) return false;
-
-        if (keyCode > 261 && keyCode < 266) {
-            scroll((keyCode % 2 == 0 ? 1 : -1) * (vertical ? getHeight() : getWidth()) * 0.05d * scrollRatio);
-            return true;
+        switch (scanCode) {
+            case Keyboard.KEY_DOWN:
+            case Keyboard.KEY_RIGHT: {
+                scroll(1 * (vertical ? getHeight() : getWidth()) * 0.05d * scrollRatio);
+                return true;
+            }
+            case Keyboard.KEY_LEFT:
+            case Keyboard.KEY_UP: {
+                scroll(-1 * (vertical ? getHeight() : getWidth()) * 0.05d * scrollRatio);
+                return true;
+            }
         }
-
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        return super.pressedKey(keyCode, scanCode);
     }
 
     @Override
-    public boolean isMouseOver(double mouseX, double mouseY) {
+    public boolean mouseOver(double mouseX, double mouseY) {
         return UIHelper.isMouseOver(getX(), getY(), getWidth(), getHeight(), mouseX, mouseY);
     }
 
@@ -134,21 +140,21 @@ public class ScrollBarWidget extends AbstractWidget implements FiguraWidget {
     // animate scroll head
     protected void lerpPos(float delta) {
         float lerpDelta = MathUtils.magicDelta(0.2f, delta);
-        scrollPos = Mth.lerp(lerpDelta, scrollPos, getScrollProgress());
+        scrollPos = MathUtils.lerp(lerpDelta, scrollPos, getScrollProgress());
     }
 
     @Override
-    public void render(PoseStack poseStack, int mouseX, int mouseY, float delta) {
+    public void draw(Minecraft minecraft, int mouseX, int mouseY, float delta) {
         if (!isVisible())
             return;
 
-        isHovered = this.isMouseOver(mouseX, mouseY);
-        renderButton(poseStack, mouseX, mouseY, delta);
+        isHovered = this.mouseOver(mouseX, mouseY);
+        drawWidget(minecraft, mouseX, mouseY, delta);
     }
 
     // render the scroll
     @Override
-    public void renderButton(PoseStack stack, int mouseX, int mouseY, float delta) {
+    public void drawWidget(Minecraft mc, int mouseX, int mouseY, float delta) {
         UIHelper.setupTexture(SCROLLBAR_TEXTURE);
         int x = getX();
         int y = getY();
@@ -156,13 +162,13 @@ public class ScrollBarWidget extends AbstractWidget implements FiguraWidget {
         int height = getHeight();
 
         // render bar
-        blit(stack, x, y, width, 1, 10f, isScrolling ? 20f : 0f, 10, 1, 20, 40);
-        blit(stack, x, y + 1, width, height - 2, 10f, isScrolling ? 21f : 1f, 10, 18, 20, 40);
-        blit(stack, x, y + height - 1, width, 1, 10f, isScrolling ? 39f : 19f, 10, 1, 20, 40);
+        UIHelper.blit(x, y, width, 1, 10f, isScrolling ? 20f : 0f, 10, 1, 20, 40);
+        UIHelper.blit(x, y + 1, width, height - 2, 10f, isScrolling ? 21f : 1f, 10, 18, 20, 40);
+        UIHelper.blit(x, y + height - 1, width, 1, 10f, isScrolling ? 39f : 19f, 10, 1, 20, 40);
 
         // render head
         lerpPos(delta);
-        blit(stack, x, (int) (y + Math.round(Mth.lerp(scrollPos, 0, height - headHeight))), 0f, (this.isFocused() || this.isHovered()) || isScrolling ? headHeight : 0f, headWidth, headHeight, 20, 40);
+        UIHelper.blit(x, (int) (y + Math.round(MathUtils.lerp(scrollPos, 0, height - headHeight))), 0f, this.isHovered || isScrolling ? headHeight : 0f, headWidth, headHeight, 20, 40);
     }
 
     // -- getters and setters -- //
@@ -199,17 +205,17 @@ public class ScrollBarWidget extends AbstractWidget implements FiguraWidget {
 
     @Override
     public int getWidth() {
-        return super.getWidth();
+        return width;
     }
 
     @Override
     public void setWidth(int width) {
-        super.setWidth(width);
+        this.width = width;
     }
 
     @Override
     public int getHeight() {
-        return super.getHeight();
+        return this.height;
     }
 
     // set scrollbar height
@@ -244,7 +250,7 @@ public class ScrollBarWidget extends AbstractWidget implements FiguraWidget {
     // manually set scroll with optional clamping
     public void setScrollProgress(double amount, boolean force) {
         amount = Double.isNaN(amount) ? 0 : amount;
-        scrollPrecise = force ? amount : Mth.clamp(amount, 0d, 1d);
+        scrollPrecise = force ? amount : MathHelper.clamp(amount, 0d, 1d);
 
         if (onPress != null)
             onPress.onPress(this);

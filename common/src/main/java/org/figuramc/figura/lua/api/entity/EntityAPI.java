@@ -1,5 +1,6 @@
 package org.figuramc.figura.lua.api.entity;
 
+import com.google.common.base.Predicate;
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.Entity;
@@ -474,8 +475,9 @@ public class EntityAPI<T extends Entity> {
 
         Entity entityHit = null;
         Vec3d hitPosition = null;
+        Predicate<Entity> entityPredicate = e -> e != entity;
 
-        for (Entity currentEntity : entity.getEntityWorld().getEntitiesWithinAABBExcludingEntity(entity, aABB)) {
+        for (Entity currentEntity : entity.getEntityWorld().getEntitiesInAABBexcluding(entity, aABB, entityPredicate)) {
             AxisAlignedBB entityAABB = currentEntity.getEntityBoundingBox().grow(currentEntity.getCollisionBorderSize());
             RayTraceResult rayTraceResult = entityAABB.calculateIntercept(eyePosition, endPos);
             if (entityAABB.contains(eyePosition)) {

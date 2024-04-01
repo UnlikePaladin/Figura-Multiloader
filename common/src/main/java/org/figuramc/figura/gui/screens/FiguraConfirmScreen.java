@@ -1,12 +1,6 @@
 package org.figuramc.figura.gui.screens;
 
-import it.unimi.dsi.fastutil.booleans.BooleanConsumer;
 import net.minecraft.client.gui.GuiScreen;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.network.chat.CommonComponents;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TextComponent;
-import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.TextComponentTranslation;
@@ -16,6 +10,7 @@ import org.figuramc.figura.gui.widgets.Button;
 import org.figuramc.figura.gui.widgets.Label;
 import org.figuramc.figura.utils.FiguraText;
 import org.figuramc.figura.utils.TextUtils;
+import org.lwjgl.input.Keyboard;
 
 import java.util.function.Function;
 
@@ -55,28 +50,22 @@ public class FiguraConfirmScreen extends AbstractPanelScreen {
     }
 
     protected void addButtons(int x, int y) {
-        this.addRenderableWidget(new Button(x - 130, y, 128, 20, CommonComponents.GUI_YES, null, button -> run(true)));
-        this.addRenderableWidget(new Button(x + 2, y, 128, 20, CommonComponents.GUI_NO, null, button -> run(false)));
+        this.addRenderableWidget(new Button(x - 130, y, 128, 20, new TextComponentTranslation("gui.yes"), null, button -> run(true)));
+        this.addRenderableWidget(new Button(x + 2, y, 128, 20, new TextComponentTranslation("gui.no"), null, button -> run(false)));
     }
 
     @Override
-    public boolean shouldCloseOnEsc() {
-        return false;
-    }
-
-    @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (keyCode == 256) {
+    public void keyTyped(char c, int scanCode) {
+        if (scanCode == Keyboard.KEY_ESCAPE) {
             run(false);
-            return true;
         } else {
-            return super.keyPressed(keyCode, scanCode, modifiers);
+            super.keyTyped(c, scanCode);
         }
     }
 
     protected void run(boolean bool) {
-        this.callback.accept(bool);
-        onClose();
+        this.callback.apply(bool);
+        onGuiClosed();
     }
 
     public static class FiguraConfirmLinkScreen extends FiguraConfirmScreen {
@@ -90,13 +79,13 @@ public class FiguraConfirmScreen extends AbstractPanelScreen {
 
         @Override
         protected void addButtons(int x, int y) {
-            this.addRenderableWidget(new Button(x - 148, y, 96, 20, new TranslatableComponent("chat.link.open"), null, button -> run(true)));
-            this.addRenderableWidget(new Button(x - 48, y, 96, 20, new TranslatableComponent("chat.copy"), null, button -> {
-                this.minecraft.keyboardHandler.setClipboard(this.url);
+            this.addRenderableWidget(new Button(x - 148, y, 96, 20, new TextComponentTranslation("chat.link.open"), null, button -> run(true)));
+            this.addRenderableWidget(new Button(x - 48, y, 96, 20, new TextComponentTranslation("chat.copy"), null, button -> {
+                GuiScreen.setClipboardString(this.url);
                 FiguraToast.sendToast(new FiguraText("toast.clipboard"));
                 run(false);
             }));
-            this.addRenderableWidget(new Button(x + 52, y, 96, 20, CommonComponents.GUI_CANCEL, null, button -> run(false)));
+            this.addRenderableWidget(new Button(x + 52, y, 96, 20, new TextComponentTranslation("gui.cancel"), null, button -> run(false)));
         }
     }
 }

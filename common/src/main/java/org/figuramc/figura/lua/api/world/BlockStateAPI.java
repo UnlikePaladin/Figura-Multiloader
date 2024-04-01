@@ -1,43 +1,22 @@
 package org.figuramc.figura.lua.api.world;
 
-import net.minecraft.block.Block;
+import net.minecraft.block.*;
+import net.minecraft.block.material.Material;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.BlockRendererDispatcher;
-import net.minecraft.client.renderer.EnumFaceDirection;
-import net.minecraft.client.renderer.block.BlockRenderDispatcher;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.block.model.IBakedModel;
-import net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.client.resources.model.BakedModel;
-import net.minecraft.commands.arguments.blocks.BlockStateParser;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Registry;
 import net.minecraft.item.Item;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTUtil;
-import net.minecraft.nbt.NbtUtils;
-import net.minecraft.nbt.Tag;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumBlockRenderType;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.EntityBlock;
-import net.minecraft.world.level.block.RenderShape;
-import net.minecraft.world.level.block.SoundType;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.material.Fluid;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.shapes.VoxelShape;
 import org.figuramc.figura.ducks.BakedQuadAccessor;
 import org.figuramc.figura.lua.LuaWhitelist;
 import org.figuramc.figura.lua.NbtToLua;
@@ -47,10 +26,9 @@ import org.figuramc.figura.lua.docs.LuaMethodDoc;
 import org.figuramc.figura.lua.docs.LuaMethodOverload;
 import org.figuramc.figura.lua.docs.LuaTypeDoc;
 import org.figuramc.figura.math.vector.FiguraVec3;
-import org.figuramc.figura.mixin.BlockBehaviourAccessor;
 import org.figuramc.figura.utils.ColorUtils;
+import org.figuramc.figura.utils.FiguraFlattenerUtils;
 import org.figuramc.figura.utils.LuaUtils;
-import org.figuramc.figura.utils.RegistryUtils;
 import org.luaj.vm2.LuaTable;
 
 import java.util.*;
@@ -75,8 +53,8 @@ public class BlockStateAPI {
     public BlockStateAPI(IBlockState blockstate, BlockPos pos) {
         this.blockState = blockstate;
         this.pos = pos;
-        this.id = RegistryUtils.getResourceLocationForRegistryObj(Block.class, blockstate.getBlock()).toString();
-
+        this.id = FiguraFlattenerUtils.theStateFlattinator2000(WorldAPI.getCurrentWorld(), pos, blockState).toString();
+//TODO : write something in the flattener for converting old -> modern properties
         NBTTagCompound tag = NBTUtil.writeBlockState(new NBTTagCompound(), blockstate);
         this.properties = new ReadOnlyLuaTable(tag.hasKey("Properties") ? NbtToLua.convert(tag.getTag("Properties")) : new LuaTable());
     }
@@ -86,6 +64,9 @@ public class BlockStateAPI {
     }
 
     protected static List<List<FiguraVec3>> voxelShapeToTable(AxisAlignedBB shape) {
+        if (shape == null)
+            return new ArrayList<>();
+
         List<List<FiguraVec3>> shapes = new ArrayList<>();
         shapes.add(Arrays.asList(FiguraVec3.of(shape.minX, shape.minY, shape.minZ), FiguraVec3.of(shape.maxX, shape.maxY, shape.maxZ)));
         return shapes;
@@ -138,116 +119,109 @@ public class BlockStateAPI {
     @LuaWhitelist
     @LuaMethodDoc("blockstate.is_translucent")
     public boolean isTranslucent() {
-        return blockState.propagatesSkylightDown(WorldAPI.getCurrentWorld(), getBlockPos());
+        return !(blockState.getBlock() instanceof BlockLiquid) && !blockState.isOpaqueCube();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("blockstate.get_opacity")
     public int getOpacity() {
-        return blockState.getPackedLightmapCoords(WorldAPI.getCurrentWorld(), getBlockPos());
+        return blockState.getLightOpacity();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("blockstate.get_map_color")
     public FiguraVec3 getMapColor() {
-        return ColorUtils.intToRGB(blockState.getMapColor(WorldAPI.getCurrentWorld(), getBlockPos()).col);
+        return ColorUtils.intToRGB(blockState.getMapColor(WorldAPI.getCurrentWorld(), getBlockPos()).colorValue);
     }
 
     @LuaWhitelist
     @LuaMethodDoc("blockstate.is_solid_block")
     public boolean isSolidBlock() {
-        return blockState.isRedstoneConductor(WorldAPI.getCurrentWorld(), getBlockPos());
+        return blockState.isNormalCube();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("blockstate.is_full_cube")
     public boolean isFullCube() {
-        return blockState.getBlock().isFullCube(WorldAPI.getCurrentWorld(), getBlockPos());
+        return blockState.isFullCube();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("blockstate.has_emissive_lighting")
     public boolean hasEmissiveLighting() {
-        return blockState.emissiveRendering(WorldAPI.getCurrentWorld(), getBlockPos());
+        return blockState.getBlock() instanceof BlockMagma || blockState.getPackedLightmapCoords(WorldAPI.getCurrentWorld(), getBlockPos()) >= 15728880;
     }
 
     @LuaWhitelist
     @LuaMethodDoc("blockstate.get_hardness")
     public float getHardness() {
-        return blockState.getDestroySpeed(WorldAPI.getCurrentWorld(), getBlockPos());
+        return blockState.getBlockHardness(WorldAPI.getCurrentWorld(), getBlockPos());
     }
 
     @LuaWhitelist
     @LuaMethodDoc("blockstate.get_comparator_output")
     public int getComparatorOutput() {
-        return blockState.getAnalogOutputSignal(WorldAPI.getCurrentWorld(), getBlockPos());
+        return blockState.getComparatorInputOverride(WorldAPI.getCurrentWorld(), getBlockPos());
     }
 
     @LuaWhitelist
     @LuaMethodDoc("blockstate.has_block_entity")
     public boolean hasBlockEntity() {
-        return blockState.getBlock() instanceof EntityBlock;
+        return blockState.getBlock().hasTileEntity();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("blockstate.is_opaque")
     public boolean isOpaque() {
-        return blockState.canOcclude();
+        return blockState.isOpaqueCube();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("blockstate.emits_redstone_power")
     public boolean emitsRedstonePower() {
-        return blockState.isSignalSource();
+        return blockState.canProvidePower();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("blockstate.get_luminance")
     public int getLuminance() {
-        return blockState.getLightEmission();
+        return blockState.getLightValue();
     }
 
     @LuaWhitelist
     @LuaMethodDoc("blockstate.get_friction")
     public float getFriction() {
-        return blockState.getBlock().getFriction();
+        return blockState.getBlock().slipperiness;
     }
 
     @LuaWhitelist
-    @LuaMethodDoc("blockstate.get_velocity_multiplier")
+    @LuaMethodDoc("blockstate.get_velocity_multiplier") // this is 0.4 for honey, and soulsand
     public float getVelocityMultiplier() {
-        return blockState.getBlock().getSpeedFactor();
+        return blockState.getBlock() instanceof BlockSoulSand ? 0.4f : 1.0f;
     }
 
     @LuaWhitelist
-    @LuaMethodDoc("blockstate.get_jump_velocity_multiplier")
+    @LuaMethodDoc("blockstate.get_jump_velocity_multiplier") // this is 0.5 for honey, honey is not real, it cannot hurt you
     public float getJumpVelocityMultiplier() {
-        return blockState.getBlock().getJumpFactor();
+        return 1.0f;
     }
 
     @LuaWhitelist
     @LuaMethodDoc("blockstate.get_blast_resistance")
     public float getBlastResistance() {
-        return blockState.getBlock().getExplosionResistance();
+        return blockState.getBlock().getExplosionResistance(Minecraft.getMinecraft().player);
     }
 
     @LuaWhitelist
     @LuaMethodDoc("blockstate.as_item")
     public ItemStackAPI asItem() {
-        return ItemStackAPI.verify(blockState.getBlock().asItem().getDefaultInstance());
+        return ItemStackAPI.verify(Item.getItemFromBlock(blockState.getBlock()).getDefaultInstance());
     }
 
     @LuaWhitelist
     @LuaMethodDoc("blockstate.get_tags")
-    public List<String> getTags() {
-        List<String> list = new ArrayList<>();
-        if (Minecraft.getInstance().getConnection() == null || Minecraft.getInstance().getConnection().getTags().getBlocks() == null)
-            return list;
-
-        for (ResourceLocation resourceLocation : Minecraft.getInstance().getConnection().getTags().getBlocks().getMatchingTags(blockState.getBlock()))
-            list.add(resourceLocation.toString());
-
-        return list;
+    public List<String> getTags() { // No tags
+        return Collections.emptyList();
     }
 
     @LuaWhitelist
@@ -265,22 +239,22 @@ public class BlockStateAPI {
     @LuaWhitelist
     @LuaMethodDoc("blockstate.get_outline_shape")
     public List<List<FiguraVec3>> getOutlineShape() {
-        return voxelShapeToTable(blockState.getShape(WorldAPI.getCurrentWorld(), getBlockPos()));
+        return voxelShapeToTable(blockState.getSelectedBoundingBox(WorldAPI.getCurrentWorld(), getBlockPos()));
     }
 
     @LuaWhitelist
     @LuaMethodDoc("blockstate.get_sounds")
     public Map<String, Object> getSounds() {
         Map<String, Object> sounds = new HashMap<>();
-        SoundType snd = blockState.getSoundType();
+        SoundType snd = blockState.getBlock().getSoundType();
 
         sounds.put("pitch", snd.getPitch());
         sounds.put("volume", snd.getVolume());
-        sounds.put("break", snd.getBreakSound().getLocation().toString());
-        sounds.put("fall", snd.getFallSound().getLocation().toString());
-        sounds.put("hit", snd.getHitSound().getLocation().toString());
-        sounds.put("place", snd.getPlaceSound().getLocation().toString());
-        sounds.put("step", snd.getStepSound().getLocation().toString());
+        sounds.put("break", snd.getBreakSound().getSoundName().toString());
+        sounds.put("fall", snd.getFallSound().getSoundName().toString());
+        sounds.put("hit", snd.getHitSound().getSoundName().toString());
+        sounds.put("place", snd.getPlaceSound().getSoundName().toString());
+        sounds.put("step", snd.getStepSound().getSoundName().toString());
 
         return sounds;
     }
@@ -288,13 +262,7 @@ public class BlockStateAPI {
     @LuaWhitelist
     @LuaMethodDoc("blockstate.get_fluid_tags")
     public List<String> getFluidTags() {
-        List<String> list = new ArrayList<>();
-        if (Minecraft.getInstance().getConnection() == null || Minecraft.getInstance().getConnection().getTags().getFluids() == null)
-            return list;
-
-        for (ResourceLocation resourceLocation : Minecraft.getInstance().getConnection().getTags().getFluids().getMatchingTags(blockState.getFluidState().getType()))
-            list.add(resourceLocation.toString());
-        return list;
+        return Collections.emptyList();
     }
 
     @LuaWhitelist
@@ -323,7 +291,7 @@ public class BlockStateAPI {
             tag.removeTag("y");
             tag.removeTag("z");
         }
-        return BlockStateParser.serialize(blockState) + tag;
+        return FiguraFlattenerUtils.serializeBlockState(WorldAPI.getCurrentWorld(), pos, blockState) + tag;
     }
 
     @LuaWhitelist
@@ -355,7 +323,7 @@ public class BlockStateAPI {
     @LuaWhitelist
     @LuaMethodDoc("blockstate.is_air")
     public boolean isAir() {
-        return blockState.isAir();
+        return blockState.getMaterial() == Material.AIR;
     }
 
     private static Set<String> getTexturesForFace(IBlockState blockState, EnumFacing direction, Random randomSource, IBakedModel bakedModel, long seed) {

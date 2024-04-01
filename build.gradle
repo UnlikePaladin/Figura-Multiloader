@@ -83,7 +83,6 @@ subprojects {
 
 		minecraftRemapper.config {
 			// most mcp mappings (except older format) dont include field desc
-			ignoreFieldDesc(true)
 			ignoreConflicts(true)
 		}
 	}

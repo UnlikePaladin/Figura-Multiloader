@@ -1,26 +1,24 @@
 package org.figuramc.figura.gui.widgets;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.components.events.GuiEventListener;
-import net.minecraft.network.chat.ClickEvent;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.Style;
-import net.minecraft.network.chat.TextComponent;
-import net.minecraft.util.Mth;
+import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.Style;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.event.ClickEvent;
 import org.figuramc.figura.utils.MathUtils;
 import org.figuramc.figura.utils.TextUtils;
 import org.figuramc.figura.utils.ui.UIHelper;
 
 import java.util.List;
 
-public class Label implements FiguraWidget, GuiEventListener {
+public class Label implements FiguraWidget, FiguraGuiEventListener {
 
     // text
-    private final Font font;
-    private Component rawText;
-    private List<Component> formattedText;
+    private final FontRenderer font;
+    private ITextComponent rawText;
+    private List<ITextComponent> formattedText;
     public TextUtils.Alignment alignment;
     public Integer outlineColor;
     public Integer backgroundColor;
@@ -39,8 +37,8 @@ public class Label implements FiguraWidget, GuiEventListener {
     public boolean centerVertically;
 
     public Label(Object text, int x, int y, float scale, int maxWidth, boolean wrap, TextUtils.Alignment alignment, Integer outlineColor) {
-        this.font = Minecraft.getInstance().font;
-        this.rawText = text instanceof Component ? (Component) text : new TextComponent(String.valueOf(text));
+        this.font = Minecraft.getMinecraft().fontRenderer;
+        this.rawText = text instanceof ITextComponent ? (ITextComponent) text : new TextComponentString(String.valueOf(text));
         this.x = x;
         this.y = y;
         this.scale = scale;
@@ -68,56 +66,56 @@ public class Label implements FiguraWidget, GuiEventListener {
     }
 
     @Override
-    public void render(PoseStack poseStack, int mouseX, int mouseY, float delta) {
+    public void draw(Minecraft minecraft, int mouseX, int mouseY, float delta) {
         hovered = null;
 
         if (!isVisible())
             return;
 
-        renderBackground(poseStack);
-        renderText(poseStack, mouseX, mouseY, delta);
+        renderBackground(minecraft);
+        renderText(minecraft, mouseX, mouseY, delta);
     }
 
-    private void renderBackground(PoseStack poseStack) {
+    private void renderBackground(Minecraft mc) {
         if (backgroundColor == null)
             return;
 
         int x = getX();
         int y = getY();
 
-        UIHelper.fill(poseStack, x, y, x + width, y + height, backgroundColor);
+        UIHelper.fill(x, y, x + width, y + height, backgroundColor);
     }
 
-    private void renderText(PoseStack pose, int mouseX, int mouseY, float delta) {
-        pose.pushPose();
-        pose.translate(this.x, getY(), 0);
-        pose.scale(scale, scale, scale);
+    private void renderText(Minecraft mc, int mouseX, int mouseY, float delta) {
+        GlStateManager.pushMatrix();
+        GlStateManager.translate(this.x, getY(), 0);
+        GlStateManager.scale(scale, scale, scale);
 
         // alpha
         if (alpha != null) {
             float lerpDelta = MathUtils.magicDelta(0.6f, delta);
-            alphaPrecise = (int) Mth.lerp(lerpDelta, alphaPrecise, isMouseOver(mouseX, mouseY) ? 0xFF : alpha);
+            alphaPrecise = (int) MathUtils.lerp(lerpDelta, alphaPrecise, mouseOver(mouseX, mouseY) ? 0xFF : alpha);
         }
 
         // prepare pos
         int y = 0;
-        int height = font.lineHeight;
+        int height = font.FONT_HEIGHT;
 
-        for (Component text : formattedText) {
+        for (ITextComponent text : formattedText) {
             // dimensions
             int x = -alignment.apply(font, text);
-            int width = font.width(text);
+            int width = font.getStringWidth(text.getFormattedText());
 
             // hovered
             if (mouseX >= this.x + x * scale && mouseX < this.x + (x + width) * scale && mouseY >= this.y + y * scale && mouseY < this.y + (y + height) * scale) {
                 // get style at the mouse pos
                 int pos = (int) ((mouseX - this.x - x * scale) / scale);
-                hovered = font.getSplitter().componentStyleAtWidth(text, pos);
+                hovered = UIHelper.getClickedComponentAt(text, this.width, pos).getStyle();
 
                 // add underline for the text with the click event
                 ClickEvent event = hovered != null ? hovered.getClickEvent() : null;
                 if (event != null)
-                    text = TextUtils.replaceStyle(text, Style.EMPTY.withUnderlined(true), style -> event.equals(style.getClickEvent()));
+                    text = TextUtils.replaceStyle(text, new Style().setUnderlined(true), style -> event.equals(style.getClickEvent()));
                     // text = TextUtils.setStyleAtWidth(text, pos, font, Style.EMPTY.withUnderlined(true));
 
                 // set tooltip for hovered text, if any
@@ -126,29 +124,29 @@ public class Label implements FiguraWidget, GuiEventListener {
 
             // render text
             if (outlineColor != null) {
-                UIHelper.renderOutlineText(pose, font, text, x, y, 0xFFFFFF, outlineColor);
+                UIHelper.renderOutlineText(font, text, x, y, 0xFFFFFF, outlineColor);
             } else {
-                font.drawShadow(pose, text, x, y, 0xFFFFFF + (alphaPrecise << 24));
+                font.drawStringWithShadow(text.getFormattedText(), x, y, 0xFFFFFF + (alphaPrecise << 24));
             }
 
             y += height;
         }
 
-        pose.popPose();
+        GlStateManager.popMatrix();
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (hovered != null && Minecraft.getInstance().screen != null) {
-            Minecraft.getInstance().screen.handleComponentClicked(hovered);
+    public boolean mouseButtonClicked(int mouseX, int mouseY, int button) {
+        if (hovered != null && Minecraft.getMinecraft().currentScreen != null) {
+            Minecraft.getMinecraft().currentScreen.handleComponentClick(new TextComponentString("").setStyle(hovered));
             return true;
         }
 
-        return GuiEventListener.super.mouseClicked(mouseX, mouseY, button);
+        return false;
     }
 
     @Override
-    public boolean isMouseOver(double mouseX, double mouseY) {
+    public boolean mouseOver(double mouseX, double mouseY) {
         if (!isVisible())
             return false;
 
@@ -157,7 +155,7 @@ public class Label implements FiguraWidget, GuiEventListener {
 
         if (mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height)
             return true;
-        return GuiEventListener.super.isMouseOver(mouseX, mouseY);
+        return FiguraGuiEventListener.super.mouseOver(mouseX, mouseY);
     }
 
     @Override
@@ -185,7 +183,7 @@ public class Label implements FiguraWidget, GuiEventListener {
         updateText();
     }
 
-    public void setText(Component text) {
+    public void setText(ITextComponent text) {
         this.rawText = text;
         updateText();
     }
@@ -193,7 +191,7 @@ public class Label implements FiguraWidget, GuiEventListener {
     private void updateText() {
         this.formattedText = TextUtils.formatInBounds(rawText, font, (int) (maxWidth / scale), wrap);
         this.width = (int) (TextUtils.getWidth(formattedText, font) * scale);
-        this.height = (int) (font.lineHeight * formattedText.size() * scale);
+        this.height = (int) (font.FONT_HEIGHT * formattedText.size() * scale);
     }
 
     @Override

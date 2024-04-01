@@ -1,10 +1,9 @@
 package org.figuramc.figura.gui.widgets.config;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.network.chat.Component;
+import net.minecraft.client.Minecraft;
+import net.minecraft.util.text.ITextComponent;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.config.ConfigType;
-import org.figuramc.figura.config.Configs;
 import org.figuramc.figura.gui.widgets.ParentedButton;
 import org.figuramc.figura.gui.widgets.SwitchButton;
 import org.figuramc.figura.gui.widgets.lists.ConfigList;
@@ -22,24 +21,24 @@ public class BooleanElement extends AbstractConfigElement {
     }
 
     @Override
-    public void render(PoseStack poseStack, int mouseX, int mouseY, float delta) {
+    public void draw(Minecraft mc, int mouseX, int mouseY, float delta) {
         if (!this.isVisible()) return;
 
         // reset enabled
         this.resetButton.setActive(!this.isDefault());
 
         // button text
-        Component text = (boolean) config.tempValue ? SwitchButton.ON : SwitchButton.OFF;
+        ITextComponent text = (boolean) config.tempValue ? SwitchButton.ON : SwitchButton.OFF;
 
         // edited colour
         if (isChanged())
-            text = text.copy().setStyle(FiguraMod.getAccentColor());
+            text = text.createCopy().setStyle(FiguraMod.getAccentColor());
 
         // set text
         this.button.setMessage(text);
 
         // super render
-        super.render(poseStack, mouseX, mouseY, delta);
+        super.draw(mc, mouseX, mouseY, delta);
     }
 
     @Override

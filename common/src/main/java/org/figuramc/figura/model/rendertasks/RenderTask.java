@@ -1,9 +1,5 @@
 package org.figuramc.figura.model.rendertasks;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.texture.OverlayTexture;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.lua.LuaNotNil;
 import org.figuramc.figura.lua.LuaWhitelist;
@@ -16,6 +12,7 @@ import org.figuramc.figura.math.vector.FiguraVec2;
 import org.figuramc.figura.math.vector.FiguraVec3;
 import org.figuramc.figura.model.FiguraModelPart;
 import org.figuramc.figura.model.PartCustomization;
+import org.figuramc.figura.model.rendering.texture.RenderTypes;
 import org.figuramc.figura.utils.LuaUtils;
 
 @LuaWhitelist
@@ -38,14 +35,13 @@ public abstract class RenderTask {
         this.customization.visible = true;
     }
 
-    public void renderTask(PartCustomization.PartCustomizationStack stack, MultiBufferSource buffer, int light, int overlay) {
+    public void renderTask(PartCustomization.PartCustomizationStack stack, RenderTypes.FiguraBufferSource buffer, int light, int overlay) {
         customization.recalculate();
         stack.push(customization);
-        PoseStack poseStack = stack.peek().copyIntoGlobalPoseStack();
-        renderTask(poseStack, buffer, light, overlay);
+        renderTask(buffer, light, overlay);
         stack.pop();
     }
-    public abstract void renderTask(PoseStack stack, MultiBufferSource buffer, int light, int overlay);
+    public abstract void renderTask(RenderTypes.FiguraBufferSource buffer, int light, int overlay);
     public abstract int getComplexity();
     public boolean shouldRender() {
         return customization.visible;
@@ -97,7 +93,7 @@ public abstract class RenderTask {
     @LuaMethodDoc("render_task.get_light")
     public FiguraVec2 getLight() {
         Integer light = customization.light;
-        return light == null ? null : FiguraVec2.of(LightTexture.block(light), LightTexture.sky(light));
+        return light == null ? null : FiguraVec2.of(light >> 4 & 0xFFFF, light >> 20 & 0xFFFF);
     }
 
     @LuaWhitelist
@@ -121,7 +117,7 @@ public abstract class RenderTask {
         }
 
         FiguraVec2 lightVec = LuaUtils.parseVec2("setLight", blockLight, skyLight);
-        customization.light = LightTexture.pack((int) lightVec.x, (int) lightVec.y);
+        customization.light = ((int)lightVec.x) << 4 | ((int)lightVec.y) << 20;
         return this;
     }
 
@@ -158,7 +154,7 @@ public abstract class RenderTask {
         }
 
         FiguraVec2 overlayVec = LuaUtils.parseVec2("setOverlay", whiteOverlay, hurtOverlay);
-        customization.overlay = OverlayTexture.pack((int) overlayVec.x, (int) overlayVec.y);
+        customization.overlay = ((int)overlayVec.x) | ((int)overlayVec.y) << 16;
         return this;
     }
 

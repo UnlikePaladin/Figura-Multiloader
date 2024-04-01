@@ -1,11 +1,13 @@
 package org.figuramc.figura.lua.api;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Optional;
-import java.util.function.Predicate;
-
-import net.minecraft.world.entity.decoration.ArmorStand;
+import com.google.common.base.Predicate;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.item.EntityArmorStand;
+import net.minecraft.util.EnumFacing;
+import net.minecraft.util.math.AxisAlignedBB;
+import net.minecraft.util.math.RayTraceResult;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.ducks.ArmorStandAccessor;
 import org.figuramc.figura.lua.LuaWhitelist;
@@ -15,24 +17,15 @@ import org.figuramc.figura.lua.docs.LuaMethodDoc;
 import org.figuramc.figura.lua.docs.LuaMethodOverload;
 import org.figuramc.figura.lua.docs.LuaTypeDoc;
 import org.figuramc.figura.math.vector.FiguraVec3;
-import org.figuramc.figura.mixin.AABBInvoker;
 import org.figuramc.figura.utils.LuaUtils;
+import org.figuramc.figura.utils.Pair;
 import org.luaj.vm2.LuaError;
 import org.luaj.vm2.LuaFunction;
 import org.luaj.vm2.LuaTable;
 import org.luaj.vm2.LuaValue;
 
-import com.mojang.datafixers.util.Pair;
-
-import net.minecraft.core.Direction;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.projectile.ProjectileUtil;
-import net.minecraft.world.level.ClipContext;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.EntityHitResult;
-import net.minecraft.world.phys.Vec3;
+import java.util.ArrayList;
+import java.util.Optional;
 
 @LuaWhitelist
 @LuaTypeDoc(
@@ -85,25 +78,24 @@ public class RaycastAPI {
         blockCastType = (String)parseResult.getSecond()[0];
         fluidCastType = (String)parseResult.getSecond()[1];
 
-        ClipContext.Block blockContext;
+        boolean ignoreBlockWithoutBoundingBox;
         try{
-            blockContext = blockCastType != null ? ClipContext.Block.valueOf(blockCastType.toUpperCase()) : ClipContext.Block.COLLIDER;
+            ignoreBlockWithoutBoundingBox = blockCastType != null && blockCastType.contains("collider");
         }
         catch(IllegalArgumentException e){
             throw new LuaError("Invalid blockRaycastType provided");
         }
 
-        ClipContext.Fluid fluidContext;
+        boolean stopOnFluid;
         try{
-            fluidContext = fluidCastType != null ? ClipContext.Fluid.valueOf(fluidCastType.toUpperCase()) : ClipContext.Fluid.NONE;
+            stopOnFluid = fluidCastType != null && !fluidCastType.contains("none");
         }
         catch(IllegalArgumentException e){
             throw new LuaError("Invalid fluidRaycastType provided");
         }
 
-        ArmorStand marker = new ArmorStand(EntityType.ARMOR_STAND, WorldAPI.getCurrentWorld());
-        ((ArmorStandAccessor)marker).figura$setMarker(true);
-        BlockHitResult result = WorldAPI.getCurrentWorld().clip(new ClipContext(start.asVec3(), end.asVec3(), blockContext, fluidContext, marker));
+        // TODO : check if this works, need to see if returnlastuncollidable works
+        RayTraceResult result = WorldAPI.getCurrentWorld().rayTraceBlocks(start.asVec3(), end.asVec3(), ignoreBlockWithoutBoundingBox, stopOnFluid, false);
         return LuaUtils.parseBlockHitResult(result);
     }
 
@@ -150,12 +142,41 @@ public class RaycastAPI {
                 return false;
             return true;
         };
-        ArmorStand marker = new ArmorStand(EntityType.ARMOR_STAND, WorldAPI.getCurrentWorld());
+        World world = WorldAPI.getCurrentWorld();
+        EntityArmorStand marker = new EntityArmorStand(WorldAPI.getCurrentWorld());
         ((ArmorStandAccessor)marker).figura$setMarker(true);
-        EntityHitResult result = ProjectileUtil.getEntityHitResult(marker, start.asVec3(), end.asVec3(), new AABB(start.asVec3(), end.asVec3()), entityPredicate, Double.MAX_VALUE);
 
-        if (result != null)
-            return new Object[]{EntityAPI.wrap(result.getEntity()), FiguraVec3.fromVec3(result.getLocation())};
+        double distance = Double.MAX_VALUE;
+        Entity entityHit = null;
+        Vec3d posHit = null;
+        for (Entity currentEntity : world.getEntitiesInAABBexcluding(marker, new AxisAlignedBB(start.asVec3(), end.asVec3()), entityPredicate)) {
+            AxisAlignedBB aABB = currentEntity.getEntityBoundingBox().grow(currentEntity.getCollisionBorderSize());
+            RayTraceResult rayTraceResult = aABB.calculateIntercept(start.asVec3(), end.asVec3());
+            if (aABB.contains(start.asVec3())) {
+                if (distance >= 0.0) {
+                    entityHit = currentEntity;
+                    posHit = rayTraceResult == null ? start.asVec3() : rayTraceResult.hitVec;
+                    distance = 0.0;
+                }
+            } else if (rayTraceResult != null) {
+                double eyeDistanceToHit = start.asVec3().distanceTo(new Vec3d(rayTraceResult.getBlockPos()));
+                if (eyeDistanceToHit < distance || distance == 0.0) {
+                    if (currentEntity.getLowestRidingEntity() == marker.getLowestRidingEntity()) {
+                        if (distance == 0.0) {
+                            entityHit = currentEntity;
+                            posHit = rayTraceResult.hitVec;
+                        }
+                    } else {
+                        entityHit = currentEntity;
+                        posHit = rayTraceResult.hitVec;
+                        distance = eyeDistanceToHit;
+                    }
+                }
+            }
+        }
+
+        if (entityHit != null && posHit != null)
+            return new Object[]{EntityAPI.wrap(entityHit), FiguraVec3.fromVec3(posHit)};
 
         return null;
     }
@@ -184,7 +205,7 @@ public class RaycastAPI {
             value = "raycast.aabb"
     )
     public Object[] aabb(Object x, Object y, Object z, Object w, Object t, Object h, LuaTable aabbs) {
-        Vec3 start, end;
+        Vec3d start, end;
 
         Pair<Pair<FiguraVec3, FiguraVec3>, Object[]> pair = LuaUtils.parse2Vec3(
             "aabb", 
@@ -199,7 +220,7 @@ public class RaycastAPI {
         if (aabbs == null)
             throw new LuaError("Illegal argument to aabb(): Expected LuaTable, recieved nil");
         
-        ArrayList<AABB> aabbList = new ArrayList<AABB>();
+        ArrayList<AxisAlignedBB> aabbList = new ArrayList<AxisAlignedBB>();
         for (int i=1;i<=aabbs.length();i++){
             LuaValue arg = aabbs.get(i);
             if (!arg.istable())
@@ -213,7 +234,7 @@ public class RaycastAPI {
             if (!max.isuserdata(FiguraVec3.class))
                 throw new LuaError("Illegal argument to AABB at array index "+ i +" at index 2: Expected Vector3, recieved " + max.typename() + " ("+max.toString()+")");
 
-            aabbList.add(new AABB(
+            aabbList.add(new AxisAlignedBB(
                 ((FiguraVec3)min.checkuserdata(FiguraVec3.class)).asVec3(), 
                 ((FiguraVec3)max.checkuserdata(FiguraVec3.class)).asVec3()
             ));
@@ -224,11 +245,11 @@ public class RaycastAPI {
         {
             double d = Double.MAX_VALUE;
             int index = -1;
-            Pair<Vec3, Direction> result = null;
+            Pair<Vec3d, EnumFacing> result = null;
             
             for(int i = 0; i < aabbList.size(); i++) {
-                AABB box = aabbList.get(i);
-                Optional<Pair<Vec3, Direction>> optional = clipAABB(box, start, end);
+                AxisAlignedBB box = aabbList.get(i);
+                Optional<Pair<Vec3d, EnumFacing>> optional = clipAABB(box, start, end);
                 if (box.contains(start)) {
                     if (d >= 0.0) {
                         index = i+1;
@@ -236,8 +257,8 @@ public class RaycastAPI {
                         d = 0.0;
                     }
                 } else if (optional.isPresent()) {
-                    Vec3 position = optional.get().getFirst();
-                    double e = start.distanceToSqr(position);
+                    Vec3d position = optional.get().getFirst();
+                    double e = start.squareDistanceTo(position);
                     if (e < d || d == 0.0) {
                         index = i+1;
                         result = optional.get();
@@ -260,17 +281,17 @@ public class RaycastAPI {
     }
 
     // Modified from AABB.clip(Vec3 min, Vec3 max) to also return the side hit
-    public Optional<Pair<Vec3, Direction>> clipAABB(AABB aabb, Vec3 min, Vec3 max) {
+    public Optional<Pair<Vec3d, EnumFacing>> clipAABB(AxisAlignedBB aabb, Vec3d min, Vec3d max) {
         double[] ds = new double[]{1.0};
         double d = max.x - min.x;
         double e = max.y - min.y;
         double f = max.z - min.z;
-        Direction direction = AABBInvoker.getDirection(aabb, min, ds, (Direction)null, d, e, f);
-        if (direction == null) {
+        RayTraceResult result = aabb.calculateIntercept(min, max);
+        if (result == null || result.sideHit == null) {
            return Optional.empty();
         } else {
            double g = ds[0];
-           return Optional.of(Pair.of(min.add(g * d, g * e, g * f), direction));
+           return Optional.of(Pair.of(min.addVector(g * d, g * e, g * f), result.sideHit));
         }
      }
 }

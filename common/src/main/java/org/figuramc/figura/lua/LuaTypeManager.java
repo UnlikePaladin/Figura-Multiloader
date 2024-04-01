@@ -1,6 +1,6 @@
 package org.figuramc.figura.lua;
 
-import net.minecraft.network.chat.Component;
+import net.minecraft.util.text.ITextComponent;
 import org.figuramc.figura.lua.docs.FiguraDocsManager;
 import org.figuramc.figura.lua.docs.LuaTypeDoc;
 import org.luaj.vm2.*;
@@ -417,9 +417,9 @@ public class LuaTypeManager {
             return wrapCollection(collection);
         } else if (val.getClass().isArray())
             return wrapArray(val);
-        else if (val instanceof Component) {
-            Component c = (Component) val;
-            return LuaValue.valueOf(Component.Serializer.toJson(c));
+        else if (val instanceof ITextComponent) {
+            ITextComponent c = (ITextComponent) val;
+            return LuaValue.valueOf(ITextComponent.Serializer.componentToJson(c));
         } else
             return wrap(val);
     }

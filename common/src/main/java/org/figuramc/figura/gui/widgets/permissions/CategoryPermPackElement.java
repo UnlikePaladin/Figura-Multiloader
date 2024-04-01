@@ -1,10 +1,10 @@
 package org.figuramc.figura.gui.widgets.permissions;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
-import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.text.ITextComponent;
 import org.figuramc.figura.gui.widgets.lists.PlayerList;
 import org.figuramc.figura.permissions.PermissionPack;
 import org.figuramc.figura.utils.FiguraIdentifier;
@@ -21,15 +21,15 @@ public class CategoryPermPackElement extends AbstractPermPackElement {
     }
 
     @Override
-    public void renderButton(PoseStack pose, int mouseX, int mouseY, float delta) {
+    public void drawWidget(Minecraft minecraft, int mouseX, int mouseY, float delta) {
         int width = getWidth();
         int height = getHeight();
 
-        pose.pushPose();
-        pose.translate(x + width / 2f, y + height / 2f, 100);
-        pose.scale(scale, scale, 1f);
+        GlStateManager.pushMatrix();
+        GlStateManager.translate(x + width / 2f, y + height / 2f, 100);
+        GlStateManager.scale(scale, scale, 1f);
 
-        animate(delta, this.isMouseOver(mouseX, mouseY) || this.isFocused());
+        animate(delta, this.mouseOver(mouseX, mouseY));
 
         // fix x, y
         int x = -width / 2;
@@ -37,27 +37,27 @@ public class CategoryPermPackElement extends AbstractPermPackElement {
 
         // selected overlay
         if (this.parent.selectedEntry == this) {
-            UIHelper.fillRounded(pose, x - 1, y - 1, width + 2, height + 2, 0xFFFFFFFF);
+            UIHelper.fillRounded(x - 1, y - 1, width + 2, height + 2, 0xFFFFFFFF);
         }
 
         // background
-        UIHelper.renderHalfTexture(pose, x, y, width, height, 0f, enabled ? 20f : 0f, 174, 20, 174, 40, BACKGROUND);
+        UIHelper.renderHalfTexture(x, y, width, height, 0f, enabled ? 20f : 0f, 174, 20, 174, 40, BACKGROUND);
 
         // name
-        Component text = pack.getCategoryName().append(pack.hasChanges() ? "*" : "");
-        Font font = Minecraft.getInstance().font;
-        UIHelper.renderOutlineText(pose, font, text, x + width / 2 - font.width(text) / 2, y + height / 2 - font.lineHeight / 2, 0xFFFFFF, 0);
+        ITextComponent text = pack.getCategoryName().appendText(pack.hasChanges() ? "*" : "");
+        FontRenderer font = Minecraft.getMinecraft().fontRenderer;
+        UIHelper.renderOutlineText(font, text, x + width / 2 - font.getStringWidth(text.getFormattedText()) / 2, y + height / 2 - font.FONT_HEIGHT / 2, 0xFFFFFF, 0);
 
-        pose.popPose();
+        GlStateManager.popMatrix();
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        return this.isMouseOver(mouseX, mouseY) && super.mouseClicked(mouseX, mouseY, button);
+    public boolean mouseButtonClicked(int mouseX, int mouseY, int button) {
+        return this.mouseOver(mouseX, mouseY) && super.mouseButtonClicked(mouseX, mouseY, button);
     }
 
     @Override
-    public void onPress() {
+    public void widgetPressed(int mouseX, int mouseY) {
         if (parent.selectedEntry == this) {
             enabled = !enabled;
             pack.setVisible(enabled);
@@ -65,7 +65,7 @@ public class CategoryPermPackElement extends AbstractPermPackElement {
             parent.updateScroll();
         }
 
-        super.onPress();
+        super.widgetPressed(mouseX, mouseY);
     }
 
     @Override

@@ -1,14 +1,9 @@
 package org.figuramc.figura.model.rendering.texture;
 
-import com.mojang.blaze3d.pipeline.RenderCall;
-import com.mojang.blaze3d.platform.NativeImage;
-import com.mojang.blaze3d.platform.TextureUtil;
-import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.SimpleTexture;
 import net.minecraft.client.renderer.texture.TextureUtil;
 import net.minecraft.client.resources.IResourceManager;
-import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.util.ResourceLocation;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.Avatar;
@@ -30,7 +25,10 @@ import org.luaj.vm2.LuaFunction;
 import org.luaj.vm2.LuaValue;
 import org.lwjgl.BufferUtils;
 
+import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
@@ -56,7 +54,7 @@ public class FiguraTexture extends SimpleTexture {
     /**
      * Native image holding the texture data for this texture.
      */
-    private final BufferedImage texture;
+    private BufferedImage texture;
     private BufferedImage backup;
     private boolean isClosed = false;
 
@@ -69,10 +67,11 @@ public class FiguraTexture extends SimpleTexture {
             ByteBuffer wrapper = BufferUtils.createByteBuffer(data.length);
             wrapper.put(data);
             wrapper.rewind();
-            image = TextureUtil.readBufferedImage(wrapper);
+            // TODO: Check if this is correct and check the image formtat
+            image = TextureUtil.readBufferedImage(new ByteArrayInputStream(data));
         } catch (IOException e) {
             FiguraMod.LOGGER.error("", e);
-            image = new NativeImage(1, 1, true);
+            image = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
         }
 
         this.texture = image;
@@ -98,18 +97,18 @@ public class FiguraTexture extends SimpleTexture {
     public void loadTexture(IResourceManager resourceManager) throws IOException {}
 
     @Override
-    public void close() {
+    public void deleteGlTexture() {
         // Make sure it doesn't close twice (minecraft tries to close the texture when reloading textures
         if (isClosed) return;
 
         isClosed = true;
 
         // Close native images
-        texture.close();
+        texture.flush();
         if (backup != null)
-            backup.close();
+            backup.flush();
 
-        this.releaseId();
+        super.deleteGlTexture();
         ((TextureManagerAccessor) Minecraft.getMinecraft().getTextureManager()).getByPath().remove(this.textureLocation);
     }
 
@@ -122,22 +121,12 @@ public class FiguraTexture extends SimpleTexture {
         if (dirty && !isClosed) {
             dirty = false;
 
-            RenderCall runnable = () -> {
-                // Upload texture to GPU.
-                TextureUtil.prepareImage(this.getId(), texture.getWidth(), texture.getHeight());
-                texture.upload(0, 0, 0, false);
-            };
-
-            if (RenderSystem.isOnRenderThreadOrInit()) {
-                runnable.execute();
-            } else {
-                RenderSystem.recordRenderCall(runnable);
-            }
+            TextureUtil.uploadTextureImageAllocate(getGlTextureId(), texture, false, false);
         }
     }
 
     public void writeTexture(Path dest) throws IOException {
-        texture.writeToFile(dest);
+        ImageIO.write(texture, "png", dest.toFile());
     }
 
     private void backupImage() {
@@ -146,10 +135,8 @@ public class FiguraTexture extends SimpleTexture {
             backup = copy();
     }
 
-    public NativeImage copy() {
-        NativeImage image = new NativeImage(texture.format(), texture.getWidth(), texture.getHeight(), true);
-        image.copyFrom(texture);
-        return image;
+    public BufferedImage copy() {
+        return new BufferedImage(texture.getColorModel(), texture.copyData(null), texture.isAlphaPremultiplied(), null);
     }
 
     public int getWidth() {
@@ -199,7 +186,7 @@ public class FiguraTexture extends SimpleTexture {
             value = "texture.get_pixel")
     public FiguraVec4 getPixel(int x, int y) {
         try {
-            return ColorUtils.abgrToRGBA(texture.getPixelRGBA(x, y));
+            return ColorUtils.abgrToRGBA(texture.getRGB(x, y));
         } catch (Exception e) {
             throw new LuaError(e.getMessage());
         }
@@ -258,7 +245,12 @@ public class FiguraTexture extends SimpleTexture {
     public FiguraTexture fill(int x, int y, int width, int height, Object r, Double g, Double b, Double a) {
         try {
             backupImage();
-            texture.fillRect(x, y, width, height, ColorUtils.rgbaToIntABGR(parseColor("fill", r, g, b, a)));
+            int color = ColorUtils.rgbaToIntABGR(parseColor("fill", r, g, b, a));
+            for (int i = y; i < y + height; ++i) {
+                for (int j = x; j < x + width; ++j) {
+                    texture.setRGB(x, y, color);
+                }
+            }
             return this;
         } catch (Exception e) {
             throw new LuaError(e.getMessage());
@@ -276,7 +268,7 @@ public class FiguraTexture extends SimpleTexture {
     @LuaMethodDoc("texture.restore")
     public FiguraTexture restore() {
         if (modified) {
-            this.texture.copyFrom(backup);
+            this.texture = new BufferedImage(backup.getColorModel(), backup.copyData(null), backup.isAlphaPremultiplied(), null);
             this.modified = false;
         }
         return this;
@@ -286,7 +278,9 @@ public class FiguraTexture extends SimpleTexture {
     @LuaMethodDoc("texture.save")
     public String save() {
         try {
-            return Base64.getEncoder().encodeToString(texture.asByteArray());
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            ImageIO.write(texture, "png", baos);
+            return Base64.getEncoder().encodeToString(baos.toByteArray());
         } catch (Exception e) {
             throw new LuaError(e.getMessage());
         }

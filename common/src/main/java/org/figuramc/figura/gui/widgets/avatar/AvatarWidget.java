@@ -1,17 +1,17 @@
 package org.figuramc.figura.gui.widgets.avatar;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TextComponent;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextFormatting;
 import org.figuramc.figura.avatar.AvatarManager;
 import org.figuramc.figura.avatar.local.LocalAvatarFetcher;
 import org.figuramc.figura.font.Emojis;
 import org.figuramc.figura.gui.widgets.Button;
 import org.figuramc.figura.gui.widgets.lists.AvatarList;
+import org.figuramc.figura.mixin.font.FontRendererAccessor;
 import org.figuramc.figura.utils.FiguraIdentifier;
 import org.figuramc.figura.utils.FileTexture;
 import org.figuramc.figura.utils.TextUtils;
@@ -25,24 +25,24 @@ public class AvatarWidget extends AbstractAvatarWidget {
         super(depth, width, 24, avatar, parent);
 
         AvatarWidget instance = this;
-        Component description = Emojis.applyEmojis(new TextComponent(avatar.getDescription()));
+        ITextComponent description = Emojis.applyEmojis(new TextComponentString(avatar.getDescription()));
         this.button = new Button(getX(), getY(), width, 24, getName(), null, button -> {
             AvatarManager.loadLocalAvatar(avatar.getPath());
             AvatarList.selectedEntry = avatar.getTheActualPathForThis();
         }) {
             @Override
-            public void renderButton(PoseStack poseStack, int mouseX, int mouseY, float delta) {
-                super.renderButton(poseStack, mouseX, mouseY, delta);
+            public void drawWidget(Minecraft mc, int mouseX, int mouseY, float delta) {
+                super.drawWidget(mc, mouseX, mouseY, delta);
 
                 // selected border
                 if (instance.isOf(AvatarList.selectedEntry))
-                    UIHelper.fillOutline(poseStack, getX(), getY(), getWidth(), getHeight(), 0xFFFFFFFF);
+                    UIHelper.fillOutline(getX(), getY(), getWidth(), getHeight(), 0xFFFFFFFF);
             }
 
             @Override
-            protected void renderText(PoseStack pose, float delta) {
+            protected void renderText(Minecraft mc, float delta) {
                 // variables
-                Font font = Minecraft.getInstance().font;
+                FontRenderer font = mc.fontRenderer;
 
                 int space = SPACING * depth;
                 int width = this.getWidth() - 26 - space;
@@ -52,28 +52,28 @@ public class AvatarWidget extends AbstractAvatarWidget {
                 // icon
                 FileTexture texture = avatar.getIcon();
                 ResourceLocation icon = texture == null ? MISSING_ICON : texture.getLocation();
-                UIHelper.renderTexture(pose, x, y, 20, 20, icon);
+                UIHelper.renderTexture(x, y, 20, 20, icon);
 
                 // name
-                Component parsedName = TextUtils.trimToWidthEllipsis(font, getMessage(), width, TextUtils.ELLIPSIS.copy().withStyle(getMessage().getStyle()));
-                font.drawShadow(pose, parsedName, x + 22, y, -1);
+                ITextComponent parsedName = TextUtils.trimToWidthEllipsis(font, getMessage(), width, TextUtils.ELLIPSIS.createCopy().setStyle(getMessage().getStyle()));
+                font.drawStringWithShadow(parsedName.getFormattedText(), x + 22, y, -1);
 
                 // description
-                Component parsedDescription = TextUtils.trimToWidthEllipsis(font, description, width, TextUtils.ELLIPSIS.copy().withStyle(description.getStyle()));
-                font.drawShadow(pose, parsedDescription, x + 22, y + font.lineHeight + 1, ChatFormatting.GRAY.getColor());
+                ITextComponent parsedDescription = TextUtils.trimToWidthEllipsis(font, description, width, TextUtils.ELLIPSIS.createCopy().setStyle(description.getStyle()));
+                font.drawStringWithShadow(parsedDescription.getFormattedText(), x + 22, y + font.FONT_HEIGHT + 1, ((FontRendererAccessor)font).getColors()[TextFormatting.GRAY.getColorIndex()]);
 
                 // tooltip
                 if (parsedName != getMessage() || parsedDescription != description) {
-                    Component tooltip = instance.getName();
-                    if (!description.getString().trim().isEmpty())
-                        tooltip = tooltip.copy().append("\n\n").append(description);
+                    ITextComponent tooltip = instance.getName();
+                    if (!description.getFormattedText().trim().isEmpty())
+                        tooltip = tooltip.createCopy().appendText("\n\n").appendSibling(description);
                     setTooltip(tooltip);
                 }
             }
 
             @Override
-            public boolean isMouseOver(double mouseX, double mouseY) {
-                return parent.isInsideScissors(mouseX, mouseY) && super.isMouseOver(mouseX, mouseY);
+            public boolean mouseOver(double mouseX, double mouseY) {
+                return parent.isInsideScissors(mouseX, mouseY) && super.mouseOver(mouseX, mouseY);
             }
 
             @Override

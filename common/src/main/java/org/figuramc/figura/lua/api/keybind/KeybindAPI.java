@@ -1,6 +1,5 @@
 package org.figuramc.figura.lua.api.keybind;
 
-import net.minecraft.client.KeyMapping;
 import net.minecraft.client.settings.KeyBinding;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.lua.LuaNotNil;
@@ -74,7 +73,8 @@ public class KeybindAPI {
         if (key == null)
             throw new LuaError("Failed to find key: \"" + id + "\"");
 
-        return newKeybind("[Vanilla] " + key.getKeyDescription(), key.saveString(), false);
+        //TODO THis is wrong, it needs the translation key for the actual key
+        return newKeybind("[Vanilla] " + KeyBinding.getDisplayString(key.getKeyDescription()), key.getKeyDescription(), false);
     }
 
     @LuaWhitelist
@@ -87,7 +87,7 @@ public class KeybindAPI {
     )
     public String getVanillaKey(@LuaNotNil String id) {
         KeyBinding key = KeyBindingAccessor.getAll().get(id);
-        return key == null ? null : key.saveString();
+        return key == null ? null : key.getKeyDescription();
     }
 
     @LuaWhitelist

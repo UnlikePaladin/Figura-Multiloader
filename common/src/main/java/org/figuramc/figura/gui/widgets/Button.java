@@ -1,18 +1,15 @@
 package org.figuramc.figura.gui.widgets;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiButton;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TextComponent;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextFormatting;
+import org.figuramc.figura.mixin.font.FontRendererAccessor;
 import org.figuramc.figura.utils.FiguraIdentifier;
 import org.figuramc.figura.utils.ui.UIHelper;
 
-public class Button extends GuiButton implements FiguraWidget {
+public class Button extends AbstractFiguraWidget implements FiguraWidget {
 
     // default textures
     private static final ResourceLocation TEXTURE = new FiguraIdentifier("textures/gui/button.png");
@@ -29,11 +26,12 @@ public class Button extends GuiButton implements FiguraWidget {
     // extra fields
     protected ITextComponent tooltip;
     private boolean hasBackground = true;
+    private final ButtonAction pressAction;
 
     // texture and text constructor
-    public Button(int x, int y, int width, int height, Integer u, Integer v, Integer regionSize, ResourceLocation texture, Integer textureWidth, Integer textureHeight, Component text, Component tooltip, OnPress pressAction) {
-        super(x, y, width, height, text, pressAction);
-
+    public Button(int x, int y, int width, int height, Integer u, Integer v, Integer regionSize, ResourceLocation texture, Integer textureWidth, Integer textureHeight, ITextComponent text, ITextComponent tooltip, ButtonAction pressAction) {
+        super(x, y, width, height, text);
+        this.pressAction = pressAction;
         this.u = u;
         this.v = v;
         this.regionSize = regionSize;
@@ -44,58 +42,58 @@ public class Button extends GuiButton implements FiguraWidget {
     }
 
     // text constructor
-    public Button(int x, int y, int width, int height, ITextComponent text, ITextComponent tooltip, ScrollBarWidget.OnPress pressAction) {
+    public Button(int x, int y, int width, int height, ITextComponent text, ITextComponent tooltip, ButtonAction pressAction) {
         this(x, y, width, height, null, null, null, null, null, null, text, tooltip, pressAction);
     }
 
     // texture constructor
-    public Button(int x, int y, int width, int height, int u, int v, int regionSize, ResourceLocation texture, int textureWidth, int textureHeight, Component tooltip, OnPress pressAction) {
-        this(x, y, width, height, u, v, regionSize, texture, textureWidth, textureHeight, TextComponent.EMPTY.copy(), tooltip, pressAction);
+    public Button(int x, int y, int width, int height, int u, int v, int regionSize, ResourceLocation texture, int textureWidth, int textureHeight, ITextComponent tooltip, ButtonAction pressAction) {
+        this(x, y, width, height, u, v, regionSize, texture, textureWidth, textureHeight, new TextComponentString(""), tooltip, pressAction);
     }
 
     @Override
-    public void render(PoseStack stack, int mouseX, int mouseY, float delta) {
+    public void draw(Minecraft minecraft, int mouseX, int mouseY, float delta) {
         if (!this.isVisible())
             return;
 
         // update hovered
-        this.setHovered(this.isMouseOver(mouseX, mouseY));
+        this.setHovered(this.mouseOver(mouseX, mouseY));
 
         // render button
-        this.renderButton(stack, mouseX, mouseY, delta);
+        this.drawWidget(minecraft, mouseX, mouseY, delta);
     }
 
     @Override
-    public void renderButton(PoseStack stack, int mouseX, int mouseY, float delta) {
+    public void drawWidget(Minecraft minecraft, int mouseX, int mouseY, float delta) {
         // render texture
         if (this.texture != null) {
-            renderTexture(stack, delta);
+            renderTexture(minecraft, delta);
         } else {
-            renderDefaultTexture(stack, delta);
+            renderDefaultTexture(minecraft, delta);
         }
 
         // render text
-        renderText(stack, delta);
+        renderText(minecraft, delta);
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        return (this.isFocused() || this.isHovered()) && this.isMouseOver(mouseX, mouseY) && super.mouseClicked(mouseX, mouseY, button);
+    public boolean mouseButtonClicked(int mouseX, int mouseY, int button) {
+        return (this.isFocused() || this.isHovered()) && this.mouseOver(mouseX, mouseY) && super.mouseButtonClicked(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean isMouseOver(double mouseX, double mouseY) {
+    public boolean mouseOver(double mouseX, double mouseY) {
         boolean over = UIHelper.isMouseOver(getX(), getY(), getWidth(), getHeight(), mouseX, mouseY);
         if (over && this.tooltip != null)
             UIHelper.setTooltip(this.tooltip);
         return over;
     }
 
-    protected void renderDefaultTexture(PoseStack stack, float delta) {
-        UIHelper.renderSliced(stack, getX(), getY(), getWidth(), getHeight(), getU() * 16f, getV() * 16f, 16, 16, 48, 32, TEXTURE);
+    protected void renderDefaultTexture(Minecraft mc, float delta) {
+        UIHelper.renderSliced(getX(), getY(), getWidth(), getHeight(), getU() * 16f, getV() * 16f, 16, 16, 48, 32, TEXTURE);
     }
 
-    protected void renderTexture(PoseStack stack, float delta) {
+    protected void renderTexture(Minecraft mc, float delta) {
         // uv transforms
         int u = this.u + this.getU() * this.regionSize;
         int v = this.v + this.getV() * this.regionSize;
@@ -104,24 +102,24 @@ public class Button extends GuiButton implements FiguraWidget {
         UIHelper.setupTexture(this.texture);
 
         int size = this.regionSize;
-        blit(stack, this.getX() + this.getWidth() / 2 - size / 2, this.getY() + this.getHeight() / 2 - size / 2, u, v, size, size, this.textureWidth, this.textureHeight);
+        UIHelper.blit(this.getX() + this.getWidth() / 2 - size / 2, this.getY() + this.getHeight() / 2 - size / 2, u, v, size, size, this.textureWidth, this.textureHeight);
     }
 
-    protected void renderText(PoseStack stack, float delta) {
-        UIHelper.renderCenteredScrollingText(stack, getMessage(), getX() + 1, getY(), getWidth() - 2, getHeight(), getTextColor());
+    protected void renderText(Minecraft mc, float delta) {
+        UIHelper.renderCenteredScrollingText(getMessage(), getX() + 1, getY(), getWidth() - 2, getHeight(), getTextColor());
     }
 
-    protected void renderVanillaBackground(PoseStack stack, int mouseX, int mouseY, float delta) {
-        Component message = getMessage();
-        setMessage(TextComponent.EMPTY.copy());
-        super.renderButton(stack, mouseX, mouseY, delta);
+    protected void renderVanillaBackground(Minecraft mc, int mouseX, int mouseY, float delta) {
+        ITextComponent message = getMessage();
+        setMessage(new TextComponentString(""));
+        super.drawWidget(mc, mouseX, mouseY, delta);
         setMessage(message);
     }
 
     protected int getU() {
         if (!this.isActive())
             return 0;
-        else if ((this.isFocused() || this.isHovered()))
+        else if ((this.isHovered()))
             return 2;
         else
             return 1;
@@ -132,7 +130,7 @@ public class Button extends GuiButton implements FiguraWidget {
     }
 
     protected int getTextColor() {
-        return (!this.isActive() ? ChatFormatting.DARK_GRAY : ChatFormatting.WHITE).getColor();
+        return ((FontRendererAccessor)Minecraft.getMinecraft().fontRenderer).getColors()[(!this.isActive() ? TextFormatting.DARK_GRAY : TextFormatting.WHITE).getColorIndex()];
     }
 
     public void setTooltip(ITextComponent tooltip) {
@@ -152,8 +150,8 @@ public class Button extends GuiButton implements FiguraWidget {
     }
 
     public void run() {
-        playPressSound(Minecraft.getMinecraft().getSoundHandler());
-        onPress();
+        playPressedSound(Minecraft.getMinecraft().getSoundHandler());
+        widgetPressed(0, 0);
     }
 
     @Override
@@ -188,17 +186,17 @@ public class Button extends GuiButton implements FiguraWidget {
 
     @Override
     public int getWidth() {
-        return super.getWidth();
+        return this.width;
     }
 
     @Override
     public void setWidth(int width) {
-        super.setWidth(width);
+        this.width = width;
     }
 
     @Override
     public int getHeight() {
-        return super.getHeight();
+        return this.height;
     }
 
     @Override
@@ -212,5 +210,15 @@ public class Button extends GuiButton implements FiguraWidget {
 
     public void setActive(boolean active) {
         this.active = active;
+    }
+
+    @Override
+    public void widgetPressed(int mouseX, int mouseY) {
+        super.widgetPressed(mouseX, mouseY);
+        pressAction.onPress(this);
+    }
+
+    public interface ButtonAction {
+        void onPress(Button button);
     }
 }

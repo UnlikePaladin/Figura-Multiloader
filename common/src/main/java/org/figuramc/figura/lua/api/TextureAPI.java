@@ -1,8 +1,7 @@
 package org.figuramc.figura.lua.api;
 
-import com.mojang.blaze3d.platform.NativeImage;
 import net.minecraft.client.Minecraft;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.client.renderer.texture.TextureUtil;
 import net.minecraft.util.ResourceLocation;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.lua.LuaNotNil;
@@ -10,10 +9,10 @@ import org.figuramc.figura.lua.LuaWhitelist;
 import org.figuramc.figura.lua.docs.LuaMethodDoc;
 import org.figuramc.figura.lua.docs.LuaMethodOverload;
 import org.figuramc.figura.lua.docs.LuaTypeDoc;
-import org.figuramc.figura.mixin.render.MissingTextureAtlasSpriteAccessor;
 import org.figuramc.figura.model.rendering.texture.FiguraTexture;
 import org.figuramc.figura.utils.ColorUtils;
 import org.figuramc.figura.utils.LuaUtils;
+import org.figuramc.figura.utils.RenderUtils;
 import org.luaj.vm2.LuaError;
 import org.luaj.vm2.LuaTable;
 
@@ -54,9 +53,9 @@ public class TextureAPI {
             ),
             value = "textures.new_texture")
     public FiguraTexture newTexture(@LuaNotNil String name, int width, int height) {
-        NativeImage image;
+        BufferedImage image;
         try {
-            image = new NativeImage(width, height, true);
+            image = new BufferedImage(width, height, 1);
         } catch (Exception e) {
             throw new LuaError(e.getMessage());
         }
@@ -80,7 +79,7 @@ public class TextureAPI {
             },
             value = "textures.read")
     public FiguraTexture read(@LuaNotNil String name, @LuaNotNil Object object) {
-        NativeImage image;
+        BufferedImage image;
         byte[] bytes;
 
         if (object instanceof LuaTable) {
@@ -97,7 +96,7 @@ public class TextureAPI {
 
         try {
             ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
-            image = NativeImage.read(null, bais);
+            image = TextureUtil.readBufferedImage(bais);
             bais.close();
         } catch (Exception e) {
             throw new LuaError(e.getMessage());
@@ -114,7 +113,7 @@ public class TextureAPI {
             ),
             value = "textures.copy")
     public FiguraTexture copy(@LuaNotNil String name, @LuaNotNil FiguraTexture texture) {
-        NativeImage image = texture.copy();
+        BufferedImage image = texture.copy();
         return register(name, image, false);
     }
 
@@ -151,10 +150,10 @@ public class TextureAPI {
         try {
             BufferedImage image;
             try {
-                image = BufferedImage.read(Minecraft.getInstance().getResourceManager().getResource(resourcePath).getInputStream());
+                image = TextureUtil.readBufferedImage(Minecraft.getMinecraft().getResourceManager().getResource(resourcePath).getInputStream());
             } catch (Exception ignored) {
                 // if the string is a valid resourceLocation but does not point to a valid resource, missingno
-                image = MissingTextureAtlasSpriteAccessor.getImageData().get();
+                image = RenderUtils.getMissingTexture();
             }
             return register(name, image, false);
         } catch (Exception e) {

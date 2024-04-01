@@ -1,15 +1,13 @@
 package org.figuramc.figura.gui.widgets.lists;
 
-import com.mojang.blaze3d.audio.SoundBuffer;
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.sounds.SoundManager;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TextComponent;
-import net.minecraft.util.Mth;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.client.audio.SoundHandler;
+import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.Style;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextFormatting;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.gui.widgets.AbstractContainerElement;
 import org.figuramc.figura.gui.widgets.Label;
@@ -39,8 +37,8 @@ public class SoundsList extends AbstractList {
         updateList();
 
         Label noOwner, noSounds;
-        this.children.add(noOwner = new Label(new FiguraText("gui.error.no_avatar").withStyle(ChatFormatting.YELLOW), x + width / 2, y + height / 2, TextUtils.Alignment.CENTER, 0));
-        this.children.add(noSounds = new Label(new FiguraText("gui.error.no_sounds").withStyle(ChatFormatting.YELLOW), x + width / 2, y + height / 2, TextUtils.Alignment.CENTER, 0));
+        this.children.add(noOwner = new Label(new FiguraText("gui.error.no_avatar").setStyle(new Style().setColor(TextFormatting.YELLOW)), x + width / 2, y + height / 2, TextUtils.Alignment.CENTER, 0));
+        this.children.add(noSounds = new Label(new FiguraText("gui.error.no_sounds").setStyle(new Style().setColor(TextFormatting.YELLOW)), x + width / 2, y + height / 2, TextUtils.Alignment.CENTER, 0));
         noOwner.centerVertically = noSounds.centerVertically = true;
 
         noOwner.setVisible(owner == null);
@@ -48,16 +46,16 @@ public class SoundsList extends AbstractList {
     }
 
     @Override
-    public void render(PoseStack pose, int mouseX, int mouseY, float delta) {
+    public void draw(Minecraft mc, int mouseX, int mouseY, float delta) {
         // background and scissors
-        UIHelper.renderSliced(pose, getX(), getY(), getWidth(), getHeight(), UIHelper.OUTLINE_FILL);
+        UIHelper.renderSliced(getX(), getY(), getWidth(), getHeight(), UIHelper.OUTLINE_FILL);
         UIHelper.setupScissor(getX() + scissorsX, getY() + scissorsY, getWidth() + scissorsWidth, getHeight() + scissorsHeight);
 
         if (!sounds.isEmpty())
             updateEntries();
 
         // children
-        super.render(pose, mouseX, mouseY, delta);
+        super.draw(mc, mouseX, mouseY, delta);
 
         // reset scissor
         UIHelper.disableScissor();
@@ -75,7 +73,7 @@ public class SoundsList extends AbstractList {
 
         // render list
         int xOffset = scrollBar.isVisible() ? 4 : 11;
-        int yOffset = scrollBar.isVisible() ? (int) -(Mth.lerp(scrollBar.getScrollProgress(), -4, totalHeight - getHeight())) : 4;
+        int yOffset = scrollBar.isVisible() ? (int) -(MathUtils.lerp(scrollBar.getScrollProgress(), -4, totalHeight - getHeight())) : 4;
         for (SoundElement sound : sounds) {
             sound.setX(getX() + xOffset);
             sound.setY(getY() + yOffset);
@@ -91,7 +89,7 @@ public class SoundsList extends AbstractList {
         if (owner == null)
             return;
 
-        for (Map.Entry<String, SoundBuffer> entry : owner.customSounds.entrySet()) {
+        for (Map.Entry<String, byte[]> entry : owner.customSounds.entrySet()) {
             SoundElement sound = new SoundElement(getWidth() - 22, entry.getKey(), entry.getValue(), this, owner);
             sounds.add(sound);
             children.add(sound);
@@ -109,29 +107,29 @@ public class SoundsList extends AbstractList {
 
     private static class SoundElement extends AbstractContainerElement implements Comparable<SoundElement> {
 
-        private final Component size;
+        private final ITextComponent size;
         private final String name;
-        private final SoundBuffer sound;
+        private final byte[] sound;
         private final Avatar owner;
         private final SoundsList parent;
 
         private final ParentedButton play, stop;
 
-        public SoundElement(int width, String name, SoundBuffer sound, SoundsList parent, Avatar owner) {
+        public SoundElement(int width, String name, byte[] sound, SoundsList parent, Avatar owner) {
             super(0, 0, width, 20);
             this.name = name;
             this.sound = sound;
             this.owner = owner;
             this.parent = parent;
 
-            int len = owner.nbt.getCompound("sounds").getByteArray(name).length;
-            this.size = new TextComponent("(" + MathUtils.asFileSize(len) + ")").withStyle(ChatFormatting.GRAY);
+            int len = owner.nbt.getCompoundTag("sounds").getByteArray(name).length;
+            this.size = new TextComponentString("(" + MathUtils.asFileSize(len) + ")").setStyle(new Style().setColor(TextFormatting.GRAY));
 
             // play button
             children.add(0, play = new ParentedButton(0, 0, 20, 20, 0, 0, 20, new FiguraIdentifier("textures/gui/play.png"), 60, 20, new FiguraText("gui.sound.play"), this, button -> {}) {
                 @Override
-                public void playDownSound(SoundManager soundManager) {
-                    Vec3 vec =  Minecraft.getInstance().player == null ? new Vec3(0, 0, 0) : Minecraft.getInstance().player.position();
+                public void playPressedSound(SoundHandler soundManager) {
+                    Vec3d vec =  Minecraft.getMinecraft().player == null ? new Vec3d(0, 0, 0) : Minecraft.getMinecraft().player.getPositionVector();
                     getSound().pos(vec.x, vec.y, vec.z).play();
                 }
             });
@@ -143,7 +141,7 @@ public class SoundsList extends AbstractList {
         }
 
         @Override
-        public void render(PoseStack stack, int mouseX, int mouseY, float delta) {
+        public void draw(Minecraft mc, int mouseX, int mouseY, float delta) {
             if (!this.isVisible()) return;
 
             int x = getX();
@@ -153,36 +151,36 @@ public class SoundsList extends AbstractList {
 
             // selected outline
             if (parent.selected == this)
-                UIHelper.fillOutline(stack, x - 1, y - 1, width + 2, height + 2, 0xFFFFFFFF);
+                UIHelper.fillOutline(x - 1, y - 1, width + 2, height + 2, 0xFFFFFFFF);
 
             // vars
-            Font font = Minecraft.getInstance().font;
-            int textY = y + height / 2 - font.lineHeight / 2;
+            FontRenderer font = Minecraft.getMinecraft().fontRenderer;
+            int textY = y + height / 2 - font.FONT_HEIGHT / 2;
 
             // hovered arrow
-            setHovered(isMouseOver(mouseX, mouseY));
-            if (isHovered()) font.draw(stack, HOVERED_ARROW, x + 4, textY, 0xFFFFFF);
+            setHovered(mouseOver(mouseX, mouseY));
+            if (isHovered()) font.drawString(HOVERED_ARROW.getFormattedText(), x + 4, textY, 0xFFFFFF);
 
             // render name
-            font.draw(stack, this.name, x + 16, textY, 0xFFFFFF);
+            font.drawString(this.name, x + 16, textY, 0xFFFFFF);
 
             // render size
-            font.draw(stack, size, x + width - 96 - font.width(size), textY, 0xFFFFFF);
+            font.drawString(size.getFormattedText(), x + width - 96 - font.getStringWidth(size.getFormattedText()), textY, 0xFFFFFF);
 
             // render children
-            super.render(stack, mouseX, mouseY, delta);
+            super.draw(mc, mouseX, mouseY, delta);
         }
 
         @Override
-        public boolean isMouseOver(double mouseX, double mouseY) {
-            return this.parent.isInsideScissors(mouseX, mouseY) && super.isMouseOver(mouseX, mouseY);
+        public boolean mouseOver(double mouseX, double mouseY) {
+            return this.parent.isInsideScissors(mouseX, mouseY) && super.mouseOver(mouseX, mouseY);
         }
 
         @Override
-        public boolean mouseClicked(double mouseX, double mouseY, int button) {
-            boolean clicked = super.mouseClicked(mouseX, mouseY, button);
+        public boolean mouseButtonClicked(int mouseX, int mouseY, int button) {
+            boolean clicked = super.mouseButtonClicked(mouseX, mouseY, button);
             if (!clicked) {
-                if (isMouseOver(mouseX, mouseY)) {
+                if (mouseOver(mouseX, mouseY)) {
                     parent.selected = this;
                     return true;
                 }

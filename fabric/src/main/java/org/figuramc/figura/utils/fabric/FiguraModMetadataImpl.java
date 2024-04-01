@@ -5,14 +5,15 @@ import net.fabricmc.loader.api.metadata.ModMetadata;
 import org.figuramc.figura.utils.FiguraModMetadata;
 import org.figuramc.figura.utils.Version;
 
-public class FiguraModMetadataImpl extends FiguraModMetadata {
+public class FiguraModMetadataImpl implements FiguraModMetadata {
     private final ModMetadata fabricMetada;
+    private final String modID;
     protected FiguraModMetadataImpl(String modID) {
-        super(modID);
+        this.modID = modID;
         this.fabricMetada = FabricLoader.getInstance().getModContainer(modID).get().getMetadata();
     }
 
-    public static FiguraModMetadata getMetadataForMod(String modID) {
+    public FiguraModMetadata getMetadataForMod(String modID) {
         return new FiguraModMetadataImpl(modID);
     }
 
@@ -40,5 +41,10 @@ public class FiguraModMetadataImpl extends FiguraModMetadata {
     @Override
     public Version getModVersion() {
         return new Version(fabricMetada.getVersion().getFriendlyString());
+    }
+
+    @Override
+    public String getModId() {
+        return modID;
     }
 }

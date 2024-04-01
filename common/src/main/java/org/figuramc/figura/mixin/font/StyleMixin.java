@@ -1,17 +1,19 @@
 package org.figuramc.figura.mixin.font;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.text.Style;
 import net.minecraft.util.text.TextFormatting;
 import net.minecraft.util.text.event.ClickEvent;
 import net.minecraft.util.text.event.HoverEvent;
 import org.figuramc.figura.ducks.extensions.StyleExtension;
+import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 
 @Mixin(Style.class)
-public class StyleMixin implements StyleExtension {
+public abstract class StyleMixin implements StyleExtension {
 
     @Shadow private TextFormatting color;
     @Shadow private Boolean bold;
@@ -22,6 +24,9 @@ public class StyleMixin implements StyleExtension {
     @Shadow private ClickEvent clickEvent;
     @Shadow private HoverEvent hoverEvent;
     @Shadow private String insertion;
+
+    @Shadow public abstract @Nullable TextFormatting getColor();
+
     @Unique
     private ResourceLocation figura$Font;
     @Unique
@@ -46,6 +51,10 @@ public class StyleMixin implements StyleExtension {
 
     @Override
     public Integer getRGBColor() {
+        if (figura$color == null && this.getColor() != null)
+            return ((FontRendererAccessor)Minecraft.getMinecraft().fontRenderer).getColors()[this.getColor().getColorIndex()];
+        if (figura$color == null)
+            return 0xFFFFF;
         return figura$color;
     }
 

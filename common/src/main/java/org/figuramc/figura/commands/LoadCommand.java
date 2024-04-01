@@ -1,9 +1,9 @@
 package org.figuramc.figura.commands;
 
-import com.mojang.brigadier.arguments.StringArgumentType;
-import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import com.mojang.brigadier.builder.RequiredArgumentBuilder;
-import com.mojang.brigadier.context.CommandContext;
+import net.minecraft.command.CommandBase;
+import net.minecraft.command.CommandException;
+import net.minecraft.command.ICommandSender;
+import net.minecraft.server.MinecraftServer;
 import org.figuramc.figura.avatar.AvatarManager;
 import org.figuramc.figura.avatar.local.LocalAvatarFetcher;
 import org.figuramc.figura.utils.FiguraClientCommandSource;
@@ -14,27 +14,29 @@ import java.nio.file.Paths;
 
 class LoadCommand {
 
-    public static LiteralArgumentBuilder<FiguraClientCommandSource> getCommand() {
-        LiteralArgumentBuilder<FiguraClientCommandSource> load = LiteralArgumentBuilder.literal("load");
+    public static class LoadSubCommand extends FiguraCommands.FiguraSubCommand {
 
-        RequiredArgumentBuilder<FiguraClientCommandSource, String> path = RequiredArgumentBuilder.argument("path", StringArgumentType.greedyString());
-        path.executes(LoadCommand::loadAvatar);
+        public LoadSubCommand() {
+            super("load");
+        }
 
-        return load.then(path);
+        @Override
+        public void execute(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] args) throws CommandException {
+            loadAvatar(iCommandSender, CommandBase.buildString(args, 0));
+        }
     }
 
-    private static int loadAvatar(CommandContext<FiguraClientCommandSource> context) {
-        String str = StringArgumentType.getString(context, "path");
+    private static int loadAvatar(ICommandSender context, String str) {
         try {
             // parse path
             Path p = LocalAvatarFetcher.getLocalAvatarDirectory().resolve(Paths.get(str));
 
             // try to load avatar
             AvatarManager.loadLocalAvatar(p);
-            context.getSource().figura$sendFeedback(new FiguraText("command.load.loading"));
+            ((FiguraClientCommandSource)context).figura$sendFeedback(new FiguraText("command.load.loading"));
             return 1;
         } catch (Exception e) {
-            context.getSource().figura$sendError(new FiguraText("command.load.invalid", str));
+            ((FiguraClientCommandSource)context).figura$sendError(new FiguraText("command.load.invalid", str));
         }
 
         return 0;

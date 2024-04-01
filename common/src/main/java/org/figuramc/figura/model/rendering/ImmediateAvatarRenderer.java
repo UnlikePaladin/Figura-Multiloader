@@ -1,20 +1,17 @@
 package org.figuramc.figura.model.rendering;
 
 import com.google.common.collect.ImmutableList;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.datafixers.util.Pair;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.LevelRenderer;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LightLayer;
+import net.minecraft.client.renderer.BufferBuilder;
+import net.minecraft.client.renderer.Matrix4f;
+import net.minecraft.client.renderer.RenderGlobal;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.world.EnumSkyBlock;
+import net.minecraft.world.World;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.config.Configs;
+import org.figuramc.figura.ducks.extensions.Vector4fExtension;
 import org.figuramc.figura.lua.api.ClientAPI;
 import org.figuramc.figura.math.matrix.FiguraMat3;
 import org.figuramc.figura.math.matrix.FiguraMat4;
@@ -26,7 +23,9 @@ import org.figuramc.figura.model.rendering.texture.FiguraTextureSet;
 import org.figuramc.figura.model.rendering.texture.RenderTypes;
 import org.figuramc.figura.model.rendertasks.RenderTask;
 import org.figuramc.figura.utils.ColorUtils;
+import org.figuramc.figura.utils.Pair;
 import org.figuramc.figura.utils.ui.UIHelper;
+import org.lwjgl.util.vector.Vector4f;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -45,7 +44,7 @@ public class ImmediateAvatarRenderer extends AvatarRenderer {
         super(avatar);
 
         // Vertex data, read model parts
-        root = FiguraModelPartReader.read(avatar, avatar.nbt.getCompound("models"), textureSets, false);
+        root = FiguraModelPartReader.read(avatar, avatar.nbt.getCompoundTag("models"), textureSets, false);
 
         sortParts();
     }
@@ -106,7 +105,7 @@ public class ImmediateAvatarRenderer extends AvatarRenderer {
 
         // Set shouldRenderPivots
         int config = Configs.RENDER_DEBUG_PARTS_PIVOT.value;
-        if (!Minecraft.getInstance().getEntityRenderDispatcher().shouldRenderHitBoxes() || (!avatar.isHost && config < 2))
+        if (!Minecraft.getMinecraft().getRenderManager().isDebugBoundingBox() || (!avatar.isHost && config < 2))
             shouldRenderPivots = 0;
         else
             shouldRenderPivots = config;
@@ -277,14 +276,14 @@ public class ImmediateAvatarRenderer extends AvatarRenderer {
 
             // recalculate light
             FiguraMod.popPushProfiler("calculateLight");
-            Level l;
+            World l;
             if (custom.light != null)
                 updateLight = false;
-            else if (updateLight && (l = Minecraft.getInstance().level) != null) {
+            else if (updateLight && (l = Minecraft.getMinecraft().world) != null) {
                 FiguraVec3 pos = part.savedPartToWorldMat.apply(0d, 0d, 0d);
-                int block = l.getBrightness(LightLayer.BLOCK, pos.asBlockPos());
-                int sky = l.getBrightness(LightLayer.SKY, pos.asBlockPos());
-                customizationStack.peek().light = LightTexture.pack(block, sky);
+                int block = l.getLightFor(EnumSkyBlock.BLOCK, pos.asBlockPos());
+                int sky = l.getLightFor(EnumSkyBlock.SKY, pos.asBlockPos());
+                customizationStack.peek().light = block << 4 | sky << 20;
             }
         }
 
@@ -385,11 +384,13 @@ public class ImmediateAvatarRenderer extends AvatarRenderer {
         double boxSize = group ? 1 / 16d : 1 / 32d;
         boxSize /= Math.max(Math.cbrt(part.savedPartToWorldMat.det()), 0.02);
 
-        PoseStack stack = customization.copyIntoGlobalPoseStack();
+        Matrix4f pos = customization.copyIntoGlobalPoseStack();
+        Vector4f vector4f = new Vector4f((float) boxSize, (float) boxSize, (float) boxSize, 1.0f);
+        ((Vector4fExtension)vector4f).figura$transform(pos);
 
-        LevelRenderer.renderLineBox(stack, bufferSource.getBuffer(RenderType.LINES),
-                -boxSize, -boxSize, -boxSize,
-                boxSize, boxSize, boxSize,
+        RenderGlobal.drawBoundingBox(bufferSource.getBuffer(RenderTypes.FiguraRenderType.LINES),
+                -vector4f.x, -vector4f.y, -vector4f.z,
+                vector4f.x, vector4f.y, vector4f.z,
                 (float) color.x, (float) color.y, (float) color.z, 1f);
     }
 
@@ -500,11 +501,11 @@ public class ImmediateAvatarRenderer extends AvatarRenderer {
         // get render type
         if (id != null) {
             if (translucent) {
-                ret.renderType = RenderType.itemEntityTranslucentCull(id);
+                ret.renderType = RenderTypes.FiguraRenderType.itemEntityTranslucentCull(id);
                 return ret;
             }
             if (glowing) {
-                ret.renderType = RenderType.outline(id);
+                ret.renderType = RenderTypes.FiguraRenderType.outline(id);
                 return ret;
             }
         }
@@ -541,8 +542,8 @@ public class ImmediateAvatarRenderer extends AvatarRenderer {
     private static final FiguraVec4 pos = FiguraVec4.of();
     private static final FiguraVec3 normal = FiguraVec3.of();
     private static final FiguraVec3 uv = FiguraVec3.of(0, 0, 1);
-    private static final List<RenderType> END_RENDER_TYPES = IntStream.range(0, 16).mapToObj(i -> RenderType.endPortal(i + 1)).collect(ImmutableList.toImmutableList());
-    private static final Map<Pair<Integer, ResourceLocation>, RenderType> TEXTURED_END_RENDER_TYPES = new HashMap<>();
+    private static final List<RenderTypes.FiguraRenderType> END_RENDER_TYPES = IntStream.range(0, 16).mapToObj(i -> RenderTypes.FiguraRenderType.getEndPortal(i + 1)).collect(ImmutableList.toImmutableList());
+    private static final Map<Pair<Integer, ResourceLocation>, RenderTypes.FiguraRenderType> TEXTURED_END_RENDER_TYPES = new HashMap<>();
     private void pushToBuffer(int faceCount, VertexData vertexData, PartCustomization customization, FiguraTextureSet textureSet, List<Vertex> vertices) {
         int vertCount = faceCount * 4;
 
@@ -562,6 +563,8 @@ public class ImmediateAvatarRenderer extends AvatarRenderer {
             float finalG1 = g;
             float finalB1 = b;
             VERTEX_BUFFER.getBufferFor(vertexData.renderType, vertexData.primary, vertexConsumer -> {
+                vertexData.renderType.setupState.run();
+                vertexConsumer.begin(vertexData.renderType.mode, vertexData.renderType.format);
                 // Initial render with the end colors
                 for (int vert = 0; vert < vertCount; vert++) {
                     Vertex vertex = vertices.get(vert);
@@ -576,14 +579,15 @@ public class ImmediateAvatarRenderer extends AvatarRenderer {
                     uv.transform(customization.uvMatrix);
 
                     vertexConsumer
-                            .vertex(pos.x, pos.y, pos.z)
+                            .pos(pos.x, pos.y, pos.z)
                             .color(finalR1, finalG1, finalB1, customization.alpha)
-                            .uv((float) uv.x, (float) uv.y)
-                            .overlayCoords(overlay)
-                            .uv2(light)
+                            .tex((float) uv.x, (float) uv.y)
+                            .lightmap(light & 0xFFFF, light >> 16 & 0xFFFF)
                             .normal((float) normal.x, (float) normal.y, (float) normal.z)
                             .endVertex();
                 }
+                vertexConsumer.finishDrawing();
+                vertexData.renderType.clearState.run();
             });
             int passes = vertexData.endRenderType == 2 ? 16 : 15;
             // Re render to get the portal effect, there's an extra pass on the gateway
@@ -596,13 +600,16 @@ public class ImmediateAvatarRenderer extends AvatarRenderer {
                 float finalG = g;
                 float finalB = b;
 
-                RenderType renderType;
+                RenderTypes.FiguraRenderType renderType;
                 if (vertexData.endRenderType == 3){
                     renderType = TEXTURED_END_RENDER_TYPES.computeIfAbsent(new Pair<>(i, vertexData.texture), integerResourceLocationPair -> RenderTypes.FiguraRenderType.getTexturedPortal(integerResourceLocationPair.getSecond(), integerResourceLocationPair.getFirst()));
                 } else {
                     renderType = END_RENDER_TYPES.get(i);
                 }
                 VERTEX_BUFFER.getBufferFor(renderType, vertexData.primary, vertexConsumer -> {
+                    vertexData.renderType.setupState.run();
+                    vertexConsumer.begin(vertexData.renderType.mode, vertexData.renderType.format);
+
                     for (int vert = 0; vert < vertCount; vert++) {
                         Vertex vertex = vertices.get(vert);
 
@@ -616,18 +623,22 @@ public class ImmediateAvatarRenderer extends AvatarRenderer {
                         uv.transform(customization.uvMatrix);
 
                         vertexConsumer
-                                .vertex(pos.x, pos.y, pos.z)
+                                .pos(pos.x, pos.y, pos.z)
                                 .color(finalR, finalG, finalB, customization.alpha)
-                                .uv((float) uv.x, (float) uv.y)
-                                .overlayCoords(overlay)
-                                .uv2(light)
+                                .tex((float) uv.x, (float) uv.y)
+                                .lightmap(light & 0xFFFF, light >> 16 & 0xFFFF)
                                 .normal((float) normal.x, (float) normal.y, (float) normal.z)
                                 .endVertex();
                     }
+                    vertexConsumer.finishDrawing();
+                    vertexData.renderType.clearState.run();
                 });
             }
         } else {
             VERTEX_BUFFER.getBufferFor(vertexData.renderType, vertexData.primary, vertexConsumer -> {
+                vertexData.renderType.setupState.run();
+                vertexConsumer.begin(vertexData.renderType.mode, vertexData.renderType.format);
+
                 for (int i = 0; i < vertCount; i++) {
                     Vertex vertex = vertices.get(i);
 
@@ -641,20 +652,21 @@ public class ImmediateAvatarRenderer extends AvatarRenderer {
                     uv.transform(customization.uvMatrix);
 
                     vertexConsumer
-                            .vertex(pos.x, pos.y, pos.z)
+                            .pos(pos.x, pos.y, pos.z)
                             .color((float) vertexData.color.x, (float) vertexData.color.y, (float) vertexData.color.z, customization.alpha)
-                            .uv((float) uv.x, (float) uv.y)
-                            .overlayCoords(overlay)
-                            .uv2(light)
+                            .tex((float) uv.x, (float) uv.y)
+                            .lightmap(light & 0xFFFF, light >> 16 & 0xFFFF)
                             .normal((float) normal.x, (float) normal.y, (float) normal.z)
                             .endVertex();
                 }
+                vertexConsumer.finishDrawing();
+                vertexData.renderType.clearState.run();
             });
         }
     }
 
     private static class VertexData {
-        public RenderType renderType;
+        public RenderTypes.FiguraRenderType renderType;
         public boolean fullBright;
         public float vertexOffset;
         public FiguraVec3 color;
@@ -665,21 +677,21 @@ public class ImmediateAvatarRenderer extends AvatarRenderer {
     }
 
     private static class VertexBuffer {
-        private final HashMap<RenderType, List<Consumer<VertexConsumer>>> primaryBuffers = new LinkedHashMap<>();
-        private final HashMap<RenderType, List<Consumer<VertexConsumer>>> secondaryBuffers = new LinkedHashMap<>();
+        private final HashMap<RenderTypes.FiguraRenderType, List<Consumer<BufferBuilder>>> primaryBuffers = new LinkedHashMap<>();
+        private final HashMap<RenderTypes.FiguraRenderType, List<Consumer<BufferBuilder>>> secondaryBuffers = new LinkedHashMap<>();
 
-        public void getBufferFor(RenderType renderType, boolean primary, Consumer<VertexConsumer> consumer) {
-            HashMap<RenderType, List<Consumer<VertexConsumer>>> buffer = primary ? primaryBuffers : secondaryBuffers;
-            List<Consumer<VertexConsumer>> list = buffer.computeIfAbsent(renderType, renderType1 -> new ArrayList<>());
+        public void getBufferFor(RenderTypes.FiguraRenderType renderType, boolean primary, Consumer<BufferBuilder> consumer) {
+            HashMap<RenderTypes.FiguraRenderType, List<Consumer<BufferBuilder>>> buffer = primary ? primaryBuffers : secondaryBuffers;
+            List<Consumer<BufferBuilder>> list = buffer.computeIfAbsent(renderType, renderType1 -> new ArrayList<>());
             list.add(consumer);
         }
 
-        public void consume(boolean primary, MultiBufferSource bufferSource) {
-            HashMap<RenderType, List<Consumer<VertexConsumer>>> map = primary ? primaryBuffers : secondaryBuffers;
-            for (Map.Entry<RenderType, List<Consumer<VertexConsumer>>> entry : map.entrySet()) {
-                VertexConsumer vertexConsumer = bufferSource.getBuffer(entry.getKey());
-                List<Consumer<VertexConsumer>> consumers = entry.getValue();
-                for (Consumer<VertexConsumer> consumer : consumers)
+        public void consume(boolean primary, RenderTypes.FiguraBufferSource bufferSource) {
+            HashMap<RenderTypes.FiguraRenderType, List<Consumer<BufferBuilder>>> map = primary ? primaryBuffers : secondaryBuffers;
+            for (Map.Entry<RenderTypes.FiguraRenderType, List<Consumer<BufferBuilder>>> entry : map.entrySet()) {
+                BufferBuilder vertexConsumer = bufferSource.getBuffer(entry.getKey());
+                List<Consumer<BufferBuilder>> consumers = entry.getValue();
+                for (Consumer<BufferBuilder> consumer : consumers)
                     consumer.accept(vertexConsumer);
             }
             map.clear();

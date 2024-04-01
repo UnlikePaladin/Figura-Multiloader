@@ -1,16 +1,10 @@
 package org.figuramc.figura.gui.screens;
 
 import com.google.common.collect.Lists;
-import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiScreen;
-import net.minecraft.client.gui.components.Widget;
-import net.minecraft.client.gui.components.events.GuiEventListener;
-import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.GlStateManager;
-import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.text.ITextComponent;
 import org.figuramc.figura.config.Configs;
@@ -18,12 +12,19 @@ import org.figuramc.figura.gui.widgets.*;
 import org.figuramc.figura.lua.api.ClientAPI;
 import org.figuramc.figura.utils.FiguraIdentifier;
 import org.figuramc.figura.utils.ui.UIHelper;
+import org.lwjgl.input.Keyboard;
+import org.lwjgl.input.Mouse;
 
 import java.util.Arrays;
 import java.util.List;
 
 public abstract class AbstractPanelScreen extends GuiScreen {
-    private final List<Gui> renderables = Lists.newArrayList();
+    private final List<FiguraRenderable> renderables = Lists.newArrayList();
+    protected final List<AbstractFiguraWidget> buttons = Lists.newArrayList();
+    protected final List<FiguraGuiEventListener> children = Lists.newArrayList();
+    protected FiguraGuiEventListener selectedListener;
+    private int prevMouseX, prevMouseY;
+
     public static final List<ResourceLocation> BACKGROUNDS = Arrays.asList(
             new FiguraIdentifier("textures/gui/background/background_0.png"),
             new FiguraIdentifier("textures/gui/background/background_1.png"),
@@ -37,19 +38,22 @@ public abstract class AbstractPanelScreen extends GuiScreen {
     // overlays
     public ContextMenu contextMenu;
     public ITextComponent tooltip;
-
+    public ITextComponent title;
     // stuff :3
     private static final String EGG = "ĉĉĈĈćĆćĆBAā";
     private String egg = EGG;
 
     protected AbstractPanelScreen(GuiScreen parentScreen, ITextComponent title) {
         super();
+        this.title = title;
         this.parentScreen = parentScreen;
     }
 
     @Override
     public void setWorldAndResolution(Minecraft minecraft, int width, int height) {
         this.renderables.clear();
+        this.children.clear();
+        this.buttons.clear();
         super.setWorldAndResolution(minecraft, width, height);
     }
 
@@ -76,7 +80,7 @@ public abstract class AbstractPanelScreen extends GuiScreen {
     }
 
     public void tick() {
-        for (Widget renderable : this.renderables()) {
+        for (FiguraRenderable renderable : this.renderables()) {
             if (renderable instanceof FiguraTickable) {
                 FiguraTickable tickable = (FiguraTickable) renderable;
                 tickable.tick();
@@ -87,7 +91,7 @@ public abstract class AbstractPanelScreen extends GuiScreen {
 
     }
 
-    public List<Gui> renderables() {
+    public List<FiguraRenderable> renderables() {
         return renderables;
     }
 
@@ -100,14 +104,14 @@ public abstract class AbstractPanelScreen extends GuiScreen {
         this.renderBackground(delta);
 
         // render contents
-        super.render(stack, mouseX, mouseY, delta);
+        super.drawScreen(mouseX, mouseY, delta);
 
-        for (Widget renderable : renderables) {
-            renderable.render(stack, mouseX, mouseY, delta);
+        for (FiguraRenderable renderable : renderables) {
+            renderable.draw(Minecraft.getMinecraft(), mouseX, mouseY, delta);
         }
 
         // render overlays
-        this.renderOverlays(stack, mouseX, mouseY, delta);
+        this.renderOverlays(mouseX, mouseY, delta);
 
         // restore vanilla framebuffer
         // UIHelper.useVanillaFramebuffer();
@@ -131,7 +135,7 @@ public abstract class AbstractPanelScreen extends GuiScreen {
             // translate the stack here because of nested contexts
             GlStateManager.pushMatrix();
             GlStateManager.translate(0f, 0f, 500f);
-            contextMenu.render(mouseX, mouseY, delta);
+            contextMenu.draw(Minecraft.getMinecraft(), mouseX, mouseY, delta);
             GlStateManager.popMatrix();
         }
 
@@ -148,27 +152,42 @@ public abstract class AbstractPanelScreen extends GuiScreen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    protected void mouseClicked(int mouseX, int mouseY, int mouseButton) {
         //fix mojang focusing for text fields
-        for (GuiEventListener listener : this.children()) {
+        for (FiguraGuiEventListener listener : this.getChildren()) {
             if (listener instanceof TextField) {
                 TextField field = (TextField) listener;
-                field.getField().setFocus(field.isEnabled() && field.isMouseOver(mouseX, mouseY));
+                field.getField().setFocused(field.isEnabled() && field.mouseOver(mouseX, mouseY));
             }
         }
-        return this.contextMenuClick(mouseX, mouseY, button) || super.mouseClicked(mouseX, mouseY, button);
+        if (this.contextMenuClick(mouseX, mouseY, mouseButton))
+            return;
+
+        for (FiguraGuiEventListener guiEventListener : this.getChildren()) {
+            if (!guiEventListener.mouseButtonClicked(mouseX, mouseY, mouseButton)) continue;
+            this.setFocusedElement(guiEventListener);
+            return;
+        }
+    }
+
+    private void setFocusedElement(FiguraGuiEventListener guiEventListener) {
+        this.selectedListener = guiEventListener;
+    }
+
+    private List<FiguraGuiEventListener> getChildren() {
+        return children;
     }
 
 
-    public boolean contextMenuClick(double mouseX, double mouseY, int button) {
+    public boolean contextMenuClick(int mouseX, int mouseY, int button) {
         // attempt to run context first
         if (contextMenu != null && contextMenu.isVisible()) {
             // attempt to click on the context menu
-            boolean clicked = contextMenu.mouseClicked(mouseX, mouseY, button);
+            boolean clicked = contextMenu.mouseButtonClicked(mouseX, mouseY, button);
 
             // then try to click on the category container and suppress it
             // let the category handle the context menu visibility
-            if (!clicked && contextMenu.parent != null && contextMenu.parent.mouseClicked(mouseX, mouseY, button))
+            if (!clicked && contextMenu.parent != null && contextMenu.parent.mouseButtonClicked(mouseX, mouseY, button))
                 return true;
 
             // otherwise, remove visibility and suppress the click only if we clicked on the context
@@ -181,24 +200,47 @@ public abstract class AbstractPanelScreen extends GuiScreen {
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+    protected void mouseClickMove(int mouseX, int mouseY, int button, long timeSinceLastClick) {
         // yeet mouse 0 and isDragging check
-        return this.getFocused() != null && this.getFocused().mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+        Minecraft minecraft = Minecraft.getMinecraft();
+        ScaledResolution scaledResolution = new ScaledResolution(minecraft);
+        double dragX = (mouseX - this.prevMouseX) * scaledResolution.getScaledWidth_double() / minecraft.displayWidth;
+        double dragY = (mouseY - this.prevMouseY) * scaledResolution.getScaledHeight_double() / minecraft.displayHeight;
+
+        if (this.getFocusedListener() != null)
+            this.getFocusedListener().mouseDragged(Minecraft.getMinecraft(), mouseX, mouseY, button, dragX, dragY);
+
+        prevMouseX = mouseX;
+        prevMouseY = mouseY;
+    }
+
+    private FiguraGuiEventListener getFocusedListener() {
+        return selectedListener;
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    protected void mouseReleased(int mouseX, int mouseY, int button) {
         // better check for mouse released when outside element boundaries
-        boolean bool = this.getFocused() != null && this.getFocused().mouseReleased(mouseX, mouseY, button);
+        boolean bool = this.getFocusedListener() != null && this.getFocusedListener().mouseButtonReleased(mouseX, mouseY, button);
 
         // remove focused when clicking
-        if (bool) setFocused(null);
+        if (bool) setFocusedElement(null);
 
-        this.setDragging(false);
-        return bool;
     }
 
     @Override
+    public void handleMouseInput() {
+        int mouseScroll = Mouse.getEventDWheel();
+        double mouseMoveScroll = Math.signum(mouseScroll) * 1.0; // TODO: Make this 1.0, sensitivity, a config option along with discrete scrolling
+        int mouseX = Mouse.getEventX() * this.width / this.mc.displayWidth;
+        int mouseY = this.height - Mouse.getEventY() * this.height / this.mc.displayHeight - 1;
+
+        if (mouseScrolled(mouseX, mouseY, mouseMoveScroll))
+            return;
+
+        super.handleMouseInput();
+    }
+
     public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
         // hide previous context
         if (contextMenu != null)
@@ -206,46 +248,62 @@ public abstract class AbstractPanelScreen extends GuiScreen {
 
         // fix scrolling targeting only one child
         boolean ret = false;
-        for (GuiEventListener child : this.children()) {
-            if (child.isMouseOver(mouseX, mouseY))
-                ret = ret || child.mouseScrolled(mouseX, mouseY, amount);
+        for (FiguraGuiEventListener child : this.getChildren()) {
+            if (child.mouseOver(mouseX, mouseY))
+                ret = ret || child.mouseScroll(mouseX, mouseY, amount);
         }
         return ret;
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    public void keyTyped(char keyCode, int scanCode) {
         egg += (char) keyCode;
         egg = egg.substring(1);
         if (EGG.equals(egg)) {
-            Minecraft.getInstance().setScreen(new GameScreen(this));
-            return true;
+            Minecraft.getMinecraft().displayGuiScreen(new GameScreen(this));
+            return;
         }
 
-        if (children().contains(panels) && panels.cycleTab(keyCode))
-            return true;
+        if (getChildren().contains(panels) && panels.cycleTab(scanCode))
+            return;
 
-        if (keyCode == 256 && contextMenu != null && contextMenu.isVisible()) {
+        if (scanCode == Keyboard.KEY_ESCAPE && contextMenu != null && contextMenu.isVisible()) {
             contextMenu.setVisible(false);
-            return true;
+            return;
         }
+        super.keyTyped(keyCode, scanCode);
 
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        if (this.getFocusedListener() != null)
+            this.getFocusedListener().pressedKey(keyCode, scanCode);
     }
 
-    protected <T extends Gui> T addRenderableWidget(T widget) {
+    protected <T extends FiguraGuiEventListener & FiguraRenderable> T addRenderableWidget(T widget) {
         this.renderables.add(widget);
-        return addButton(widget);
+        return addWidget(widget);
     }
 
-    protected void removeWidget(Gui child) {
-        if (child instanceof Gui)
+    protected void removeWidget(FiguraGuiEventListener child) {
+        if (child instanceof FiguraRenderable)
             this.renderables.remove(child);
-        this.remove(child);
+        this.children.remove(child);
     }
 
-    protected <T extends Gui> T addRenderableOnly(T drawable) {
+    protected <T extends FiguraRenderable> T addRenderableOnly(T drawable) {
         this.renderables.add(drawable);
         return drawable;
+    }
+
+    protected <T extends AbstractFiguraWidget> T addButton(T button) {
+        this.buttons.add(button);
+        return this.addWidget(button);
+    }
+
+    protected <T extends FiguraGuiEventListener> T addWidget(T listener) {
+        this.children.add(listener);
+        return listener;
+    }
+
+    public ITextComponent getTitle() {
+        return title;
     }
 }

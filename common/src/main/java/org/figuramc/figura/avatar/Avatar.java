@@ -1,43 +1,28 @@
 package org.figuramc.figura.avatar;
 
-import com.mojang.blaze3d.audio.OggAudioStream;
-import com.mojang.blaze3d.audio.SoundBuffer;
-import com.mojang.blaze3d.platform.Lighting;
-import com.mojang.blaze3d.platform.NativeImage;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.math.Matrix3f;
-import com.mojang.math.Matrix4f;
-import com.mojang.math.Vector3f;
-import com.mojang.math.Quaternion;
-import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.model.EntityModel;
-import net.minecraft.client.model.geom.ModelPart;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.entity.LivingEntityRenderer;
-import net.minecraft.client.renderer.entity.player.PlayerRenderer;
-import net.minecraft.client.renderer.texture.OverlayTexture;
-import net.minecraft.core.Direction;
+import net.minecraft.client.model.ModelBase;
+import net.minecraft.client.model.ModelRenderer;
+import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.client.renderer.Matrix4f;
+import net.minecraft.client.renderer.RenderHelper;
+import net.minecraft.client.renderer.entity.RenderLivingBase;
+import net.minecraft.client.renderer.entity.RenderManager;
+import net.minecraft.client.renderer.entity.RenderPlayer;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.CompressedStreamTools;
 import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.nbt.NbtIo;
-import net.minecraft.nbt.Tag;
-import net.minecraft.network.chat.Component;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraft.util.EnumFacing;
+import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.text.ITextComponent;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.phys.Vec3;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.animation.Animation;
 import org.figuramc.figura.animation.AnimationPlayer;
 import org.figuramc.figura.backend2.NetworkStuff;
 import org.figuramc.figura.config.Configs;
+import org.figuramc.figura.ducks.extensions.Vector3fExtension;
 import org.figuramc.figura.lua.FiguraLuaPrinter;
 import org.figuramc.figura.lua.FiguraLuaRuntime;
 import org.figuramc.figura.lua.api.TextureAPI;
@@ -53,6 +38,7 @@ import org.figuramc.figura.lua.api.world.ItemStackAPI;
 import org.figuramc.figura.math.matrix.FiguraMat3;
 import org.figuramc.figura.math.matrix.FiguraMat4;
 import org.figuramc.figura.math.vector.FiguraVec3;
+import org.figuramc.figura.mixin.sound.SoundHandlerAccessor;
 import org.figuramc.figura.model.FiguraModelPart;
 import org.figuramc.figura.model.ParentType;
 import org.figuramc.figura.model.PartCustomization;
@@ -61,6 +47,7 @@ import org.figuramc.figura.model.rendering.EntityRenderMode;
 import org.figuramc.figura.model.rendering.ImmediateAvatarRenderer;
 import org.figuramc.figura.model.rendering.PartFilterScheme;
 import org.figuramc.figura.model.rendering.texture.FiguraTexture;
+import org.figuramc.figura.model.rendering.texture.RenderTypes;
 import org.figuramc.figura.permissions.PermissionManager;
 import org.figuramc.figura.permissions.PermissionPack;
 import org.figuramc.figura.permissions.Permissions;
@@ -69,10 +56,15 @@ import org.figuramc.figura.utils.ui.UIHelper;
 import org.luaj.vm2.LuaError;
 import org.luaj.vm2.LuaValue;
 import org.luaj.vm2.Varargs;
+import org.lwjgl.BufferUtils;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.util.vector.Quaternion;
+import paulscode.sound.SoundBuffer;
 
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.nio.FloatBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -116,7 +108,7 @@ public class Avatar {
 
     public final PermissionPack.PlayerPermissionPack permissions;
 
-    public final Map<String, SoundBuffer> customSounds = new HashMap<>();
+    public final Map<String, byte[]> customSounds = new HashMap<>();
     public final Map<Integer, Animation> animations = new HashMap<>();
 
     // runtime status
@@ -403,7 +395,7 @@ public class Avatar {
         return isCancelled(result);
     }
 
-    public boolean itemRenderEvent(ItemStackAPI item, String mode, FiguraVec3 pos, FiguraVec3 rot, FiguraVec3 scale, boolean leftHanded, PoseStack stack, MultiBufferSource bufferSource, int light, int overlay) {
+    public boolean itemRenderEvent(ItemStackAPI item, String mode, FiguraVec3 pos, FiguraVec3 rot, FiguraVec3 scale, boolean leftHanded, RenderTypes.FiguraBufferSource bufferSource, int light, int overlay) {
         Varargs result = loaded ? run("ITEM_RENDER", render, item, mode, pos, rot, scale, leftHanded) : null;
         if (result == null)
             return false;
@@ -411,7 +403,7 @@ public class Avatar {
         boolean rendered = false;
         for (int i = 1; i <= result.narg(); i++) {
             if (result.arg(i).isuserdata(FiguraModelPart.class))
-                rendered |= renderItem(stack, bufferSource, (FiguraModelPart) result.arg(i).checkuserdata(FiguraModelPart.class), light, overlay);
+                rendered |= renderItem(bufferSource, (FiguraModelPart) result.arg(i).checkuserdata(FiguraModelPart.class), light, overlay);
         }
         return rendered;
     }
@@ -487,7 +479,7 @@ public class Avatar {
         complexity.remaining = prev;
     }
 
-    public void render(Entity entity, float yaw, float delta, float alpha, PoseStack stack, MultiBufferSource bufferSource, int light, int overlay, LivingEntityRenderer<?, ?> entityRenderer, PartFilterScheme filter, boolean translucent, boolean glowing) {
+    public void render(Entity entity, float yaw, float delta, float alpha, RenderTypes.FiguraBufferSource bufferSource, int light, int overlay, RenderLivingBase<?> entityRenderer, PartFilterScheme filter, boolean translucent, boolean glowing) {
         if (renderer == null || !loaded)
             return;
 
@@ -496,7 +488,7 @@ public class Avatar {
         renderer.entity = entity;
 
         renderer.setupRenderer(
-                filter, bufferSource, stack,
+                filter, bufferSource,
                 delta, light, alpha, overlay,
                 translucent, glowing
         );
@@ -504,7 +496,7 @@ public class Avatar {
         render();
     }
 
-    public synchronized void worldRender(Entity entity, double camX, double camY, double camZ, PoseStack stack, MultiBufferSource bufferSource, int lightFallback, float tickDelta, EntityRenderMode mode) {
+    public synchronized void worldRender(Entity entity, double camX, double camY, double camZ, RenderTypes.FiguraBufferSource bufferSource, int lightFallback, float tickDelta, EntityRenderMode mode) {
         if (renderer == null || !loaded)
             return;
 
@@ -517,8 +509,8 @@ public class Avatar {
         renderer.entity = entity;
 
         renderer.setupRenderer(
-                PartFilterScheme.WORLD, bufferSource, stack,
-                tickDelta, lightFallback, 1f, OverlayTexture.NO_OVERLAY,
+                PartFilterScheme.WORLD, bufferSource,
+                tickDelta, lightFallback, 1f, 10 << 16,
                 false, false,
                 camX, camY, camZ
         );
@@ -529,7 +521,7 @@ public class Avatar {
         renderer.updateLight = false;
     }
 
-    public void capeRender(Entity entity, MultiBufferSource bufferSource, PoseStack stack, int light, float tickDelta, ModelPart cloak) {
+    public void capeRender(Entity entity, RenderTypes.FiguraBufferSource bufferSource, int light, float tickDelta, ModelRenderer cloak) {
         if (renderer == null || !loaded)
             return;
 
@@ -541,8 +533,8 @@ public class Avatar {
         renderer.entity = entity;
 
         renderer.setupRenderer(
-                PartFilterScheme.CAPE, bufferSource, stack,
-                tickDelta, light, 1f, OverlayTexture.NO_OVERLAY,
+                PartFilterScheme.CAPE, bufferSource,
+                tickDelta, light, 1f, 10 << 16,
                 renderer.translucent, renderer.glowing
         );
 
@@ -551,7 +543,7 @@ public class Avatar {
         FiguraMod.popProfiler(3);
     }
 
-    public void elytraRender(Entity entity, MultiBufferSource bufferSource, PoseStack stack, int light, float tickDelta, EntityModel<?> model) {
+    public void elytraRender(Entity entity, RenderTypes.FiguraBufferSource bufferSource, int light, float tickDelta, ModelBase model) {
         if (renderer == null || !loaded)
             return;
 
@@ -562,8 +554,8 @@ public class Avatar {
         renderer.entity = entity;
 
         renderer.setupRenderer(
-                PartFilterScheme.LEFT_ELYTRA, bufferSource, stack,
-                tickDelta, light, 1f, OverlayTexture.NO_OVERLAY,
+                PartFilterScheme.LEFT_ELYTRA, bufferSource,
+                tickDelta, light, 1f, 10 << 16,
                 renderer.translucent, renderer.glowing
         );
 
@@ -581,7 +573,7 @@ public class Avatar {
         FiguraMod.popProfiler(4);
     }
 
-    public void firstPersonWorldRender(Entity watcher, MultiBufferSource bufferSource, PoseStack matrices, Camera camera, float tickDelta) {
+    public void firstPersonWorldRender(Entity watcher, RenderTypes.FiguraBufferSource bufferSource, RenderManager camera, float tickDelta) {
         if (renderer == null || !loaded)
             return;
 
@@ -589,19 +581,19 @@ public class Avatar {
         FiguraMod.pushProfiler(this);
         FiguraMod.pushProfiler("firstPersonWorldRender");
 
-        int light = Minecraft.getInstance().getEntityRenderDispatcher().getPackedLightCoords(watcher, tickDelta);
-        Vec3 camPos = camera.getPosition();
+        int light = camera.world.getCombinedLight(watcher.getPosition(), 0);
+        Vec3d camPos = new Vec3d(camera.viewerPosX, camera.viewerPosY, camera.viewerPosZ);
 
-        worldRender(watcher, camPos.x, camPos.y, camPos.z, matrices, bufferSource, light, tickDelta, EntityRenderMode.FIRST_PERSON_WORLD);
+        worldRender(watcher, camPos.x, camPos.y, camPos.z, bufferSource, light, tickDelta, EntityRenderMode.FIRST_PERSON_WORLD);
 
         FiguraMod.popProfiler(3);
     }
 
-    public void firstPersonRender(PoseStack stack, MultiBufferSource bufferSource, Player player, PlayerRenderer playerRenderer, ModelPart arm, int light, float tickDelta) {
+    public void firstPersonRender(RenderTypes.FiguraBufferSource bufferSource, EntityPlayer player, RenderPlayer playerRenderer, ModelRenderer arm, int light, float tickDelta) {
         if (renderer == null || !loaded)
             return;
 
-        boolean lefty = arm == playerRenderer.getModel().leftArm;
+        boolean lefty = arm == playerRenderer.getMainModel().bipedLeftArm;
 
         FiguraMod.pushProfiler(FiguraMod.MOD_ID);
         FiguraMod.pushProfiler(this);
@@ -614,14 +606,17 @@ public class Avatar {
         renderer.allowMatrixUpdate = false;
         renderer.ignoreVanillaVisibility = true;
 
-        stack.pushPose();
+        GlStateManager.pushMatrix();
         if (!config) {
-            stack.mulPose(Vector3f.ZP.rotation(arm.zRot));
-            stack.mulPose(Vector3f.YP.rotation(arm.yRot));
-            stack.mulPose(Vector3f.XP.rotation(arm.xRot));
+            // GlStateManager.rotate(arm.rotateAngleZ, 0,0,1); //TODO: Remove quaternions here
+            GlStateManager.rotate(((Vector3fExtension)UIHelper.ZP).figura$rotation(arm.rotateAngleZ));
+         //   stack.mulPose(Vector3f.YP.rotation(arm.yRot));
+            GlStateManager.rotate(((Vector3fExtension)UIHelper.YP).figura$rotation(arm.rotateAngleY));
+           // stack.mulPose(Vector3f.XP.rotation(arm.xRot));
+            GlStateManager.rotate(((Vector3fExtension)UIHelper.XP).figura$rotation(arm.rotateAngleX));
         }
-        render(player, 0f, tickDelta, 1f, stack, bufferSource, light, OverlayTexture.NO_OVERLAY, playerRenderer, filter, false, false);
-        stack.popPose();
+        render(player, 0f, tickDelta, 1f, bufferSource, light, 10 << 16, playerRenderer, filter, false, false);
+        GlStateManager.popMatrix();
 
         renderer.allowHiddenTransforms = true;
         renderer.ignoreVanillaVisibility = false;
@@ -629,57 +624,58 @@ public class Avatar {
         FiguraMod.popProfiler(4);
     }
 
-    public void hudRender(PoseStack stack, MultiBufferSource bufferSource, Entity entity, float tickDelta) {
+    public void hudRender(RenderTypes.FiguraBufferSource bufferSource, Entity entity, float tickDelta) {
         if (renderer == null || !loaded)
             return;
 
         FiguraMod.pushProfiler(this);
         FiguraMod.pushProfiler("hudRender");
 
-        stack.pushPose();
-        stack.last().pose().multiply(Matrix4f.createScaleMatrix(16, 16, -16));
-        stack.last().normal().mul(Matrix3f.createScaleMatrix(1, 1, -1));
+        GlStateManager.pushMatrix();
+        //TODO investigate if the matrix still needs to be scaled:tm:
+        GlStateManager.scale(16, 16, -16);
+        GlStateManager.scale(1, 1, -1); // We flip on Z
 
-        Lighting.setupForFlatItems();
-        RenderSystem.disableDepthTest();
+        RenderHelper.enableGUIStandardItemLighting();
+        GlStateManager.disableDepth();
 
         renderer.entity = entity;
 
         renderer.setupRenderer(
-                PartFilterScheme.HUD, bufferSource, stack,
-                tickDelta, 15 << 20 | 15 << 4, 1f, OverlayTexture.NO_OVERLAY,
+                PartFilterScheme.HUD, bufferSource,
+                tickDelta, 15 << 20 | 15 << 4, 1f, 10 << 16,
                 false, false
         );
 
         if (renderer.renderSpecialParts() > 0)
-            ((MultiBufferSource.BufferSource) renderer.bufferSource).endBatch();
+            renderer.bufferSource.endBatch();
 
-        RenderSystem.enableDepthTest();
-        Lighting.setupFor3DItems();
-        stack.popPose();
+        GlStateManager.enableDepth();
+        RenderHelper.enableStandardItemLighting();
+        GlStateManager.popMatrix();
 
         FiguraMod.popProfiler(2);
     }
 
-    public boolean skullRender(PoseStack stack, MultiBufferSource bufferSource, int light, Direction direction, float yaw) {
+    public boolean skullRender(RenderTypes.FiguraBufferSource bufferSource, int light, EnumFacing direction, float yaw) {
         if (renderer == null || !loaded || !renderer.allowSkullRendering)
             return false;
-
-        stack.pushPose();
+        //TODO: check if these are still necessary too
+        GlStateManager.pushMatrix();
 
         if (direction == null)
-            stack.translate(0.5d, 0d, 0.5d);
+            GlStateManager.translate(0.5d, 0d, 0.5d);
         else
-            stack.translate((0.5d - direction.getStepX() * 0.25d), 0.25d, (0.5d - direction.getStepZ() * 0.25d));
+            GlStateManager.translate((0.5d - direction.getFrontOffsetX() * 0.25d), 0.25d, (0.5d - direction.getFrontOffsetZ() * 0.25d));
 
-        stack.scale(-1f, -1f, 1f);
-        stack.mulPose(Vector3f.YP.rotationDegrees(yaw));
+        GlStateManager.scale(-1f, -1f, 1f);
+        GlStateManager.rotate(((Vector3fExtension)UIHelper.YP).figura$rotationDegrees(yaw));
 
         renderer.allowPivotParts = false;
 
         renderer.setupRenderer(
-                PartFilterScheme.SKULL, bufferSource, stack,
-                1f, light, 1f, OverlayTexture.NO_OVERLAY,
+                PartFilterScheme.SKULL, bufferSource,
+                1f, light, 1f, 10 << 16,
                 false, false
         );
 
@@ -687,14 +683,14 @@ public class Avatar {
         complexity.use(comp);
 
         // head
-        boolean bool = comp > 0 || headRender(stack, bufferSource, light, true);
+        boolean bool = comp > 0 || headRender(bufferSource, light, true);
 
         renderer.allowPivotParts = true;
-        stack.popPose();
+        GlStateManager.popMatrix();
         return bool;
     }
 
-    public boolean headRender(PoseStack stack, MultiBufferSource bufferSource, int light, boolean useComplexity) {
+    public boolean headRender(RenderTypes.FiguraBufferSource bufferSource, int light, boolean useComplexity) {
         if (renderer == null || !loaded)
             return false;
 
@@ -702,8 +698,8 @@ public class Avatar {
 
         // pre render
         renderer.setupRenderer(
-                PartFilterScheme.HEAD, bufferSource, stack,
-                1f, light, 1f, OverlayTexture.NO_OVERLAY,
+                PartFilterScheme.HEAD, bufferSource,
+                1f, light, 1f, 10 << 16,
                 false, false
         );
 
@@ -724,18 +720,23 @@ public class Avatar {
         return comp > 0 && luaRuntime != null && !luaRuntime.vanilla_model.HEAD.checkVisible();
     }
 
-    public boolean renderPortrait(PoseStack pose, int x, int y, int size, float modelScale, boolean upsideDown) {
+    public static FloatBuffer posBuf = BufferUtils.createFloatBuffer(16);
+    public boolean renderPortrait(int x, int y, int size, float modelScale, boolean upsideDown) {
         if (!Configs.AVATAR_PORTRAIT.value || renderer == null || !loaded)
             return false;
 
         // matrices
-        pose.pushPose();
-        pose.translate(x, y, 0d);
-        pose.scale(modelScale, modelScale * (upsideDown ? 1 : -1), modelScale);
-        pose.mulPose(Vector3f.XP.rotationDegrees(180f));
+        GlStateManager.pushMatrix();
+        GlStateManager.translate(x, y, 0d);
+        GlStateManager.scale(modelScale, modelScale * (upsideDown ? 1 : -1), modelScale);
+        GlStateManager.rotate(((Vector3fExtension)UIHelper.XP).figura$rotationDegrees(180f)); //TODO remove quaternionss
 
         // scissors
-        FiguraVec3 pos = FiguraMat4.of().set(pose.last().pose()).apply(0d, 0d, 0d);
+        GlStateManager.getFloat(GL11.GL_MODELVIEW_MATRIX, posBuf);
+        Matrix4f transformedPos = new Matrix4f();
+        transformedPos.load(posBuf);
+
+        FiguraVec3 pos = FiguraMat4.of().set(transformedPos).apply(0d, 0d, 0d);
 
         int x1 = (int) pos.x;
         int y1 = (int) pos.y;
@@ -747,28 +748,28 @@ public class Avatar {
         UIHelper.dollScale = 16f;
 
         // setup render
-        pose.translate(4d / 16d, upsideDown ? 0 : (8d / 16d), 0d);
+        GlStateManager.translate(4d / 16d, upsideDown ? 0 : (8d / 16d), 0d);
 
-        Lighting.setupForFlatItems();
+        RenderHelper.enableGUIStandardItemLighting();
 
-        MultiBufferSource.BufferSource buffer = Minecraft.getInstance().renderBuffers().bufferSource();
+        RenderTypes.FiguraBufferSource buffer = RenderTypes.FiguraBufferSource.INSTANCE;
         int light = 15 << 20 | 15 << 4;
 
         renderer.allowPivotParts = false;
 
         renderer.setupRenderer(
-                PartFilterScheme.PORTRAIT, buffer, pose,
-                1f, light, 1f, OverlayTexture.NO_OVERLAY,
+                PartFilterScheme.PORTRAIT, buffer,
+                1f, light, 1f, 10 << 16,
                 false, false
         );
 
         // render
         int comp = renderer.renderSpecialParts();
-        boolean ret = comp > 0 || headRender(pose, buffer, light, false);
+        boolean ret = comp > 0 || headRender(buffer, light, false);
 
         // after render
         buffer.endBatch();
-        pose.popPose();
+        GlStateManager.popMatrix();
 
         UIHelper.disableScissor();
         UIHelper.paperdoll = false;
@@ -779,59 +780,59 @@ public class Avatar {
         return ret;
     }
 
-    public boolean renderArrow(PoseStack stack, MultiBufferSource bufferSource, float delta, int light) {
+    public boolean renderArrow(RenderTypes.FiguraBufferSource bufferSource, float delta, int light) {
         if (renderer == null || !loaded)
             return false;
 
-        stack.pushPose();
-        Quaternion quaternionf = Vector3f.XP.rotationDegrees(135f);
-        Quaternion quaternionf2 = Vector3f.YP.rotationDegrees(-90f);
-        quaternionf.mul(quaternionf2);
-        stack.mulPose(quaternionf);
+        GlStateManager.pushMatrix();
+        Quaternion quaternionf = ((Vector3fExtension)UIHelper.XP).figura$rotationDegrees(135f); //TODO quaternionss
+        Quaternion quaternionf2 = ((Vector3fExtension)UIHelper.YP).figura$rotationDegrees(-90f);
+        Quaternion.mul(quaternionf, quaternionf2, quaternionf);
+        GlStateManager.rotate(quaternionf);
 
         renderer.setupRenderer(
-                PartFilterScheme.ARROW, bufferSource, stack,
-                delta, light, 1f, OverlayTexture.NO_OVERLAY,
+                PartFilterScheme.ARROW, bufferSource,
+                delta, light, 1f, 10 << 16,
                 false, false
         );
 
         int comp = renderer.renderSpecialParts();
 
-        stack.popPose();
+        GlStateManager.popMatrix();
         return comp > 0;
     }
 
-    public boolean renderTrident(PoseStack stack, MultiBufferSource bufferSource, float delta, int light) {
+    public boolean renderTrident(RenderTypes.FiguraBufferSource bufferSource, float delta, int light) {
         if (renderer == null || !loaded)
             return false;
 
-        stack.pushPose();
-        Quaternion quaternionf = Vector3f.ZP.rotationDegrees(90f);
-        Quaternion quaternionf2 = Vector3f.YP.rotationDegrees(90f);
-        quaternionf.mul(quaternionf2);
-        stack.mulPose(quaternionf);
+        GlStateManager.pushMatrix();
+        Quaternion quaternionf = ((Vector3fExtension)UIHelper.ZP).figura$rotationDegrees(90f);
+        Quaternion quaternionf2 = ((Vector3fExtension)UIHelper.YP).figura$rotationDegrees(90f);
+        Quaternion.mul(quaternionf, quaternionf2, quaternionf);
+        GlStateManager.rotate(quaternionf);
 
         renderer.setupRenderer(
-                PartFilterScheme.TRIDENT, bufferSource, stack,
-                delta, light, 1f, OverlayTexture.NO_OVERLAY,
+                PartFilterScheme.TRIDENT, bufferSource,
+                delta, light, 1f, 10 << 16,
                 false, false
         );
 
         int comp = renderer.renderSpecialParts();
 
-        stack.popPose();
+        GlStateManager.popMatrix();
         return comp > 0;
     }
 
-    public boolean renderItem(PoseStack stack, MultiBufferSource bufferSource, FiguraModelPart part, int light, int overlay) {
+    public boolean renderItem(RenderTypes.FiguraBufferSource bufferSource, FiguraModelPart part, int light, int overlay) {
         if (renderer == null || !loaded || part.parentType != ParentType.Item)
             return false;
 
-        stack.pushPose();
-        stack.mulPose(Vector3f.ZP.rotationDegrees(180f));
+        GlStateManager.pushMatrix();
+        GlStateManager.rotate(((Vector3fExtension)UIHelper.ZP).figura$rotationDegrees(180f));
 
         renderer.setupRenderer(
-                PartFilterScheme.ITEM, bufferSource, stack,
+                PartFilterScheme.ITEM, bufferSource,
                 1f, light, 1f, overlay,
                 false, false
         );
@@ -840,12 +841,12 @@ public class Avatar {
 
         int ret = renderer.renderSpecialParts();
 
-        stack.popPose();
+        GlStateManager.popMatrix();
         return ret > 0;
     }
 
     private static final PartCustomization PIVOT_PART_RENDERING_CUSTOMIZATION = new PartCustomization();
-    public synchronized boolean pivotPartRender(ParentType parent, Consumer<PoseStack> consumer) {
+    public synchronized boolean pivotPartRender(ParentType parent, Consumer<Matrix4f> consumer) {
         if (renderer == null || !loaded || !parent.isPivot)
             return false;
 
@@ -860,15 +861,15 @@ public class Avatar {
             PIVOT_PART_RENDERING_CUSTOMIZATION.setPositionMatrix(matrixPair.getFirst());
             PIVOT_PART_RENDERING_CUSTOMIZATION.setNormalMatrix(matrixPair.getSecond());
             PIVOT_PART_RENDERING_CUSTOMIZATION.needsMatrixRecalculation = false;
-            PoseStack stack = PIVOT_PART_RENDERING_CUSTOMIZATION.copyIntoGlobalPoseStack();
-            consumer.accept(stack);
+            Matrix4f position = PIVOT_PART_RENDERING_CUSTOMIZATION.copyIntoGlobalPoseStack();
+            consumer.accept(position);
         }
 
         queue.clear();
         return true;
     }
 
-    public void updateMatrices(LivingEntityRenderer<?, ?> entityRenderer, PoseStack stack) {
+    public void updateMatrices(RenderLivingBase<?> entityRenderer) {
         if (renderer == null || !loaded)
             return;
 
@@ -878,7 +879,7 @@ public class Avatar {
 
         renderer.vanillaModelData.update(entityRenderer);
         renderer.currentFilterScheme = PartFilterScheme.MODEL;
-        renderer.setMatrices(stack);
+        renderer.setMatrices();
         renderer.updateMatrices();
 
         FiguraMod.popProfiler(3);
@@ -937,8 +938,8 @@ public class Avatar {
 
     public void clearSounds() {
         SoundAPI.getSoundEngine().figura$stopSound(owner, null);
-        for (SoundBuffer value : customSounds.values())
-            value.releaseAlBuffer();
+        for (Map.Entry<String, byte[]> value : customSounds.entrySet())
+            customSounds.remove(value.getKey(), value.getValue());
     }
 
     public void closeSockets() {
@@ -973,7 +974,7 @@ public class Avatar {
         try {
             // get size
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            NbtIo.writeCompressed(nbt, baos);
+            CompressedStreamTools.writeCompressed(nbt, baos);
             return baos.size();
         } catch (Exception e) {
             FiguraMod.LOGGER.warn("Failed to generate file size for model " + this.name, e);
@@ -990,19 +991,19 @@ public class Avatar {
     // -- loading -- //
 
     private void createLuaRuntime() {
-        if (!nbt.contains("scripts"))
+        if (!nbt.hasKey("scripts"))
             return;
 
         Map<String, String> scripts = new HashMap<>();
-        CompoundTag scriptsNbt = nbt.getCompound("scripts");
-        for (String s : scriptsNbt.getAllKeys())
+        NBTTagCompound scriptsNbt = nbt.getCompoundTag("scripts");
+        for (String s : scriptsNbt.getKeySet())
             scripts.put(PathUtils.computeSafeString(s), new String(scriptsNbt.getByteArray(s), StandardCharsets.UTF_8));
 
-        CompoundTag metadata = nbt.getCompound("metadata");
+        NBTTagCompound metadata = nbt.getCompoundTag("metadata");
 
-        ListTag autoScripts;
-        if (metadata.contains("autoScripts"))
-            autoScripts = metadata.getList("autoScripts", NbtType.STRING.getValue());
+        NBTTagList autoScripts;
+        if (metadata.hasKey("autoScripts"))
+            autoScripts = metadata.getTagList("autoScripts", NbtType.STRING.getValue());
         else
             autoScripts = null;
 
@@ -1020,28 +1021,30 @@ public class Avatar {
     }
 
     private void loadAnimations() {
-        if (!nbt.contains("animations"))
+        if (!nbt.hasKey("animations"))
             return;
 
         ArrayList<String> autoAnims = new ArrayList<>();
-        CompoundTag metadata = nbt.getCompound("metadata");
-        if (metadata.contains("autoAnims")) {
-            for (Tag name : metadata.getList("autoAnims", NbtType.STRING.getValue()))
-                autoAnims.add(name.getAsString());
+        NBTTagCompound metadata = nbt.getCompoundTag("metadata");
+        if (metadata.hasKey("autoAnims")) {
+            NBTTagList codeList = metadata.getTagList("autoAnims", NbtType.STRING.getValue());
+            for (int tagIndx = 0; tagIndx < codeList.tagCount(); tagIndx++) {
+                autoAnims.add(codeList.getStringTagAt(tagIndx));
+            }
         }
 
-        ListTag root = nbt.getList("animations", NbtType.COMPOUND.getValue());
-        for (int i = 0; i < root.size(); i++) {
+        NBTTagList root = nbt.getTagList("animations", NbtType.COMPOUND.getValue());
+        for (int i = 0; i < root.tagCount(); i++) {
             try {
-                CompoundTag animNbt = root.getCompound(i);
+                NBTTagCompound animNbt = root.getCompoundTagAt(i);
 
-                if (!animNbt.contains("mdl") || !animNbt.contains("name"))
+                if (!animNbt.hasKey("mdl") || !animNbt.hasKey("name"))
                     continue;
 
                 String mdl = animNbt.getString("mdl");
                 String name = animNbt.getString("name");
                 Animation.LoopMode loop = Animation.LoopMode.ONCE;
-                if (animNbt.contains("loop")) {
+                if (animNbt.hasKey("loop")) {
                     try {
                         loop = Animation.LoopMode.valueOf(animNbt.getString("loop").toUpperCase());
                     } catch (Exception ignored) {}
@@ -1049,17 +1052,18 @@ public class Avatar {
 
                 Animation animation = new Animation(this,
                         mdl, name, loop,
-                        animNbt.contains("ovr") && animNbt.getBoolean("ovr"),
-                        animNbt.contains("len") ? animNbt.getFloat("len") : 0f,
-                        animNbt.contains("off") ? animNbt.getFloat("off") : 0f,
-                        animNbt.contains("bld") ? animNbt.getFloat("bld") : 1f,
-                        animNbt.contains("sdel") ? animNbt.getFloat("sdel") : 0f,
-                        animNbt.contains("ldel") ? animNbt.getFloat("ldel") : 0f
+                        animNbt.hasKey("ovr") && animNbt.getBoolean("ovr"),
+                        animNbt.hasKey("len") ? animNbt.getFloat("len") : 0f,
+                        animNbt.hasKey("off") ? animNbt.getFloat("off") : 0f,
+                        animNbt.hasKey("bld") ? animNbt.getFloat("bld") : 1f,
+                        animNbt.hasKey("sdel") ? animNbt.getFloat("sdel") : 0f,
+                        animNbt.hasKey("ldel") ? animNbt.getFloat("ldel") : 0f
                 );
 
-                if (animNbt.contains("code")) {
-                    for (Tag code : animNbt.getList("code", NbtType.COMPOUND.getValue())) {
-                        CompoundTag compound = (CompoundTag) code;
+                if (animNbt.hasKey("code")) {
+                    NBTTagList codeList = animNbt.getTagList("code", NbtType.COMPOUND.getValue());
+                    for (int tagIndx = 0; tagIndx < codeList.tagCount(); tagIndx++) {
+                        NBTTagCompound compound = codeList.getCompoundTagAt(tagIndx);
                         animation.newCode(compound.getFloat("time"), compound.getString("src"));
                     }
                 }
@@ -1073,11 +1077,11 @@ public class Avatar {
     }
 
     private void loadCustomSounds() {
-        if (!nbt.contains("sounds"))
+        if (!nbt.hasKey("sounds"))
             return;
 
-        CompoundTag root = nbt.getCompound("sounds");
-        for (String key : root.getAllKeys()) {
+        NBTTagCompound root = nbt.getCompoundTag("sounds");
+        for (String key : root.getKeySet()) {
             try {
                 loadSound(key, root.getByteArray(key));
             } catch (Exception e) {
@@ -1087,10 +1091,7 @@ public class Avatar {
     }
 
     public void loadSound(String name, byte[] data) throws Exception {
-        try (ByteArrayInputStream inputStream = new ByteArrayInputStream(data); OggAudioStream oggAudioStream = new OggAudioStream(inputStream)) {
-            SoundBuffer sound = new SoundBuffer(oggAudioStream.readAll(), oggAudioStream.getFormat());
-            this.customSounds.put(name, sound);
-        }
+        this.customSounds.put(name, data);
     }
 
     public FiguraTexture registerTexture(String name, BufferedImage image, boolean ignoreSize) {
@@ -1102,7 +1103,7 @@ public class Avatar {
 
         FiguraTexture oldText = renderer.customTextures.get(name);
         if (oldText != null)
-            oldText.close();
+            oldText.deleteGlTexture();
 
         if (renderer.customTextures.size() > TextureAPI.TEXTURE_LIMIT)
             throw new LuaError("Maximum amount of textures reached!");

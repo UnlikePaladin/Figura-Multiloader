@@ -8,4 +8,6 @@ public interface Vector3fExtension {
 
     void figura$transform(Quaternion rotation);
     Quaternion figura$rotationDegrees(float f);
+
+    Quaternion figura$rotation(float f);
 }

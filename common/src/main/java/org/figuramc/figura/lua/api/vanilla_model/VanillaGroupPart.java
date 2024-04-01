@@ -1,6 +1,6 @@
 package org.figuramc.figura.lua.api.vanilla_model;
 
-import net.minecraft.client.model.EntityModel;
+import net.minecraft.client.model.ModelBase;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.lua.LuaWhitelist;
 import org.figuramc.figura.lua.docs.LuaMethodDoc;
@@ -30,25 +30,25 @@ public class VanillaGroupPart extends VanillaPart {
     }
 
     @Override
-    public void save(EntityModel<?> model) {
+    public void save(ModelBase model) {
         for (VanillaPart part : cachedParts)
             part.save(model);
     }
 
     @Override
-    public void preTransform(EntityModel<?> model) {
+    public void preTransform(ModelBase model) {
         for (VanillaPart part : cachedParts)
             part.preTransform(model);
     }
 
     @Override
-    public void posTransform(EntityModel<?> model) {
+    public void posTransform(ModelBase model) {
         for (VanillaPart part : cachedParts)
             part.posTransform(model);
     }
 
     @Override
-    public void restore(EntityModel<?> model) {
+    public void restore(ModelBase model) {
         for (VanillaPart part : cachedParts)
             part.restore(model);
     }

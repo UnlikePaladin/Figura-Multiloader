@@ -1,16 +1,15 @@
 package org.figuramc.figura.lua.api;
 
-import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.renderer.texture.TextureMap;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.ResourceLocation;
+import org.figuramc.figura.ducks.TextureMapAccessor;
 import org.figuramc.figura.lua.LuaNotNil;
 import org.figuramc.figura.lua.LuaWhitelist;
 import org.figuramc.figura.lua.docs.LuaMethodDoc;
 import org.figuramc.figura.lua.docs.LuaMethodOverload;
 import org.figuramc.figura.lua.docs.LuaTypeDoc;
 import org.figuramc.figura.math.vector.FiguraVec4;
-import org.figuramc.figura.ducks.TextureAtlasAccessor;
 import org.figuramc.figura.utils.LuaUtils;
 
 import java.util.ArrayList;
@@ -32,10 +31,7 @@ public class TextureAtlasAPI {
     @LuaWhitelist
     @LuaMethodDoc("texture_atlas.list_sprites")
     public List<String> listSprites() {
-        List<String> list = new ArrayList<>();
-        for (ResourceLocation res : ((TextureAtlasAccessor) atlas).getTexturesByName().keySet())
-            list.add(res.toString());
-        return list;
+        return new ArrayList<>(((TextureMapAccessor) atlas).getTexturesByName().keySet());
     }
 
     @LuaWhitelist
@@ -48,8 +44,8 @@ public class TextureAtlasAPI {
     )
     public FiguraVec4 getSpriteUV(@LuaNotNil String sprite) {
         ResourceLocation spriteLocation = LuaUtils.parsePath(sprite);
-        TextureAtlasSprite s = atlas.getSprite(spriteLocation);
-        return FiguraVec4.of(s.getU0(), s.getV0(), s.getU1(), s.getV1());
+        TextureAtlasSprite s = atlas.getAtlasSprite(spriteLocation.toString());
+        return FiguraVec4.of(s.getMinU(), s.getMinV(), s.getMaxU(), s.getMaxV());
     }
 
 
@@ -67,6 +63,6 @@ public class TextureAtlasAPI {
 
     @Override
     public String toString() {
-        return "TextureAtlas (" + atlas.location() + ")";
+        return "TextureAtlas (" + ((TextureMapAccessor)atlas).getAtlasName() + ")";
     }
 }

@@ -2,6 +2,7 @@ package org.figuramc.figura.gui;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
+import net.minecraft.entity.Entity;
 import net.minecraft.world.entity.Entity;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.Avatar;
@@ -22,12 +23,12 @@ public class FiguraGui {
         FiguraMod.popProfiler();
 
         // get avatar
-        Entity entity = Minecraft.getInstance().getCameraEntity();
+        Entity entity = Minecraft.getMinecraft().getRenderViewEntity();
         Avatar avatar = entity == null ? null : AvatarManager.getAvatar(entity);
 
         if (avatar != null) {
             // hud parent type
-            avatar.hudRender(poseStack, Minecraft.getInstance().renderBuffers().bufferSource(), entity, tickDelta);
+            avatar.hudRender(poseStack, Minecraft.getMinecraft().renderBuffers().bufferSource(), entity, tickDelta);
 
             // hud hidden by script
             if (avatar.luaRuntime != null && !avatar.luaRuntime.renderer.renderHUD) {

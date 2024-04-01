@@ -1,10 +1,9 @@
 package org.figuramc.figura.gui;
 
-import com.mojang.blaze3d.platform.Window;
-import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.player.Player;
+import net.minecraft.client.gui.ScaledResolution;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.player.EntityPlayer;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.avatar.AvatarManager;
 import org.figuramc.figura.config.Configs;
@@ -15,30 +14,28 @@ public class PaperDoll {
 
     private static Long lastActivityTime = 0L;
 
-    public static void render(PoseStack stack, boolean force) {
-        Minecraft minecraft = Minecraft.getInstance();
-        LivingEntity entity = minecraft.getCameraEntity() instanceof LivingEntity ? (LivingEntity) minecraft.getCameraEntity() : null;
+    public static void render(boolean force) {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        EntityLivingBase entity = minecraft.getRenderViewEntity() instanceof EntityLivingBase ? (EntityLivingBase) minecraft.getRenderViewEntity() : null;
         Avatar avatar;
 
         if ((!Configs.HAS_PAPERDOLL.value && !force) ||
                 entity == null ||
-                !Minecraft.renderNames() ||
-                minecraft.options.renderDebug ||
-                (Configs.FIRST_PERSON_PAPERDOLL.value && !minecraft.options.getCameraType().isFirstPerson() && !force) ||
-                entity.isSleeping())
+                Minecraft.getMinecraft().gameSettings.hideGUI ||
+                minecraft.gameSettings.showDebugInfo ||
+                (Configs.FIRST_PERSON_PAPERDOLL.value && minecraft.gameSettings.thirdPersonView != 0 && !force) ||
+                entity.isPlayerSleeping())
             return;
 
         // check if it should stay always on
         if (!Configs.PAPERDOLL_ALWAYS_ON.value && !force && (avatar = AvatarManager.getAvatar(entity)) != null && avatar.luaRuntime != null && !avatar.luaRuntime.renderer.forcePaperdoll) {
             // if action - reset activity time and enable can draw
             if (entity.isSprinting() ||
-                    entity.isCrouching() ||
-                    entity.isAutoSpinAttack() ||
-                    entity.isVisuallySwimming() ||
-                    entity.isFallFlying() ||
-                    entity.isBlocking() ||
-                    entity.onClimbable() ||
-                    (entity instanceof Player && ((Player) entity).abilities.flying))
+                    entity.isSneaking() ||
+                    entity.isElytraFlying() ||
+                    entity.isActiveItemStackBlocking() ||
+                    entity.isOnLadder() ||
+                    (entity instanceof EntityPlayer && ((EntityPlayer) entity).capabilities.isFlying))
                 lastActivityTime = System.currentTimeMillis();
 
                 // if activity time is greater than duration - return
@@ -47,10 +44,9 @@ public class PaperDoll {
         }
 
         // draw
-        Window window = minecraft.getWindow();
-        float screenWidth = window.getWidth();
-        float screenHeight = window.getHeight();
-        float guiScale = (float) window.getGuiScale();
+        float screenWidth = minecraft.displayWidth;
+        float screenHeight = minecraft.displayHeight;
+        float guiScale = (float) new ScaledResolution(minecraft).getScaleFactor();
 
         float scale = Configs.PAPERDOLL_SCALE.tempValue;
         float x = scale * 25f;
@@ -62,7 +58,7 @@ public class PaperDoll {
                 x, y,
                 scale * 30f,
                 Configs.PAPERDOLL_PITCH.tempValue, Configs.PAPERDOLL_YAW.tempValue,
-                entity, stack, EntityRenderMode.PAPERDOLL
+                entity, EntityRenderMode.PAPERDOLL
         );
     }
 }

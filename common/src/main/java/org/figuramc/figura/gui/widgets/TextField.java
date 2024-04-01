@@ -1,98 +1,113 @@
 package org.figuramc.figura.gui.widgets;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TextComponent;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.Mth;
+import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.client.gui.GuiPageButtonList;
+import net.minecraft.client.gui.GuiTextField;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.Style;
+import net.minecraft.util.text.TextFormatting;
+import org.figuramc.figura.mixin.font.FontRendererAccessor;
+import org.figuramc.figura.mixin.gui.GuiTextFieldAccessor;
 import org.figuramc.figura.utils.FiguraIdentifier;
 import org.figuramc.figura.utils.FiguraText;
 import org.figuramc.figura.utils.TextUtils;
 import org.figuramc.figura.utils.ui.UIHelper;
 
-import java.util.function.Consumer;
-
 public class TextField extends AbstractContainerElement {
 
     public static final ResourceLocation BACKGROUND = new FiguraIdentifier("textures/gui/text_field.png");
-    public static final int ENABLED_COLOR = ChatFormatting.WHITE.getColor();
-    public static final int DISABLED_COLOR = ChatFormatting.DARK_GRAY.getColor();
+    public static Integer ENABLED_COLOR = null;
+    public static Integer DISABLED_COLOR = null;
+
+    public static int getEnabledColor() {
+        if (ENABLED_COLOR == null) {
+            ENABLED_COLOR = ((FontRendererAccessor)Minecraft.getMinecraft().fontRenderer).getColors()[TextFormatting.WHITE.getColorIndex()];
+        }
+        return ENABLED_COLOR;
+    }
+
+    public static int getDisabledColor() {
+        if (DISABLED_COLOR == null) {
+            DISABLED_COLOR = ((FontRendererAccessor)Minecraft.getMinecraft().fontRenderer).getColors()[TextFormatting.DARK_GRAY.getColorIndex()];
+        }
+        return DISABLED_COLOR;
+    }
 
     private final HintType hint;
-    private final EditBox field;
+    private final GuiTextField field;
     private int borderColour = 0xFFFFFFFF;
     private boolean enabled = true;
 
-    public TextField(int x, int y, int width, int height, HintType hint, Consumer<String> changedListener) {
+    public TextField(int x, int y, int width, int height, HintType hint, GuiPageButtonList.GuiResponder changedListener) {
         super(x, y, width, height);
         this.hint = hint;
 
-        field = new EditBox(Minecraft.getInstance().font, x + 4, y + (height - 8) / 2, width - 12, height - (height - 8) / 2, TextComponent.EMPTY.copy());
-        field.setMaxLength(32767);
-        field.setBordered(false);
-        field.setResponder(changedListener);
-        children.add(field);
+        field = new GuiTextField(0, Minecraft.getMinecraft().fontRenderer, x + 4, y + (height - 8) / 2, width - 12, height - (height - 8) / 2);
+        field.setText("");
+        field.setMaxStringLength(32767);
+        field.setEnableBackgroundDrawing(false);
+        field.setGuiResponder(changedListener);
     }
 
     @Override
     public void tick() {
-        field.tick();
+        field.updateCursorCounter();
         super.tick();
     }
 
     @Override
-    public void render(PoseStack stack, int mouseX, int mouseY, float delta) {
+    public void draw(Minecraft mc, int mouseX, int mouseY, float delta) {
         if (!isVisible()) return;
 
         // render background
-        UIHelper.renderSliced(stack, getX(), getY(), getWidth(), getHeight(), !isEnabled() ? 0f : this.isMouseOver(mouseX, mouseY) ? 32f : 16f, 0f, 16, 16, 48, 16, BACKGROUND);
+        UIHelper.renderSliced(getX(), getY(), getWidth(), getHeight(), !isEnabled() ? 0f : this.mouseOver(mouseX, mouseY) ? 32f : 16f, 0f, 16, 16, 48, 16, BACKGROUND);
 
         // render outline
         if (isFocused())
-            UIHelper.fillOutline(stack, getX(), getY(), getWidth(), getHeight(), borderColour);
+            UIHelper.fillOutline(getX(), getY(), getWidth(), getHeight(), borderColour);
 
         // hint text
-        if (hint != null && field.getValue().isEmpty() && !field.isFocused())
-            renderHint(stack);
+        if (hint != null && field.getText().isEmpty() && !field.isFocused())
+            renderHint(mc);
 
         // children
-        super.render(stack, mouseX, mouseY, delta);
+        super.draw(mc, mouseX, mouseY, delta);
+        field.drawTextBox();
     }
 
-    protected void renderHint(PoseStack stack) {
-        Font font = Minecraft.getInstance().font;
-        font.drawShadow(
-                stack, hint.hint.copy().append(TextUtils.ELLIPSIS).withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.ITALIC),
-                getX() + 4, getY() + (int) ((getHeight() - font.lineHeight + 1) / 2f), 0xFFFFFF
+    protected void renderHint(Minecraft mc) {
+        FontRenderer font = mc.fontRenderer;
+        font.drawStringWithShadow(
+                hint.hint.createCopy().appendSibling(TextUtils.ELLIPSIS).setStyle(new Style().setColor(TextFormatting.DARK_GRAY).setItalic(true)).getUnformattedText(),
+                getX() + 4, getY() + (int) ((getHeight() - font.FONT_HEIGHT + 1) / 2f), 0xFFFFFF
         );
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseButtonClicked(int mouseX, int mouseY, int button) {
         // mouse over check
-        if (!isEnabled() || !this.isMouseOver(mouseX, mouseY))
+        if (!isEnabled() || !this.mouseOver(mouseX, mouseY))
             return false;
 
         // hacky
-        mouseX = Mth.clamp(mouseX, field.x, field.x + field.getWidth() - 1);
-        mouseY = Mth.clamp(mouseY, field.y, field.y + field.getHeight() - 1);
+        mouseX = MathHelper.clamp(mouseX, field.x, field.x + field.getWidth() - 1);
+        mouseY = MathHelper.clamp(mouseY, field.y, field.y + ((GuiTextFieldAccessor)field).getHeight() - 1);
 
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseButtonClicked(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    public boolean mouseButtonReleased(int mouseX, int mouseY, int button) {
         return !field.isFocused();
     }
 
     @Override
     public void setX(int x) {
         super.setX(x);
-        this.field.setX(x + 4);
+        this.field.x = (x + 4);
     }
 
     @Override
@@ -109,7 +124,7 @@ public class TextField extends AbstractContainerElement {
         return borderColour;
     }
 
-    public EditBox getField() {
+    public GuiTextField getField() {
         return field;
     }
 
@@ -119,21 +134,24 @@ public class TextField extends AbstractContainerElement {
             return;
 
         super.setVisible(visible);
-        this.field.setFocus(false);
+        this.field.setFocused(false);
     }
 
     public void setColor(int color) {
-        this.field.setTextColor(enabled ? color : DISABLED_COLOR);
+        this.field.setTextColor(enabled ? color : getDisabledColor());
     }
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
-        setColor(ENABLED_COLOR);
+        setColor(getEnabledColor());
     }
 
     @Override
-    public boolean changeFocus(boolean bl) {
-        return this.field.changeFocus(bl);
+    public boolean focusChange(boolean bl) {
+        if (!field.getVisible() || !((GuiTextFieldAccessor)field).isEnabled()) return false;
+
+        this.field.setFocused(bl);
+        return true;
     }
 
     public boolean isEnabled() {
@@ -156,7 +174,7 @@ public class TextField extends AbstractContainerElement {
         SEARCH,
         NAME;
 
-        private final Component hint;
+        private final ITextComponent hint;
 
         HintType() {
             this.hint = new FiguraText("gui.text_hint." + this.name().toLowerCase());

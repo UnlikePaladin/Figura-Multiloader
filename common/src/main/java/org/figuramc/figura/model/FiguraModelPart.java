@@ -1,8 +1,5 @@
 package org.figuramc.figura.model;
 
-import com.mojang.datafixers.util.Pair;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.texture.OverlayTexture;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.lua.LuaNotNil;
 import org.figuramc.figura.lua.LuaWhitelist;
@@ -1146,7 +1143,7 @@ public class FiguraModelPart implements Comparable<FiguraModelPart> {
         }
 
         FiguraVec2 lightVec = LuaUtils.parseVec2("setLight", light, skyLight);
-        this.customization.light = LightTexture.pack((int) lightVec.x, (int) lightVec.y);
+        this.customization.light = ((int) lightVec.x) | ((int) lightVec.y) << 16;
         return this;
     }
 
@@ -1159,7 +1156,7 @@ public class FiguraModelPart implements Comparable<FiguraModelPart> {
     @LuaMethodDoc("model_part.get_light")
     public FiguraVec2 getLight() {
         Integer light = this.customization.light;
-        return light == null ? null : FiguraVec2.of(LightTexture.block(light), LightTexture.sky(light));
+        return light == null ? null : FiguraVec2.of(light >> 4 & 0xFFFF, light >> 20 & 0xFFFF);
     }
 
     @LuaWhitelist
@@ -1183,7 +1180,7 @@ public class FiguraModelPart implements Comparable<FiguraModelPart> {
         }
 
         FiguraVec2 overlayVec = LuaUtils.parseVec2("setOverlay", whiteOverlay, hurtOverlay);
-        this.customization.overlay = OverlayTexture.pack((int) overlayVec.x, (int) overlayVec.y);
+        this.customization.overlay = ((int) overlayVec.x) | ((int) overlayVec.y) << 16;
         return this;
     }
 

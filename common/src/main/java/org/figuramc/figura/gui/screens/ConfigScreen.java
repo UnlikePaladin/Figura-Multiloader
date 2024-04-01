@@ -1,11 +1,10 @@
 package org.figuramc.figura.gui.screens;
 
-import com.mojang.blaze3d.platform.InputConstants;
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiPageButtonList;
+import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
 import org.figuramc.figura.config.ConfigManager;
 import org.figuramc.figura.config.ConfigType;
 import org.figuramc.figura.gui.PaperDoll;
@@ -18,6 +17,7 @@ import org.figuramc.figura.utils.IOUtils;
 import org.figuramc.figura.utils.NbtType;
 import org.figuramc.figura.utils.TextUtils;
 import org.figuramc.figura.utils.ui.UIHelper;
+import org.lwjgl.input.Keyboard;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -31,18 +31,18 @@ public class ConfigScreen extends AbstractPanelScreen {
     private final boolean hasPanels;
     public boolean renderPaperdoll;
 
-    public ConfigScreen(Screen parentScreen) {
+    public ConfigScreen(GuiScreen parentScreen) {
         this(parentScreen, true);
     }
 
-    public ConfigScreen(Screen parentScreen, boolean enablePanels) {
+    public ConfigScreen(GuiScreen parentScreen, boolean enablePanels) {
         super(parentScreen, new FiguraText("gui.panels.title.settings"));
         this.hasPanels = enablePanels;
     }
 
     @Override
-    protected void init() {
-        super.init();
+    public void initGui() {
+        super.initGui();
         loadNbt();
 
         if (!hasPanels) {
@@ -57,7 +57,22 @@ public class ConfigScreen extends AbstractPanelScreen {
         int width = Math.min(this.width - 8, 420);
         list = new ConfigList((this.width - width) / 2, 52, width, height - 80, this);
 
-        this.addRenderableWidget(new SearchBar(this.width / 2 - 122, 28, 244, 20, query -> list.updateSearch(query.toLowerCase())));
+        this.addRenderableWidget(new SearchBar(this.width / 2 - 122, 28, 244, 20, new GuiPageButtonList.GuiResponder() {
+            @Override
+            public void setEntryValue(int i, boolean value) {
+                list.updateSearch(String.valueOf(value));
+            }
+
+            @Override
+            public void setEntryValue(int i, float value) {
+                list.updateSearch(String.valueOf(value));
+            }
+
+            @Override
+            public void setEntryValue(int i, String value) {
+                list.updateSearch(value.toLowerCase());
+            }
+        }));
         this.addRenderableWidget(list);
 
         // -- bottom buttons -- //
@@ -80,35 +95,43 @@ public class ConfigScreen extends AbstractPanelScreen {
     }
 
     @Override
-    public void removed() {
+    public void onGuiClosed() {
         ConfigManager.applyConfig();
         ConfigManager.saveConfig();
         saveNbt();
-        super.removed();
+        super.onGuiClosed();
     }
 
     @Override
-    public void renderBackground(PoseStack stack, float delta) {
-        super.renderBackground(stack, delta);
+    public void renderBackground(float delta) {
+        super.renderBackground(delta);
         if (renderPaperdoll)
-            UIHelper.renderWithoutScissors(() -> PaperDoll.render(stack, true));
+            UIHelper.renderWithoutScissors(() -> PaperDoll.render(true));
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        return list.updateKey(InputConstants.Type.MOUSE.getOrCreate(button)) || super.mouseClicked(mouseX, mouseY, button);
+    protected void mouseClicked(int mouseX, int mouseY, int button) {
+        // -100 from Mojank's GuiControls
+        if (list.updateKey(-100 + button))
+            return;
+
+        super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        return list.updateKey(keyCode == 256 ? InputConstants.UNKNOWN : InputConstants.getKey(keyCode, scanCode)) || super.keyPressed(keyCode, scanCode, modifiers);
+    public void keyTyped(char c, int scanCode) {
+        // 1 is Escape here / 256 for whatever reason, 0 is unbound
+        if(list.updateKey(scanCode == Keyboard.KEY_ESCAPE ? 0: scanCode != 0 ? scanCode : (c+256)))
+            return;
+
+        super.keyTyped(c, scanCode);
     }
 
     private static void loadNbt() {
         IOUtils.readCacheFile("settings", nbt -> {
-            ListTag groupList = nbt.getList("settings", NbtType.COMPOUND.getValue());
-            for (Tag tag : groupList) {
-                CompoundTag compound = (CompoundTag) tag;
+            NBTTagList groupList = nbt.getTagList("settings", NbtType.COMPOUND.getValue());
+            for (int i = 0; i < groupList.tagCount(); i++) {
+                NBTTagCompound compound = groupList.getCompoundTagAt(i);
 
                 String config = compound.getString("config");
                 boolean expanded = compound.getBoolean("expanded");
@@ -119,16 +142,16 @@ public class ConfigScreen extends AbstractPanelScreen {
 
     private static void saveNbt() {
         IOUtils.saveCacheFile("settings", nbt -> {
-            ListTag list = new ListTag();
+            NBTTagList list = new NBTTagList();
 
             for (Map.Entry<ConfigType.Category, Boolean> entry : CATEGORY_DATA.entrySet()) {
-                CompoundTag compound = new CompoundTag();
-                compound.putString("config", entry.getKey().id);
-                compound.putBoolean("expanded", entry.getValue());
-                list.add(compound);
+                NBTTagCompound compound = new NBTTagCompound();
+                compound.setString("config", entry.getKey().id);
+                compound.setBoolean("expanded", entry.getValue());
+                list.appendTag(compound);
             }
 
-            nbt.put("settings", list);
+            nbt.setTag("settings", list);
         });
     }
 

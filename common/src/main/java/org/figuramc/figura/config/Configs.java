@@ -1,8 +1,9 @@
 package org.figuramc.figura.config;
 
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.network.chat.Component;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.Style;
+import net.minecraft.util.text.TextFormatting;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.AvatarManager;
 import org.figuramc.figura.avatar.local.CacheAvatarLoader;
@@ -56,11 +57,11 @@ public class Configs {
             PAPERDOLL = new ConfigType.Category("paperdoll"),
             MISC = new ConfigType.Category("misc"),
             DEV = new ConfigType.Category("dev") {{
-                this.name = this.name.copy().withStyle(ChatFormatting.RED);
+                this.name = this.name.createCopy().setStyle(new Style().setColor(TextFormatting.RED));
             }},
             NETWORKING = new ConfigType.Category("networking") {{
-                this.name = this.name.copy().withStyle(ChatFormatting.RED);
-                this.tooltip = this.tooltip.copy().withStyle(ChatFormatting.RED);
+                this.name = this.name.createCopy().setStyle(new Style().setColor(TextFormatting.RED));
+                this.tooltip = this.tooltip.createCopy().setStyle(new Style().setColor(TextFormatting.RED));
             }};
 
 
@@ -72,12 +73,12 @@ public class Configs {
             PREVIEW_NAMEPLATE = new ConfigType.BoolConfig("preview_nameplate", NAMEPLATE, false),
             SOUND_BADGE = new ConfigType.BoolConfig("sound_badge", NAMEPLATE, true);
     private static final String NAMEPLATE_PATH = "config.nameplate_level.";
-    private static final List<Component> NAMEPLATE_ENUM = Arrays.asList(
+    private static final List<ITextComponent> NAMEPLATE_ENUM = Arrays.asList(
             new FiguraText(NAMEPLATE_PATH + "1"),
             new FiguraText(NAMEPLATE_PATH + "2"),
             new FiguraText(NAMEPLATE_PATH + "3")
     );
-    private static final List<Component> NAMEPLATE_TOOLTIP = Arrays.asList(
+    private static final List<ITextComponent> NAMEPLATE_TOOLTIP = Arrays.asList(
             new FiguraText(NAMEPLATE_PATH + "1.tooltip"),
             new FiguraText(NAMEPLATE_PATH + "2.tooltip"),
             new FiguraText(NAMEPLATE_PATH + "3.tooltip")
@@ -107,8 +108,8 @@ public class Configs {
                 {
                     String tooltip = "config.format_script.tooltip.";
                     this.tooltip = new FiguraText(tooltip + "1")
-                            .append("\n")
-                            .append(new FiguraText(tooltip + "2").withStyle(ChatFormatting.RED));
+                            .appendText("\n")
+                            .appendSibling(new FiguraText(tooltip + "2").setStyle(new Style().setColor(TextFormatting.RED)));
                 }
 
                 @Override
@@ -217,10 +218,10 @@ public class Configs {
             },
             DEFAULT_PERMISSION_LEVEL = new ConfigType.EnumConfig("default_permission_level", MISC, 2, Permissions.Category.values().length) {
                 {
-                    List<Component> list = new ArrayList<>();
+                    List<ITextComponent> list = new ArrayList<>();
                     Permissions.Category[] categories = Permissions.Category.values();
                     for (Permissions.Category category : categories)
-                        list.add(category.text.copy());
+                        list.add(category.text.createCopy());
                     this.enumList = list;
                     this.enumTooltip = null;
                 }
@@ -251,17 +252,17 @@ public class Configs {
             SYNC_PINGS = new ConfigType.BoolConfig("sync_pings", DEV, false) {{
         String tooltip = "config.sync_pings.tooltip.";
         this.tooltip = new FiguraText(tooltip + "1")
-                .append("\n")
-                .append(new FiguraText(tooltip + "2").withStyle(ChatFormatting.RED));
+                .appendText("\n")
+                .appendSibling(new FiguraText(tooltip + "2").setStyle(new Style().setColor(TextFormatting.RED)));
     }},
             CHAT_MESSAGES = new ConfigType.BoolConfig("chat_messages", DEV, false) {{
-                this.name = this.name.copy().withStyle(ChatFormatting.RED);
+                this.name = this.name.createCopy().setStyle(new Style().setColor(TextFormatting.RED));
                 String tooltip = "config.chat_messages.tooltip.";
                 this.tooltip = new FiguraText(tooltip + "1")
-                        .append("\n\n")
-                        .append(new FiguraText(tooltip + "2").withStyle(ChatFormatting.RED))
-                        .append("\n\n")
-                        .append(new FiguraText(tooltip + "3").withStyle(ChatFormatting.RED, ChatFormatting.BOLD));
+                        .appendText("\n\n")
+                        .appendSibling(new FiguraText(tooltip + "2").setStyle(new Style().setColor(TextFormatting.RED)))
+                        .appendText("\n\n")
+                        .appendSibling(new FiguraText(tooltip + "3").setStyle(new Style().setColor(TextFormatting.RED).setBold(true)));
             }};
     public static final ConfigType.FolderConfig
             MAIN_DIR = new ConfigType.FolderConfig("main_dir", DEV, "") {
@@ -291,7 +292,7 @@ public class Configs {
     }),
             REDOWNLOAD_ASSETS = new ConfigType.ButtonConfig("redownload_assets", DEV, () -> {
                 FiguraRuntimeResources.init();
-                Minecraft.getInstance().reloadResourcePacks();
+                Minecraft.getMinecraft().refreshResources();
             }),
             CLEAR_AVATAR_DATA = new ConfigType.ButtonConfig("clear_avatar_data", DEV, () -> {
                 ConfigAPI.clearAllData();

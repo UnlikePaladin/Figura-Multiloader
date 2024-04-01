@@ -1,7 +1,7 @@
 package org.figuramc.figura.lua.api.vanilla_model;
 
-import net.minecraft.client.model.EntityModel;
-import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.model.ModelBase;
+import net.minecraft.client.model.ModelRenderer;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.lua.LuaWhitelist;
 import org.figuramc.figura.lua.docs.LuaMethodDoc;
@@ -19,7 +19,7 @@ import java.util.function.Function;
 public class VanillaModelPart extends VanillaPart {
 
     private final ParentType parentType;
-    private final Function<EntityModel<?>, ModelPart> provider;
+    private final Function<ModelBase, ModelRenderer> provider;
 
     // backup
     private float backupPosX, backupPosY, backupPosZ;
@@ -33,45 +33,45 @@ public class VanillaModelPart extends VanillaPart {
     private final FiguraVec3 originPos = FiguraVec3.of();
     private final FiguraVec3 originScale = FiguraVec3.of();
 
-    public VanillaModelPart(Avatar owner, String name, ParentType parentType, Function<EntityModel<?>, ModelPart> provider) {
+    public VanillaModelPart(Avatar owner, String name, ParentType parentType, Function<ModelBase, ModelRenderer> provider) {
         super(owner, name);
         this.parentType = parentType;
         this.provider = provider;
     }
 
-    private ModelPart getPart(EntityModel<?> model) {
+    private ModelRenderer getPart(ModelBase model) {
         return provider == null ? null : provider.apply(model);
     }
 
     @Override
-    public void save(EntityModel<?> model) {
+    public void save(ModelBase model) {
         saved = false;
-        ModelPart part = getPart(model);
+        ModelRenderer part = getPart(model);
         if (part == null) return;
 
         // set getters
-        originRot.set(-part.xRot, -part.yRot, part.zRot);
+        originRot.set(-part.rotateAngleX, -part.rotateAngleY, part.rotateAngleZ);
         originRot.scale(180 / Math.PI);
 
         FiguraVec3 pivot = parentType.offset.copy();
-        pivot.subtract(part.x, part.y, part.z);
+        pivot.subtract(part.rotationPointX, part.rotationPointY, part.rotationPointZ);
         pivot.multiply(1, -1, -1);
         originPos.set(pivot);
 
         //originScale.set(part.xScale, part.yScale, part.zScale);
 
         // save visible
-        originVisible = part.visible;
+        originVisible = part.showModel;
 
         // save pos
-        backupPosX = part.x;
-        backupPosY = part.y;
-        backupPosZ = part.z;
+        backupPosX = part.rotationPointX;
+        backupPosY = part.rotationPointY;
+        backupPosZ = part.rotationPointZ;
 
         // save rot
-        backupRotX = part.xRot;
-        backupRotY = part.yRot;
-        backupRotZ = part.zRot;
+        backupRotX = part.rotateAngleX;
+        backupRotY = part.rotateAngleY;
+        backupRotZ = part.rotateAngleZ;
 
         // save scale
         //backupScaleX = part.xScale;
@@ -82,31 +82,31 @@ public class VanillaModelPart extends VanillaPart {
     }
 
     @Override
-    public void preTransform(EntityModel<?> model) {
+    public void preTransform(ModelBase model) {
         if (!saved) return;
 
-        ModelPart part = getPart(model);
+        ModelRenderer part = getPart(model);
         if (part == null) return;
 
         // pos
         if (pos != null) {
-            part.x += (float) -pos.x;
-            part.y += (float) -pos.y;
-            part.z += (float) pos.z;
+            part.rotationPointX += (float) -pos.x;
+            part.rotationPointY += (float) -pos.y;
+            part.rotationPointZ += (float) pos.z;
         }
 
         // rot
         if (rot != null) {
             FiguraVec3 rot = this.rot.toRad();
-            part.xRot = (float) -rot.x;
-            part.yRot = (float) -rot.y;
-            part.zRot = (float) rot.z;
+            part.rotateAngleX = (float) -rot.x;
+            part.rotateAngleY = (float) -rot.y;
+            part.rotateAngleZ = (float) rot.z;
         }
         if (offsetRot != null) {
             FiguraVec3 rot = offsetRot.toRad();
-            part.xRot += (float) -rot.x;
-            part.yRot += (float) -rot.y;
-            part.zRot += (float) rot.z;
+            part.rotateAngleX += (float) -rot.x;
+            part.rotateAngleY += (float) -rot.y;
+            part.rotateAngleZ += (float) rot.z;
         }
         // scale
 //        if (scale != null) {
@@ -119,34 +119,34 @@ public class VanillaModelPart extends VanillaPart {
     }
 
     @Override
-    public void posTransform(EntityModel<?> model) {
+    public void posTransform(ModelBase model) {
         if (visible == null)
             return;
 
-        ModelPart part = getPart(model);
+        ModelRenderer part = getPart(model);
         if (part != null)
-            part.visible = visible;
+            part.showModel = visible;
     }
 
     @Override
-    public void restore(EntityModel<?> model) {
-        ModelPart part = getPart(model);
+    public void restore(ModelBase model) {
+        ModelRenderer part = getPart(model);
         if (part == null) return;
 
         // restore visible
-        part.visible = originVisible;
+        part.showModel = originVisible;
 
         if (!saved) return;
 
         // restore pos
-        part.x = backupPosX;
-        part.y = backupPosY;
-        part.z = backupPosZ;
+        part.rotationPointX = backupPosX;
+        part.rotationPointY = backupPosY;
+        part.rotationPointZ = backupPosZ;
 
         // restore rot
-        part.xRot = backupRotX;
-        part.yRot = backupRotY;
-        part.zRot = backupRotZ;
+        part.rotateAngleX = backupRotX;
+        part.rotateAngleY = backupRotY;
+        part.rotateAngleZ = backupRotZ;
 
         // restore scale
 //        part.xScale = backupScaleX;

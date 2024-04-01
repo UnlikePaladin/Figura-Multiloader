@@ -1,20 +1,22 @@
 package org.figuramc.figura.entries.forge;
 
-import net.minecraftforge.fml.ModList;
-import net.minecraftforge.forgespi.language.ModFileScanData;
+import net.minecraftforge.fml.common.discovery.ASMDataTable;
 import org.figuramc.figura.FiguraMod;
+import org.figuramc.figura.entries.EntryPointManager;
 import org.figuramc.figura.entries.annotations.FiguraAPIPlugin;
 import org.figuramc.figura.entries.annotations.FiguraPermissionsPlugin;
 import org.figuramc.figura.entries.annotations.FiguraScreenPlugin;
 import org.figuramc.figura.entries.annotations.FiguraVanillaPartPlugin;
-import org.objectweb.asm.Type;
 
 import java.lang.reflect.Constructor;
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
-public class EntryPointManagerImpl {
+public class EntryPointManagerImpl extends EntryPointManager {
     public static final Map<String, Class<?>> nameToAnnotationClass = new HashMap<>();
-
+    private static ASMDataTable dataTable;
     static {
         nameToAnnotationClass.put("figura_api", FiguraAPIPlugin.class);
         nameToAnnotationClass.put("figura_permissions", FiguraPermissionsPlugin.class);
@@ -22,34 +24,28 @@ public class EntryPointManagerImpl {
         nameToAnnotationClass.put("figura_vanilla_part", FiguraVanillaPartPlugin.class);
     }
 
-    public static <T> Set<T> load(String name, Class<T> clazz) {
+    @Override
+    public <T> Set<T> load(String name, Class<T> clazz) {
         Set<T> ret = new HashSet<>();
         Class<?> annotationClass = nameToAnnotationClass.get(name);
         if (annotationClass != null) {
-            Type annotationType = Type.getType(annotationClass);
-            List<ModFileScanData> modFileScanDataList = ModList.get().getAllScanData();
-            Set<String> pluginClassNames = new LinkedHashSet<>();
-            for (ModFileScanData scanData : modFileScanDataList) {
-                Iterable<ModFileScanData.AnnotationData> annotations = scanData.getAnnotations();
-                for (ModFileScanData.AnnotationData a : annotations) {
-                    if (Objects.equals(a.getAnnotationType(), annotationType)) {
-                        String memberName = a.getMemberName();
-                        pluginClassNames.add(memberName);
-                    }
-                }
-            }
-            for (String className : pluginClassNames) {
+            Set<ASMDataTable.ASMData> data = dataTable.getAll(annotationClass.getCanonicalName());
+            for (ASMDataTable.ASMData asmData : data) {
                 try {
-                    Class<?> asmClass = Class.forName(className);
+                    Class<?> asmClass = Class.forName(asmData.getClassName());
                     Class<? extends T> asmInstanceClass = asmClass.asSubclass(clazz);
                     Constructor<? extends T> constructor = asmInstanceClass.getDeclaredConstructor();
                     T instance = constructor.newInstance();
                     ret.add(instance);
                 } catch (ReflectiveOperationException | LinkageError e) {
-                    FiguraMod.LOGGER.error("Failed to load entrypoint: {}", className, e);
+                    FiguraMod.LOGGER.error("Failed to load entrypoint: {}", asmData.getClassName(), e);
                 }
             }
         }
         return ret;
+    }
+
+    public void setASMDataTable(ASMDataTable table) {
+        dataTable = table;
     }
 }

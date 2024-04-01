@@ -1,11 +1,11 @@
 package org.figuramc.figura.model.rendering.texture;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientPacketListener;
-import net.minecraft.client.multiplayer.PlayerInfo;
-import net.minecraft.client.renderer.texture.MissingTextureAtlasSprite;
-import net.minecraft.resources.ResourceLocation;
-import org.figuramc.figura.mixin.render.layers.elytra.ElytraLayerAccessor;
+import net.minecraft.client.network.NetHandlerPlayClient;
+import net.minecraft.client.network.NetworkPlayerInfo;
+import net.minecraft.client.renderer.texture.TextureMap;
+import net.minecraft.util.ResourceLocation;
+import org.figuramc.figura.mixin.render.layers.elytra.LayerElytraAccessor;
 import org.figuramc.figura.model.TextureCustomization;
 import org.jetbrains.annotations.Nullable;
 
@@ -28,7 +28,7 @@ public class FiguraTextureSet {
     public void clean() {
         for (FiguraTexture texture : textures) {
             if (texture != null)
-                texture.close();
+                texture.deleteGlTexture();
         }
     }
 
@@ -65,21 +65,21 @@ public class FiguraTextureSet {
             case SKIN:
             case CAPE:
             case ELYTRA: {
-                ClientPacketListener connection = Minecraft.getInstance().getConnection();
+                NetHandlerPlayClient connection = Minecraft.getMinecraft().getConnection();
                 if (connection == null) {
                     return null;
                 } else {
-                    PlayerInfo info = connection.getPlayerInfo(owner);
+                    NetworkPlayerInfo info = connection.getPlayerInfo(owner);
                     if (info == null) {
                         return null;
                     } else {
                         switch (type) {
                             case CAPE:
-                                return info.getCapeLocation();
+                                return info.getLocationCape();
                             case ELYTRA:
-                                return info.getElytraLocation() == null ? ElytraLayerAccessor.getWingsLocation() : info.getElytraLocation();
+                                return info.getLocationElytra() == null ? LayerElytraAccessor.getWingsLocation() : info.getLocationElytra();
                             default:
-                                return info.getSkinLocation();
+                                return info.getLocationSkin();
                         }
                     }
                 }
@@ -88,7 +88,7 @@ public class FiguraTextureSet {
                 try {
                     return new ResourceLocation(String.valueOf(pair.getValue()));
                 } catch (Exception ignored) {
-                    return MissingTextureAtlasSprite.getLocation();
+                    return TextureMap.LOCATION_MISSING_TEXTURE;
                 }
             }
             case PRIMARY:
@@ -103,7 +103,7 @@ public class FiguraTextureSet {
                 try {
                     return ((FiguraTexture) pair.getValue()).getLocation();
                 } catch (Exception ignored) {
-                    return MissingTextureAtlasSprite.getLocation();
+                    return TextureMap.LOCATION_MISSING_TEXTURE;
                 }
             }
             default:

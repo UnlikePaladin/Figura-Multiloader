@@ -1,9 +1,9 @@
 package org.figuramc.figura.gui.widgets.config;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.client.KeyMapping;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TranslatableComponent;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.settings.KeyBinding;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.TextComponentTranslation;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.config.ConfigKeyBinding;
 import org.figuramc.figura.config.ConfigType;
@@ -14,7 +14,7 @@ import org.figuramc.figura.gui.widgets.lists.ConfigList;
 public class KeybindElement extends AbstractConfigElement {
 
     private final KeybindWidgetHelper helper = new KeybindWidgetHelper();
-    private final KeyMapping binding;
+    private final KeyBinding binding;
     private final ParentedButton button;
 
     public KeybindElement(int width, ConfigType.KeybindConfig config, ConfigList parentList, CategoryWidget parentCategory) {
@@ -22,7 +22,7 @@ public class KeybindElement extends AbstractConfigElement {
         this.binding = config.keyBind;
 
         // toggle button
-        children.add(0, button = new ParentedButton(0, 0, 90, 20, this.binding.getTranslatedKeyMessage(), this, button -> {
+        children.add(0, button = new ParentedButton(0, 0, 90, 20, new TextComponentTranslation(this.binding.getKeyDescription()), this, button -> {
             parentList.focusedBinding = binding;
             FiguraMod.processingKeybind = true;
             updateText();
@@ -31,8 +31,8 @@ public class KeybindElement extends AbstractConfigElement {
 
         // overwrite reset button to update the keybind
         children.remove(resetButton);
-        children.add(resetButton = new ParentedButton(getX() + width - 60, getY(), 60, 20, new TranslatableComponent("controls.reset"), this, button -> {
-            binding.setKey(binding.getDefaultKey());
+        children.add(resetButton = new ParentedButton(getX() + width - 60, getY(), 60, 20, new TextComponentTranslation("controls.reset"), this, button -> {
+            binding.setKeyCode(binding.getKeyCodeDefault());
             ((ConfigKeyBinding)binding).saveConfigChanges();
             parentList.updateKeybinds();
         }));
@@ -41,20 +41,20 @@ public class KeybindElement extends AbstractConfigElement {
     }
 
     @Override
-    public void render(PoseStack poseStack, int mouseX, int mouseY, float delta) {
+    public void draw(Minecraft mc, int mouseX, int mouseY, float delta) {
         if (!this.isVisible()) return;
 
         // reset enabled
-        helper.renderConflictBars(poseStack, button.getX() - 8, button.getY() + 2, 4, 16);
+        helper.renderConflictBars(button.getX() - 8, button.getY() + 2, 4, 16);
 
         // super render
-        super.render(poseStack, mouseX, mouseY, delta);
+        super.draw(mc, mouseX, mouseY, delta);
     }
 
     @Override
-    public boolean isMouseOver(double mouseX, double mouseY) {
-        boolean bool = super.isMouseOver(mouseX, mouseY);
-        if (bool && button.isMouseOver(mouseX, mouseY))
+    public boolean mouseOver(double mouseX, double mouseY) {
+        boolean bool = super.mouseOver(mouseX, mouseY);
+        if (bool && button.mouseOver(mouseX, mouseY))
             helper.renderTooltip();
         return bool;
     }
@@ -73,7 +73,7 @@ public class KeybindElement extends AbstractConfigElement {
 
     @Override
     public boolean isDefault() {
-        return this.binding.isDefault();
+        return this.binding.getKeyCode() == this.binding.getKeyCodeDefault();
     }
 
     @Override
@@ -91,7 +91,7 @@ public class KeybindElement extends AbstractConfigElement {
 
         // text
         boolean selected = parentList.focusedBinding == binding;
-        Component text = helper.getText(isDefault, selected, binding.getTranslatedKeyMessage());
+        ITextComponent text = helper.getText(isDefault, selected, new TextComponentTranslation(binding.getKeyDescription()));
         button.setMessage(text);
     }
 }

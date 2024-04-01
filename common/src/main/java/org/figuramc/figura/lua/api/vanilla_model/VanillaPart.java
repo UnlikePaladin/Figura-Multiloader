@@ -1,6 +1,6 @@
 package org.figuramc.figura.lua.api.vanilla_model;
 
-import net.minecraft.client.model.EntityModel;
+import net.minecraft.client.model.ModelBase;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.lua.LuaWhitelist;
 import org.figuramc.figura.lua.docs.LuaMethodDoc;
@@ -33,10 +33,10 @@ public abstract class VanillaPart {
         return visible == null || visible;
     }
 
-    public abstract void save(EntityModel<?> model);
-    public abstract void preTransform(EntityModel<?> model);
-    public abstract void posTransform(EntityModel<?> model);
-    public abstract void restore(EntityModel<?> model);
+    public abstract void save(ModelBase model);
+    public abstract void preTransform(ModelBase model);
+    public abstract void posTransform(ModelBase model);
+    public abstract void restore(ModelBase model);
 
     @LuaWhitelist
     @LuaMethodDoc("vanilla_part.get_visible")

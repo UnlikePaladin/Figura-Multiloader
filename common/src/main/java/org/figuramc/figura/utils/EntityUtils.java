@@ -13,7 +13,7 @@ import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.text.TextFormatting;
 import net.minecraft.world.World;
-import org.figuramc.figura.mixin.ClientWorldInvoker;
+import org.figuramc.figura.mixin.WorldClientInvoker;
 import org.figuramc.figura.mixin.EntityAccessor;
 import org.figuramc.figura.mixin.gui.PlayerTabOverlayAccessor;
 
@@ -35,7 +35,7 @@ public class EntityUtils {
         if (uuidToNetworkID.containsKey(uuid))
             return Minecraft.getMinecraft().world.getEntityByID(uuidToNetworkID.get(uuid));
 
-        for (Entity entity : ((ClientWorldInvoker) Minecraft.getMinecraft().world).getEntityList())
+        for (Entity entity : ((WorldClientInvoker) Minecraft.getMinecraft().world).getEntityList())
             if (uuid.equals(entity.getUniqueID())) {
                 uuidToNetworkID.put(uuid, entity.getEntityId());
                 return entity;

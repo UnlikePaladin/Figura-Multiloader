@@ -1,17 +1,15 @@
 package org.figuramc.figura.gui.screens;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.network.chat.Style;
-import net.minecraft.network.chat.TextComponent;
-import net.minecraft.util.Mth;
-import net.minecraft.world.level.Level;
+import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.Style;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.world.World;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.AvatarManager;
-import org.figuramc.figura.config.Configs;
+import org.figuramc.figura.ducks.extensions.StyleExtension;
 import org.figuramc.figura.gui.FiguraToast;
 import org.figuramc.figura.gui.widgets.Button;
 import org.figuramc.figura.gui.widgets.EntityPreview;
@@ -28,6 +26,7 @@ import org.figuramc.figura.utils.FiguraIdentifier;
 import org.figuramc.figura.utils.FiguraText;
 import org.figuramc.figura.utils.MathUtils;
 import org.figuramc.figura.utils.ui.UIHelper;
+import org.lwjgl.input.Keyboard;
 
 import java.util.UUID;
 
@@ -54,56 +53,56 @@ public class PermissionsScreen extends AbstractPanelScreen {
     private boolean expanded;
     private PlayerPermPackElement dragged = null;
 
-    public PermissionsScreen(Screen parentScreen) {
+    public PermissionsScreen(GuiScreen parentScreen) {
         super(parentScreen, new FiguraText("gui.panels.title.permissions"));
     }
 
     @Override
-    protected void init() {
-        super.init();
+    public void initGui() {
+        super.initGui();
 
         int middle = this.width / 2;
         int listWidth = Math.min(middle - 6, 208);
-        int lineHeight =  font.lineHeight;
+        int lineHeight =  fontRenderer.FONT_HEIGHT;
 
         int entitySize = (int) Math.min(height - 95 - lineHeight * 1.5 - (FiguraMod.debugModeEnabled() ? 24 : 0), listWidth);
         int modelSize = 11 * entitySize / 29;
         int entityX = Math.max(middle + (listWidth - entitySize) / 2 + 1, middle + 2);
 
         // entity widget
-        entityWidget = new EntityPreview(entityX, 28, entitySize, entitySize, modelSize, -15f, 30f, Minecraft.getInstance().player, this);
+        entityWidget = new EntityPreview(entityX, 28, entitySize, entitySize, modelSize, -15f, 30f, Minecraft.getMinecraft().player, this);
 
         // permission slider and list
         slider = new SliderWidget(middle + 2, (int) (entityWidget.getY() + entityWidget.getHeight() + lineHeight * 1.5 + 20), listWidth, 11, 1d, 5, true) {
             @Override
-            public void renderButton(PoseStack pose, int mouseX, int mouseY, float delta) {
-                super.renderButton(pose, mouseX, mouseY, delta);
+            public void drawWidget(Minecraft mc, int mouseX, int mouseY, float delta) {
+                super.drawWidget(mc, mouseX, mouseY, delta);
 
                 PermissionPack selectedPack = playerList.selectedEntry.getPack();
-                MutableComponent text = selectedPack.getCategoryName();
+                ITextComponent text = selectedPack.getCategoryName();
 
-                int x = (int) (this.getX() + this.getWidth() / 2f - font.width(text) * 0.75f);
-                int y = this.getY() - 4 - font.lineHeight * 2;
+                int x = (int) (this.getX() + this.getWidth() / 2f - fontRenderer.getStringWidth(text.getFormattedText()) * 0.75f);
+                int y = this.getY() - 4 - fontRenderer.FONT_HEIGHT * 2;
 
-                pose.pushPose();
-                pose.translate(x, y, 0f);
-                pose.scale(1.5f, 1.5f, 1f);
-                UIHelper.renderOutlineText(pose, font, text, 0, 0, 0xFFFFFF, 0x202020);
-                pose.popPose();
+                GlStateManager.pushMatrix();
+                GlStateManager.translate(x, y, 0f);
+                GlStateManager.scale(1.5f, 1.5f, 1f);
+                UIHelper.renderOutlineText(fontRenderer, text, 0, 0, 0xFFFFFF, 0x202020);
+                GlStateManager.popMatrix();
 
-                MutableComponent info = new TextComponent("?").withStyle(Style.EMPTY.withFont(UIHelper.UI_FONT));
+                ITextComponent info = new TextComponentString("?").setStyle(((StyleExtension)new Style()).setFont(UIHelper.UI_FONT));
                 int color = 0x404040;
 
-                int width = font.width(info);
-                x = Math.min((int) (x + font.width(text) * 1.5f + font.width("  ")), PermissionsScreen.this.width - width);
-                y += font.lineHeight * 0.25f;
+                int width = fontRenderer.getStringWidth(info.getFormattedText());
+                x = Math.min((int) (x + fontRenderer.getStringWidth(text.getFormattedText()) * 1.5f + fontRenderer.getStringWidth("  ")), PermissionsScreen.this.width - width);
+                y += fontRenderer.FONT_HEIGHT * 0.25f;
 
-                if (UIHelper.isMouseOver(x, y, width, font.lineHeight, mouseX, mouseY)) {
+                if (UIHelper.isMouseOver(x, y, width, fontRenderer.FONT_HEIGHT, mouseX, mouseY)) {
                     color = 0xFFFFFF;
                     UIHelper.setTooltip(selectedPack.getCategory().info);
                 }
 
-                font.drawShadow(pose, info, x, y, color);
+                fontRenderer.drawStringWithShadow(info.getFormattedText(), x, y, color);
             }
         };
         permissionsList = new PermissionsList(middle + 2, height, listWidth, height - 54);
@@ -131,7 +130,7 @@ public class PermissionsScreen extends AbstractPanelScreen {
         }));
 
         // back button
-        addRenderableWidget(back = new Button(middle + 6 + bottomButtonsWidth, height - 24, bottomButtonsWidth, 20, new FiguraText("gui.done"), null, bx -> onClose()));
+        addRenderableWidget(back = new Button(middle + 6 + bottomButtonsWidth, height - 24, bottomButtonsWidth, 20, new FiguraText("gui.done"), null, bx -> onGuiClosed()));
 
         // expand button
         addRenderableWidget(expandButton = new SwitchButton( middle + listWidth - 18, height - 24, 20, 20, 0, 0, 20, new FiguraIdentifier("textures/gui/expand_v.png"), 60, 40, new FiguraText("gui.permissions.expand_permissions.tooltip"), btn -> {
@@ -161,8 +160,8 @@ public class PermissionsScreen extends AbstractPanelScreen {
 
         addRenderableWidget(precisePermissions = new SwitchButton(middle + 66, height, listWidth - 88, 20, new FiguraText("gui.permissions.precise"), false) {
             @Override
-            public void onPress() {
-                super.onPress();
+            public void widgetPressed(int mouseX, int mouseY) {
+                super.widgetPressed(mouseX, mouseY);
                 permissionsList.precise = this.isToggled();
                 permissionsList.updateList(playerList.selectedEntry.getPack());
             }
@@ -178,91 +177,89 @@ public class PermissionsScreen extends AbstractPanelScreen {
     }
 
     @Override
-    public void render(PoseStack pose, int mouseX, int mouseY, float delta) {
+    public void drawScreen(int mouseX, int mouseY, float delta) {
         // set entity to render
         AbstractPermPackElement entity = playerList.selectedEntry;
-        Level world = Minecraft.getInstance().level;
+        World world = Minecraft.getMinecraft().world;
         if (world != null && entity instanceof PlayerPermPackElement) {
             PlayerPermPackElement player = (PlayerPermPackElement) entity;
-            entityWidget.setEntity(world.getPlayerByUUID(UUID.fromString(player.getPack().name)));
+            entityWidget.setEntity(world.getPlayerEntityByUUID(UUID.fromString(player.getPack().name)));
         } else
             entityWidget.setEntity(null);
 
         // expand animation
         float lerpDelta = MathUtils.magicDelta(0.6f, delta);
 
-        listYPrecise = Mth.lerp(lerpDelta, listYPrecise, expandButton.isToggled() ? 50f : height + 1);
+        listYPrecise = (float) MathUtils.lerp(lerpDelta, listYPrecise, expandButton.isToggled() ? 50f : height + 1);
         this.permissionsList.setY((int) listYPrecise);
 
-        expandYPrecise = Mth.lerp(lerpDelta, expandYPrecise, expandButton.isToggled() ? listYPrecise - 22f : listYPrecise - 24f);
+        expandYPrecise = (float) MathUtils.lerp(lerpDelta, expandYPrecise, expandButton.isToggled() ? listYPrecise - 22f : listYPrecise - 24f);
         this.expandButton.setY((int) expandYPrecise);
 
-        resetYPrecise = Mth.lerp(lerpDelta, resetYPrecise, expandButton.isToggled() ? listYPrecise - 22f : height);
+        resetYPrecise = (float) MathUtils.lerp(lerpDelta, resetYPrecise, expandButton.isToggled() ? listYPrecise - 22f : height);
         this.resetButton.setY((int) resetYPrecise);
         this.precisePermissions.setY((int) resetYPrecise);
 
         // render
-        super.render(pose, mouseX, mouseY, delta);
+        super.drawScreen(mouseX, mouseY, delta);
     }
 
     @Override
-    public void renderOverlays(PoseStack pose, int mouseX, int mouseY, float delta) {
+    public void renderOverlays(int mouseX, int mouseY, float delta) {
         if (dragged != null && dragged.dragged)
-            dragged.renderDragged(pose, mouseX, mouseY, delta);
+            dragged.renderDragged(mc, mouseX, mouseY, delta);
 
-        super.renderOverlays(pose, mouseX, mouseY, delta);
+        super.renderOverlays(mouseX, mouseY, delta);
     }
 
     @Override
-    public void removed() {
+    public void onGuiClosed() {
         PermissionManager.saveToDisk();
-        super.removed();
+        super.onGuiClosed();
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    public void keyTyped(char keyCode, int scanCode) {
         // yeet ESC key press for collapsing the card list
-        if (keyCode == 256 && expandButton.isToggled()) {
-            expandButton.onPress();
-            return true;
+        if (scanCode == Keyboard.KEY_ESCAPE && expandButton.isToggled()) {
+            expandButton.widgetPressed(0,0);
+            return;
         }
 
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        super.keyTyped(keyCode, scanCode);
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        boolean bool = super.mouseClicked(mouseX, mouseY, button);
+    public void mouseClicked(int mouseX, int mouseY, int button) {
+        super.mouseClicked(mouseX, mouseY, button);
         dragged = null;
 
-        if (button == 0 && playerList.selectedEntry instanceof PlayerPermPackElement && ((PlayerPermPackElement) playerList.selectedEntry).isMouseOver(mouseX, mouseY)) {
+        if (button == 0 && playerList.selectedEntry instanceof PlayerPermPackElement && ((PlayerPermPackElement) playerList.selectedEntry).mouseOver(mouseX, mouseY)) {
             PlayerPermPackElement element = (PlayerPermPackElement) playerList.selectedEntry;
             dragged = element;
             element.anchorX = (int) mouseX;
             element.anchorY = (int) mouseY;
             element.initialY = element.getY();
         }
-
-        return bool;
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+    protected void mouseClickMove(int mouseX, int mouseY, int button, long timeSinceLastClick) {
         if (dragged != null) {
             dragged.index = playerList.getCategoryAt(mouseY);
             dragged.dragged = true;
-            return true;
+            return;
         }
 
-        return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+        super.mouseClickMove(mouseX, mouseY, button, timeSinceLastClick);
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        boolean bool = super.mouseReleased(mouseX, mouseY, button);
+    protected void mouseReleased(int mouseX, int mouseY, int button) {
+        super.mouseReleased(mouseX, mouseY, button);
 
         if (dragged == null || !dragged.dragged)
-            return bool;
+            return;
 
         PermissionPack pack = dragged.getPack();
         Permissions.Category category = Permissions.Category.indexOf(Math.min(dragged.index, Permissions.Category.values().length - 1));
@@ -272,7 +269,6 @@ public class PermissionsScreen extends AbstractPanelScreen {
 
         dragged.dragged = false;
         dragged = null;
-        return bool;
     }
 
     public void updatePermissions(PermissionPack pack) {

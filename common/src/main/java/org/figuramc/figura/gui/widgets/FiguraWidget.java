@@ -1,8 +1,7 @@
 package org.figuramc.figura.gui.widgets;
 
-import net.minecraft.client.gui.components.Widget;
 
-public interface FiguraWidget extends Widget {
+public interface FiguraWidget extends FiguraRenderable {
     boolean isVisible();
     void setVisible(boolean visible);
     int getX();

@@ -29,7 +29,7 @@ import org.figuramc.figura.lua.docs.LuaMethodDoc;
 import org.figuramc.figura.lua.docs.LuaMethodOverload;
 import org.figuramc.figura.lua.docs.LuaTypeDoc;
 import org.figuramc.figura.math.vector.FiguraVec3;
-import org.figuramc.figura.mixin.LivingEntityAccessor;
+import org.figuramc.figura.mixin.EntityLivingBaseAccessor;
 import org.figuramc.figura.mixin.gui.GuiChatAccessor;
 import org.figuramc.figura.mixin.gui.GuiIngameAccessor;
 import org.figuramc.figura.mixin.gui.GuiNewChatAccessor;
@@ -591,7 +591,7 @@ public class HostAPI {
     public boolean isJumping() {
         EntityPlayerSP player = this.minecraft.player;
         if (isHost() && player != null)
-            return ((LivingEntityAccessor) player).isJumping();
+            return ((EntityLivingBaseAccessor) player).isJumping();
         return false;
     }
 

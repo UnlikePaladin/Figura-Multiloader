@@ -1,8 +1,9 @@
 package org.figuramc.figura.lua.api.keybind;
 
-import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.Minecraft;
-import net.minecraft.network.chat.Component;
+import net.minecraft.client.settings.GameSettings;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.TextComponentString;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.lua.LuaNotNil;
 import org.figuramc.figura.lua.LuaWhitelist;
@@ -13,9 +14,11 @@ import org.figuramc.figura.lua.docs.LuaTypeDoc;
 import org.luaj.vm2.LuaError;
 import org.luaj.vm2.LuaFunction;
 import org.luaj.vm2.Varargs;
+import org.lwjgl.input.Keyboard;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 @LuaWhitelist
 @LuaTypeDoc(
@@ -26,9 +29,9 @@ public class FiguraKeybind {
 
     private final Avatar owner;
     private final String name;
-    private final InputConstants.Key defaultKey;
+    private final int defaultKey;
 
-    private InputConstants.Key key;
+    private int key;
     private boolean isDown, override;
     private boolean enabled = true;
     private boolean gui;
@@ -41,7 +44,7 @@ public class FiguraKeybind {
     @LuaFieldDoc("keybind.release")
     public LuaFunction release;
 
-    public FiguraKeybind(Avatar owner, String name, InputConstants.Key key) {
+    public FiguraKeybind(Avatar owner, String name, int key) {
         this.owner = owner;
         this.name = name;
         this.defaultKey = key;
@@ -71,28 +74,61 @@ public class FiguraKeybind {
         return override;
     }
 
-    public void setKey(InputConstants.Key key) {
+    public void setKey(int key) {
         this.key = key;
     }
 
-    public Component getTranslatedKeyMessage() {
-        return this.key.getDisplayName();
+    public ITextComponent getTranslatedKeyMessage() {
+        return new TextComponentString(GameSettings.getKeyDisplayString(this.key));
     }
 
     // -- static -- // 
 
-    public static InputConstants.Key parseStringKey(String key) {
+    public static int parseStringKey(String key) {
         try {
-            return InputConstants.getKey(key);
+            if (key.contains("unknown"))
+                return Keyboard.KEY_O;
+            else if (key.contains("mouse")) {
+                if (key.contains("left")) //MC used to take the mouse number and subtract 100 from it for whatever reason
+                    return -100;
+                else if (key.contains("right"))
+                    return -99;
+                else if (key.contains("middle"))
+                    return -98;
+                else return Integer.parseInt(key.replace("key.mouse.", "")) + 101;
+            }  else if (key.contains("keyboard")) {
+                try {
+                    if (key.contains("keypad")) {
+                        Integer.parseInt(key.substring(key.indexOf("keypad.")));
+                        key = key.replace("keypad.", "NUMPAD");
+                    }
+                } catch (NumberFormatException ignored) {
+                    key = key.replace("keypad.", "");
+                }
+                key = key.replace("num.lock", "NUMLOCK");
+                key = key.replace("grave.accent", "GRAVE");
+                key = key.replace("grave.accent", "GRAVE");
+                key = key.replace("left.", "L");
+                key = key.replace("right.", "R");
+                key = key.replace("alt", "MENU");
+                key = key.replace("win", "META");
+                key = key.replace("page.down", "NEXT");
+                key = key.replace("page.up", "PRIOR");
+                key = key.replace("caps.lock", "CAPITAL");
+
+                String keyName = "KEY_" + key.replace("key.keyboard", "").toUpperCase(Locale.US);
+                return Keyboard.getKeyIndex(keyName);
+            }
+            return -1;
         } catch (Exception passed) {
             throw new LuaError("Invalid key: " + key);
         }
     }
 
-    public static boolean set(List<FiguraKeybind> bindings, InputConstants.Key key, boolean pressed, int modifiers) {
+    public static boolean set(List<FiguraKeybind> bindings, int key, boolean pressed, int modifiers) {
         boolean overrided = false;
         for (FiguraKeybind keybind : new ArrayList<>(bindings)) {
-            if (keybind.key == key && keybind.enabled && (keybind.gui || Minecraft.getInstance().screen == null))
+            if (keybind.key == key && keybind.enabled && (keybind.gui || Minecraft.getMinecraft().currentScreen == null))
                 overrided = keybind.setDown(pressed, modifiers) || overrided;
         }
         return overrided;
@@ -105,13 +141,13 @@ public class FiguraKeybind {
 
     public static void updateAll(List<FiguraKeybind> bindings) {
         for (FiguraKeybind keybind : bindings) {
-            int value = keybind.key.getValue();
-            if (keybind.enabled && keybind.key.getType() == InputConstants.Type.KEYSYM && value != InputConstants.UNKNOWN.getValue())
-                keybind.setDown(InputConstants.isKeyDown(Minecraft.getInstance().getWindow().getWindow(), value), -1);
+            int value = keybind.key;
+            if (keybind.enabled && value < 256  && Keyboard.getKeyName(keybind.key) != null && value != Keyboard.KEY_NONE)
+                keybind.setDown(Keyboard.isKeyDown(value), -1);
         }
     }
 
-    public static boolean overridesKey(List<FiguraKeybind> bindings, InputConstants.Key key) {
+    public static boolean overridesKey(List<FiguraKeybind> bindings, int key) {
         for (FiguraKeybind binding : bindings)
             if (binding.key == key && binding.enabled && binding.override)
                 return true;
@@ -182,19 +218,19 @@ public class FiguraKeybind {
     @LuaWhitelist
     @LuaMethodDoc("keybind.is_default")
     public boolean isDefault() {
-        return this.key.equals(this.defaultKey);
+        return this.key == this.defaultKey;
     }
 
     @LuaWhitelist
     @LuaMethodDoc("keybind.get_key")
     public String getKey() {
-        return this.key.getName();
+        return Keyboard.getKeyName(this.key);
     }
 
     @LuaWhitelist
     @LuaMethodDoc("keybind.get_key_name")
     public String getKeyName() {
-        return this.key.getDisplayName().getString();
+        return GameSettings.getKeyDisplayString(this.key);
     }
 
     @LuaWhitelist
@@ -206,13 +242,13 @@ public class FiguraKeybind {
     @LuaWhitelist
     @LuaMethodDoc("keybind.get_id")
     public int getID() {
-        return this.key.getValue();
+        return this.key;
     }
 
     @LuaWhitelist
     @LuaMethodDoc("keybind.is_pressed")
     public boolean isPressed() {
-        return (this.gui || Minecraft.getInstance().screen == null) && this.isDown;
+        return (this.gui || Minecraft.getMinecraft().currentScreen == null) && this.isDown;
     }
 
     @LuaWhitelist
@@ -294,6 +330,6 @@ public class FiguraKeybind {
 
     @Override
     public String toString() {
-        return this.name + " (" + key.getName() + ") (Keybind)";
+        return this.name + " (" + GameSettings.getKeyDisplayString(key) + ") (Keybind)";
     }
 }

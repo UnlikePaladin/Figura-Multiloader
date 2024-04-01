@@ -3,25 +3,24 @@ package org.figuramc.figura.lua.docs;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import net.minecraft.ChatFormatting;
-import net.minecraft.client.renderer.block.model.ItemTransforms;
-import net.minecraft.core.Registry;
-import net.minecraft.locale.Language;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.network.chat.TextComponent;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.Pose;
-import net.minecraft.world.entity.player.PlayerModelPart;
-import net.minecraft.world.item.UseAnim;
-import net.minecraft.world.level.ClipContext;
-
-import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.client.renderer.block.model.ItemCameraTransforms;
+import net.minecraft.command.CommandBase;
+import net.minecraft.command.CommandException;
+import net.minecraft.command.ICommandSender;
+import net.minecraft.entity.player.EnumPlayerModelParts;
+import net.minecraft.item.EnumAction;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.Style;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextFormatting;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.animation.Animation;
+import org.figuramc.figura.commands.FiguraCommands;
 import org.figuramc.figura.mixin.input.KeyBindingAccessor;
-import org.figuramc.figura.mixin.render.GameRendererAccessor;
+import org.figuramc.figura.mixin.render.EntityRendererAccessor;
 import org.figuramc.figura.model.ParentType;
 import org.figuramc.figura.model.rendering.EntityRenderMode;
 import org.figuramc.figura.model.rendering.texture.FiguraTextureSet;
@@ -29,6 +28,7 @@ import org.figuramc.figura.model.rendering.texture.RenderTypes;
 import org.figuramc.figura.utils.ColorUtils;
 import org.figuramc.figura.utils.FiguraClientCommandSource;
 import org.figuramc.figura.utils.FiguraText;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 import java.util.function.Supplier;
@@ -62,16 +62,24 @@ public class FiguraListDocs {
             add(value.name());
     }};
     private static final LinkedHashSet<String> ENTITY_POSES = new LinkedHashSet<String>() {{
-        for (Pose value : Pose.values())
-            add(value.name());
+        String[] poses = new String[] {
+                "STANDING",
+                "FALL_FLYING",
+                "SLEEPING",
+                "SWIMMING",
+                "SPIN_ATTACK",
+                "CROUCHING",
+                "DYING"
+        };
+        this.addAll(Arrays.asList(poses));
     }};
     private static final LinkedHashSet<String> ITEM_DISPLAY_MODES = new LinkedHashSet<String>() {{
-        for (ItemTransforms.TransformType value : ItemTransforms.TransformType.values())
+        for (ItemCameraTransforms.TransformType value : ItemCameraTransforms.TransformType.values())
             add(value.name());
     }};
     private static final LinkedHashSet<String> POST_EFFECTS = new LinkedHashSet<String>() {{
-        for (ResourceLocation effect : GameRendererAccessor.getEffects()) {
-            String[] split = effect.getPath().split("/");
+        for (ResourceLocation effect : EntityRendererAccessor.getEffects()) {
+            String[] split = effect.getResourcePath().split("/");
             String name = split[split.length - 1];
             add(name.split("\\.")[0]);
         }
@@ -89,34 +97,94 @@ public class FiguraListDocs {
             put(value.name(), Collections.singletonList(value.name()));
     }};
     private static final LinkedHashSet<String> PLAYER_MODEL_PARTS = new LinkedHashSet<String>() {{
-        for (PlayerModelPart value : PlayerModelPart.values()) {
+        for (EnumPlayerModelParts value : EnumPlayerModelParts.values()) {
             String name = value.name();
             add(name.endsWith("_LEG") ? name.substring(0, name.length() - 4) : name);
         }
     }};
     private static final LinkedHashSet<String> USE_ACTIONS = new LinkedHashSet<String>() {{
-        for (UseAnim value : UseAnim.values())
+        for (EnumAction value : EnumAction.values())
             add(value.name());
+        add("SPEAR");
+        add("CROSSBOW");
     }};
     private static final LinkedHashSet<String> RENDER_MODES = new LinkedHashSet<String>() {{
         for (EntityRenderMode value : EntityRenderMode.values())
             add(value.name());
     }};
     private static final LinkedHashSet<String> BLOCK_RAYCAST_TYPE = new LinkedHashSet<String>() {{
-        for (ClipContext.Block value : ClipContext.Block.values())
-            add(value.name());
+        add("COLLIDER");
+        add("OUTLINE");
+        add("VISUAL");
     }};
     private static final LinkedHashSet<String> FLUID_RAYCAST_TYPE = new LinkedHashSet<String>() {{
-        for (ClipContext.Fluid value : ClipContext.Fluid.values())
-            add(value.name());
+        add("NONE");
+        add("SOURCE");
+        add("ANY");
     }};
+
     private static final LinkedHashSet<String> HEIGHTMAP_TYPE = new LinkedHashSet<String>() {{
-        for (Heightmap.Types value : Heightmap.Types.values())
-            add(value.name());
+        String[] types = new String[]{
+                "WORLD_SURFACE_WG",
+                "WORLD_SURFACE",
+                "OCEAN_FLOOR_WG",
+                "OCEAN_FLOOR",
+                "MOTION_BLOCKING",
+                "MOTION_BLOCKING_NO_LEAVES"
+        };
+        this.addAll(Arrays.asList(types));
     }};
     private static final LinkedHashSet<String> REGISTRIES = new LinkedHashSet<String>() {{
-        for (ResourceLocation resourceLocation : Registry.REGISTRY.keySet())
-            add(resourceLocation.getPath());
+        String[] registries = new String[] {
+                "sound_event",
+                "fluid",
+                "mob_effect",
+                "block",
+                "enchantment",
+                "entity_type",
+                "item",
+                "potion",
+                "particle_type",
+                "block_entity_type",
+                "motive",
+                "custom_stat",
+                "chunk_status",
+                "rule_test",
+                "pos_rule_test",
+                "menu",
+                "recipe_type",
+                "recipe_serializer",
+                "attribute",
+                "stat_type",
+                "villager_type",
+                "villager_profession",
+                "point_of_interest_type",
+                "memory_module_type",
+                "sensor_type",
+                "schedule",
+                "activity",
+                "loot_pool_entry_type",
+                "loot_function_type",
+                "loot_condition_type",
+                "worldgen/surface_builder",
+                "worldgen/carver",
+                "worldgen/feature",
+                "worldgen/structure_feature",
+                "worldgen/structure_piece",
+                "worldgen/decorator",
+                "worldgen/block_state_provider_type",
+                "worldgen/block_placer_type",
+                "worldgen/foliage_placer_type",
+                "worldgen/trunk_placer_type",
+                "worldgen/tree_decorator_type",
+                "worldgen/feature_size_type",
+                "worldgen/biome_source",
+                "worldgen/chunk_generator",
+                "worldgen/structure_processor",
+                "worldgen/structure_pool_element"
+        };
+
+        this.addAll(Arrays.asList(registries));
     }};
 
     private enum ListDoc {
@@ -168,7 +236,7 @@ public class FiguraListDocs {
 
             // list properties
             object.addProperty("name", name);
-            object.addProperty("description", translate ? Language.getInstance().getOrDefault(new FiguraText("docs.enum." + id).getString()) : FiguraMod.MOD_ID + "." + "docs.enum." + id);
+            object.addProperty("description", translate ? new FiguraText("docs.enum." + id).getFormattedText() : FiguraMod.MOD_ID + "." + "docs.enum." + id);
 
             // list entries
             Collection<?> coll = get();
@@ -191,122 +259,177 @@ public class FiguraListDocs {
             return object;
         }
 
-        private LiteralArgumentBuilder<FiguraClientCommandSource> generateCommand() {
-            // command
-            LiteralArgumentBuilder<FiguraClientCommandSource> command = LiteralArgumentBuilder.literal(id);
+        private class FiguraEntrySubCommand extends FiguraCommands.FiguraSubCommand {
 
-            // display everything
-            command.executes(context -> {
+            Object entryObj;
+            Map<String, FiguraCommands.FiguraSubCommand> childEntries = new HashMap<>();
+            public FiguraEntrySubCommand(Object entryObj, String name) {
+                super(name);
+                this.entryObj = entryObj;
+
+                if (entryObj instanceof Map.Entry) {
+                    Map.Entry e = (Map.Entry) entryObj;
+                    for (String s : (List<String>) e.getValue()) {
+                        FiguraCommands.FiguraSubCommand child = new FiguraCommands.FiguraSubCommand(s) {
+                            @Override
+                            public void execute(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] args) throws CommandException {
+                                FiguraMod.sendChatMessage(new TextComponentString(getName()).setStyle(ColorUtils.Colors.AWESOME_BLUE.style));
+                            }
+                        };
+                        childEntries.put(s, child);
+                    }
+                }
+            }
+
+            @Override
+            public void execute(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] args) throws CommandException {
+                if (args.length == 0)
+                    FiguraMod.sendChatMessage(new TextComponentString(name).setStyle(ColorUtils.Colors.AWESOME_BLUE.style));
+                else if (childEntries.containsKey(args[0]))
+                    childEntries.get(args[0]).execute(minecraftServer, iCommandSender, Arrays.copyOfRange(args, 1, args.length));
+            }
+
+            @Override
+            public List<String> getTabCompletions(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] strings, @Nullable BlockPos targetPos) {
+                if (strings.length > 0 && childEntries.containsKey(strings[0]))
+                    return childEntries.get(strings[0]).getTabCompletions(minecraftServer, iCommandSender, Arrays.copyOfRange(strings, 1, strings.length), targetPos);
+
+                return CommandBase.getListOfStringsMatchingLastWord(strings, childEntries.keySet());
+            }
+        }
+
+        public class FiguraListDocSubCommand extends FiguraCommands.FiguraSubCommand {
+
+            Map<String, FiguraCommands.FiguraSubCommand> childEntries = new HashMap<>();
+            public FiguraListDocSubCommand() {
+                super(id);
+
+                Collection<?> coll = get();
+                // add collection as child for easy navigation
+                for (Object o : coll) {
+                    String text = o instanceof Map.Entry ? ((Map.Entry) o).getKey().toString() : o.toString();
+                    FiguraEntrySubCommand entrySubCommand = new FiguraEntrySubCommand(o, text);
+                    childEntries.put(text, entrySubCommand);
+                }
+            }
+
+            @Override
+            public void execute(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] args) throws CommandException {
                 Collection<?> coll = get();
                 if (coll.size() == 0) {
                     FiguraMod.sendChatMessage(new FiguraText("docs.enum.empty"));
-                    return 0;
+                    return;
+                } else if (args.length > 0 && childEntries.containsKey(args[0])){
+                    childEntries.get(args[0]).execute(minecraftServer, iCommandSender, Arrays.copyOfRange(args, 1, args.length));
+                    return;
                 }
 
-                MutableComponent text = FiguraDoc.HEADER.copy()
-                        .append("\n\n")
-                        .append(new TextComponent("• ")
-                                .append(new FiguraText("docs.text.description"))
-                                .append(":")
-                                .withStyle(ColorUtils.Colors.PURPLE.style))
-                        .append("\n\t")
-                        .append(new TextComponent("• ")
-                                .append(new FiguraText("docs.enum." + id))
-                                .withStyle(ColorUtils.Colors.BLUE.style))
-                        .append("\n\n")
-                        .append(new TextComponent("• ")
-                                .append(new FiguraText("docs.text.entries"))
-                                .append(":")
-                                .withStyle(ColorUtils.Colors.PURPLE.style));
+                ITextComponent text = FiguraDoc.HEADER.createCopy()
+                        .appendText("\n\n")
+                        .appendSibling(new TextComponentString("• ")
+                                .appendSibling(new FiguraText("docs.text.description"))
+                                .appendText(":")
+                                .setStyle(ColorUtils.Colors.PURPLE.style))
+                        .appendText("\n\t")
+                        .appendSibling(new TextComponentString("• ")
+                                .appendSibling(new FiguraText("docs.enum." + id))
+                                .setStyle(ColorUtils.Colors.BLUE.style))
+                        .appendText("\n\n")
+                        .appendSibling(new TextComponentString("• ")
+                                .appendSibling(new FiguraText("docs.text.entries"))
+                                .appendText(":")
+                                .setStyle(ColorUtils.Colors.PURPLE.style));
 
                 int i = 0;
                 for (Object o : coll) {
-                    MutableComponent component;
+                    ITextComponent component;
 
                     if (o instanceof Map.Entry) {
                         Map.Entry e = (Map.Entry) o;
-                        component = new TextComponent(e.getKey().toString()).withStyle(ChatFormatting.WHITE);
+                        component = new TextComponentString(e.getKey().toString()).setStyle(new Style().setColor(TextFormatting.WHITE));
                         for (String s : (List<String>) e.getValue()) {
-                            component.append(new TextComponent(" | ").withStyle(ChatFormatting.YELLOW))
-                                    .append(new TextComponent(s).withStyle(ChatFormatting.GRAY));
+                            component.appendSibling(new TextComponentString(" | ").setStyle(new Style().setColor(TextFormatting.YELLOW)))
+                                    .appendSibling(new TextComponentString(s).setStyle(new Style().setColor(TextFormatting.GRAY)));
                         }
                     } else {
-                        component = new TextComponent(o.toString()).withStyle(ChatFormatting.WHITE);
+                        component = new TextComponentString(o.toString()).setStyle(new Style().setColor(TextFormatting.WHITE));
                     }
 
-                    text.append(i % split == 0 ? "\n\t" : "\t");
-                    text.append(new TextComponent("• ").withStyle(ChatFormatting.YELLOW)).append(component);
+                    text.appendText(i % split == 0 ? "\n\t" : "\t");
+                    text.appendSibling(new TextComponentString("• ").setStyle(new Style().setColor(TextFormatting.YELLOW))).appendSibling(component);
                     i++;
                 }
 
                 FiguraMod.sendChatMessage(text);
-                return 1;
-            });
-
-            // add collection as child for easy navigation
-            Collection<?> coll = get();
-            for (Object o : coll) {
-                String text = o instanceof Map.Entry ? ((Map.Entry) o).getKey().toString() : o.toString();
-                LiteralArgumentBuilder<FiguraClientCommandSource> entry = LiteralArgumentBuilder.literal(text);
-                entry.executes(context -> {
-                    FiguraMod.sendChatMessage(new TextComponent(text).withStyle(ColorUtils.Colors.AWESOME_BLUE.style));
-                    return 1;
-                });
-
-                if (o instanceof Map.Entry) {
-                    Map.Entry e = (Map.Entry) o;
-                    for (String s : (List<String>) e.getValue()) {
-                        LiteralArgumentBuilder<FiguraClientCommandSource> child = LiteralArgumentBuilder.literal(s);
-                        child.executes(context -> {
-                            FiguraMod.sendChatMessage(new TextComponent(s).withStyle(ColorUtils.Colors.AWESOME_BLUE.style));
-                            return 1;
-                        });
-                        entry.then(child);
-                    }
-                }
-
-                command.then(entry);
             }
 
+            @Override
+            public List<String> getTabCompletions(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] strings, @Nullable BlockPos targetPos) {
+                if (strings.length > 0 && childEntries.containsKey(strings[0]))
+                    return childEntries.get(strings[0]).getTabCompletions(minecraftServer, iCommandSender, Arrays.copyOfRange(strings, 1, strings.length), targetPos);
+
+                return CommandBase.getListOfStringsMatchingLastWord(strings, childEntries.keySet());
+            }
+        }
+
+        private FiguraCommands.FiguraSubCommand generateCommand() {
+            // command
+            return new FiguraListDocSubCommand();
             // return
-            return command;
         }
     }
 
     // -- doc methods -- //
 
-    public static LiteralArgumentBuilder<FiguraClientCommandSource> getCommand() {
+    public static FiguraCommands.FiguraSubCommand getCommand() {
         // self
-        LiteralArgumentBuilder<FiguraClientCommandSource> root = LiteralArgumentBuilder.literal("enums");
-        root.executes(context -> {
-            FiguraMod.sendChatMessage(FiguraDoc.HEADER.copy()
-                    .append("\n\n")
-                    .append(new TextComponent("• ")
-                            .append(new FiguraText("docs.text.type"))
-                            .append(":")
-                            .withStyle(ColorUtils.Colors.PURPLE.style))
-                    .append("\n\t")
-                    .append(new TextComponent("• ")
-                            .append(new TextComponent("enumerators"))
-                            .withStyle(ColorUtils.Colors.BLUE.style))
+        return new FiguraListDocsSubCommand();
+    }
 
-                    .append("\n\n")
-                    .append(new TextComponent("• ")
-                            .append(new FiguraText("docs.text.description"))
-                            .append(":")
-                            .withStyle(ColorUtils.Colors.PURPLE.style))
-                    .append("\n\t")
-                    .append(new TextComponent("• ")
-                            .append(new FiguraText("docs.enum"))
-                            .withStyle(ColorUtils.Colors.BLUE.style))
-            );
-            return 1;
-        });
+    public static class FiguraListDocsSubCommand extends FiguraCommands.FiguraSubCommand {
 
-        for (ListDoc value : ListDoc.values())
-            root.then(value.generateCommand());
+        private Map<String, FiguraCommands.FiguraSubCommand> figuraListDocSubCommandMap = new HashMap<>();
+        public FiguraListDocsSubCommand() {
+            super("enums");
+            for (ListDoc value : ListDoc.values())
+                figuraListDocSubCommandMap.put(value.id, value.generateCommand());
+        }
 
-        return root;
+        @Override
+        public void execute(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] args) throws CommandException {
+            if (args.length == 0)  {
+                FiguraMod.sendChatMessage(FiguraDoc.HEADER.createCopy()
+                        .appendText("\n\n")
+                        .appendSibling(new TextComponentString("• ")
+                                .appendSibling(new FiguraText("docs.text.type"))
+                                .appendText(":")
+                                .setStyle(ColorUtils.Colors.PURPLE.style))
+                        .appendText("\n\t")
+                        .appendSibling(new TextComponentString("• ")
+                                .appendSibling(new TextComponentString("enumerators"))
+                                .setStyle(ColorUtils.Colors.BLUE.style))
+
+                        .appendText("\n\n")
+                        .appendSibling(new TextComponentString("• ")
+                                .appendSibling(new FiguraText("docs.text.description"))
+                                .appendText(":")
+                                .setStyle(ColorUtils.Colors.PURPLE.style))
+                        .appendText("\n\t")
+                        .appendSibling(new TextComponentString("• ")
+                                .appendSibling(new FiguraText("docs.enum"))
+                                .setStyle(ColorUtils.Colors.BLUE.style))
+                );
+            } else if (figuraListDocSubCommandMap.containsKey(args[0])) {
+                figuraListDocSubCommandMap.get(args[0]).execute(minecraftServer, iCommandSender, Arrays.copyOfRange(args, 1 , args.length));
+            }
+        }
+
+        @Override
+        public List<String> getTabCompletions(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] strings, @Nullable BlockPos targetPos) {
+            if (strings.length > 0 && figuraListDocSubCommandMap.containsKey(strings[0]))
+                return figuraListDocSubCommandMap.get(strings[0]).getTabCompletions(minecraftServer, iCommandSender, Arrays.copyOfRange(strings, 1, strings.length), targetPos);
+            return CommandBase.getListOfStringsMatchingLastWord(strings, figuraListDocSubCommandMap.keySet());
+        }
     }
 
     public static List<String> getEnumValues(String enumName) {

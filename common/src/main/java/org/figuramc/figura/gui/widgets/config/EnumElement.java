@@ -1,17 +1,12 @@
 package org.figuramc.figura.gui.widgets.config;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.components.AbstractWidget;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TextComponent;
-import org.figuramc.figura.gui.widgets.ContextMenu;
-import org.figuramc.figura.gui.widgets.ParentedButton;
+import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.TextComponentString;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.config.ConfigType;
-import org.figuramc.figura.config.Configs;
+import org.figuramc.figura.gui.widgets.AbstractFiguraWidget;
 import org.figuramc.figura.gui.widgets.ContextMenu;
 import org.figuramc.figura.gui.widgets.ParentedButton;
 import org.figuramc.figura.gui.widgets.lists.ConfigList;
@@ -21,7 +16,7 @@ import java.util.List;
 
 public class EnumElement extends AbstractConfigElement {
 
-    private final List<Component> names;
+    private final List<ITextComponent> names;
     private final ParentedButton button;
     private ContextMenu context;
 
@@ -41,20 +36,20 @@ public class EnumElement extends AbstractConfigElement {
             }
         }) {
             @Override
-            protected void renderText(PoseStack pose, float delta) {
-                Font font = Minecraft.getInstance().font;
-                Component arrow = context.isVisible() ? UIHelper.DOWN_ARROW : UIHelper.UP_ARROW;
-                int arrowWidth = font.width(arrow);
+            protected void renderText(Minecraft mc, float delta) {
+                FontRenderer font = mc.fontRenderer;
+                ITextComponent arrow = context.isVisible() ? UIHelper.DOWN_ARROW : UIHelper.UP_ARROW;
+                int arrowWidth = font.getStringWidth(arrow.getFormattedText());
 
-                Component message = getMessage();
-                int textWidth = font.width(message);
+                ITextComponent message = getMessage();
+                int textWidth = font.getStringWidth(message.getFormattedText());
 
                 // draw text
                 int color = getTextColor();
-                UIHelper.renderCenteredScrollingText(pose, message, getX() + 1, getY(), getWidth() - (textWidth <= getWidth() - arrowWidth - 9 ? 0 : arrowWidth + 1) - 2, getHeight(), color);
+                UIHelper.renderCenteredScrollingText(message, getX() + 1, getY(), getWidth() - (textWidth <= getWidth() - arrowWidth - 9 ? 0 : arrowWidth + 1) - 2, getHeight(), color);
 
                 // draw arrow
-                font.drawShadow(pose, arrow, getX() + getWidth() - arrowWidth - 3, (int) (getY() + getHeight() / 2f - font.lineHeight / 2f), color);
+                font.drawStringWithShadow(arrow.getFormattedText(), getX() + getWidth() - arrowWidth - 3, (int) (getY() + getHeight() / 2f - font.FONT_HEIGHT / 2f), color);
             }
 
             @Override
@@ -73,13 +68,13 @@ public class EnumElement extends AbstractConfigElement {
         context = new ContextMenu(button, button.getWidth());
         for (int i = 0; i < names.size(); i++) {
             int finalI = i;
-            Component tooltip = config.enumTooltip != null ? config.enumTooltip.get(i) : null;
+            ITextComponent tooltip = config.enumTooltip != null ? config.enumTooltip.get(i) : null;
             context.addAction(names.get(i), tooltip, button1 -> config.tempValue = finalI);
         }
     }
 
     @Override
-    public void render(PoseStack poseStack, int mouseX, int mouseY, float delta) {
+    public void draw(Minecraft mc, int mouseX, int mouseY, float delta) {
         if (!this.isVisible()) return;
 
         // reset enabled
@@ -87,22 +82,22 @@ public class EnumElement extends AbstractConfigElement {
 
         // button text
         int selectedIndex = (int) this.config.tempValue % this.names.size();
-        Component text = names.get(selectedIndex);
+        ITextComponent text = names.get(selectedIndex);
 
         // edited colour
         if (this.isChanged())
-            text = text.copy().setStyle(FiguraMod.getAccentColor());
+            text = text.createCopy().setStyle(FiguraMod.getAccentColor());
 
         // set text
         this.button.setMessage(text);
 
         // set tooltip
-        List<Component> tooltip = ((ConfigType.EnumConfig) this.config).enumTooltip;
+        List<ITextComponent> tooltip = ((ConfigType.EnumConfig) this.config).enumTooltip;
         if (tooltip != null)
             button.setTooltip(tooltip.get(selectedIndex));
 
         // super render
-        super.render(poseStack, mouseX, mouseY, delta);
+        super.draw(mc, mouseX, mouseY, delta);
     }
 
     @Override
@@ -129,17 +124,17 @@ public class EnumElement extends AbstractConfigElement {
 
     private void updateContextText() {
         // cache entries
-        List<? extends AbstractWidget> entries = context.getEntries();
+        List<? extends AbstractFiguraWidget> entries = context.getEntries();
 
         // entries should have the same size as names
         // otherwise something went really wrong
         for (int i = 0; i < names.size(); i++) {
             // get text
-            Component text = names.get(i);
+            ITextComponent text = names.get(i);
 
             // selected entry
             if (i == (int) this.config.tempValue % this.names.size())
-                text = TextComponent.EMPTY.copy().setStyle(FiguraMod.getAccentColor()).withStyle(ChatFormatting.UNDERLINE).append(text);
+                text = new TextComponentString("").setStyle(FiguraMod.getAccentColor().setUnderlined(true)).appendSibling(text);
 
             // apply text
             entries.get(i).setMessage(text);

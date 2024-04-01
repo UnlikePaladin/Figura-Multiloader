@@ -1,6 +1,5 @@
 package org.figuramc.figura.config;
 
-import dev.architectury.injectables.annotations.ExpectPlatform;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.settings.GameSettings;
 import net.minecraft.client.settings.KeyBinding;
@@ -35,5 +34,6 @@ public class ConfigKeyBinding extends KeyBinding {
     }
 
     @ExpectPlatform
+    // TODO : add a service for keybinds
     public static void addKeyBind(ConfigKeyBinding keyBind) {}
 }

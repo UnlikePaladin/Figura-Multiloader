@@ -1,7 +1,6 @@
 package org.figuramc.figura.gui.screens;
 
 import net.minecraft.client.gui.GuiScreen;
-import net.minecraft.client.gui.screens.Screen;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.avatar.AvatarManager;
@@ -41,7 +40,7 @@ public class SoundScreen extends AbstractPanelScreen {
         addRenderableWidget(piano = new PianoWidget(listX, height - 88, listWidth, 60, list::getSound));
 
         // back
-        addRenderableWidget(new Button(width / 2 - 60, height - 24, 120, 20, new FiguraText("gui.done"), null, bx -> onClose()));
+        addRenderableWidget(new Button(width / 2 - 60, height - 24, 120, 20, new FiguraText("gui.done"), null, bx -> onGuiClosed()));
     }
 
     @Override
@@ -50,14 +49,14 @@ public class SoundScreen extends AbstractPanelScreen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public void mouseClicked(int mouseX, int mouseY, int button) {
         piano.pressed = button == 0;
-        return super.mouseClicked(mouseX, mouseY, button);
+        super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    public void mouseReleased(int mouseX, int mouseY, int button) {
         piano.pressed = false;
-        return super.mouseReleased(mouseX, mouseY, button);
+        super.mouseReleased(mouseX, mouseY, button);
     }
 }

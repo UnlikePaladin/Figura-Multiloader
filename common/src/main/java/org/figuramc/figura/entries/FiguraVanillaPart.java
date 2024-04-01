@@ -1,8 +1,8 @@
 package org.figuramc.figura.entries;
 
-import com.mojang.datafixers.util.Pair;
-import net.minecraft.client.model.EntityModel;
-import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.model.ModelBase;
+import net.minecraft.client.model.ModelRenderer;
+import org.figuramc.figura.utils.Pair;
 
 import java.util.Collection;
 import java.util.function.Function;
@@ -21,5 +21,5 @@ public interface FiguraVanillaPart {
      * the function consists about giving the current Entity Model and getting a Model Part for that Entity
      * the string is the parts name, case-insensitive, where the mod ID will be added into the final part name, as "ID_NAME"
      */
-    Collection<Pair<String, Function<EntityModel<?>, ModelPart>>> getParts();
+    Collection<Pair<String, Function<ModelBase, ModelRenderer>>> getParts();
 }

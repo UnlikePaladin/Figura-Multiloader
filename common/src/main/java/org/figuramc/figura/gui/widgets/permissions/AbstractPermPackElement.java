@@ -1,8 +1,6 @@
 package org.figuramc.figura.gui.widgets.permissions;
 
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TextComponent;
-import net.minecraft.util.Mth;
+import net.minecraft.util.text.TextComponentString;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.avatar.AvatarManager;
 import org.figuramc.figura.gui.widgets.Button;
@@ -21,7 +19,7 @@ public class AbstractPermPackElement extends Button implements Comparable<Abstra
     protected float scale = 1f;
 
     protected AbstractPermPackElement(int width, int height, PermissionPack pack, PlayerList parent) {
-        super(0, 0, width, height, TextComponent.EMPTY.copy(), null, bx -> {});
+        super(0, 0, width, height, new TextComponentString(""), null, bx -> {});
         this.parent = parent;
         this.pack = pack;
     }
@@ -29,15 +27,15 @@ public class AbstractPermPackElement extends Button implements Comparable<Abstra
     protected void animate(float delta, boolean anim) {
         if (anim) {
             float lerpDelta = MathUtils.magicDelta(0.2f, delta);
-            scale = Mth.lerp(lerpDelta, scale, 1.2f);
+            scale = (float) MathUtils.lerp(lerpDelta, scale, 1.2f);
         } else {
             float lerpDelta = MathUtils.magicDelta(0.3f, delta);
-            scale = Mth.lerp(lerpDelta, scale, 1f);
+            scale = (float) MathUtils.lerp(lerpDelta, scale, 1f);
         }
     }
 
     @Override
-    public boolean isMouseOver(double mouseX, double mouseY) {
+    public boolean mouseOver(double mouseX, double mouseY) {
         int width = getWidth();
         int height = getHeight();
         int x = getX() + width / 2;
@@ -48,12 +46,7 @@ public class AbstractPermPackElement extends Button implements Comparable<Abstra
     }
 
     @Override
-    protected boolean clicked(double mouseX, double mouseY) {
-        return isMouseOver(mouseX, mouseY);
-    }
-
-    @Override
-    public void onPress() {
+    public void widgetPressed(int mouseX, int mouseY) {
         // set selected entry
         parent.selectedEntry = this;
 

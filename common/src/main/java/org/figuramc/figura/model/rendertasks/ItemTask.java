@@ -1,21 +1,20 @@
 package org.figuramc.figura.model.rendertasks;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.block.model.ItemTransforms;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.item.ItemStack;
-import org.figuramc.figura.model.FiguraModelPart;
+import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.client.renderer.OpenGlHelper;
+import net.minecraft.client.renderer.block.model.ItemCameraTransforms;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.item.ItemStack;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.lua.LuaNotNil;
 import org.figuramc.figura.lua.LuaWhitelist;
 import org.figuramc.figura.lua.api.world.ItemStackAPI;
-import org.figuramc.figura.lua.api.world.WorldAPI;
 import org.figuramc.figura.lua.docs.LuaMethodDoc;
 import org.figuramc.figura.lua.docs.LuaMethodOverload;
 import org.figuramc.figura.lua.docs.LuaTypeDoc;
-import org.figuramc.figura.model.PartCustomization;
+import org.figuramc.figura.model.FiguraModelPart;
+import org.figuramc.figura.model.rendering.texture.RenderTypes;
 import org.figuramc.figura.utils.LuaUtils;
 import org.luaj.vm2.LuaError;
 
@@ -29,7 +28,7 @@ import java.util.Random;
 public class ItemTask extends RenderTask {
 
     private ItemStack item;
-    private ItemTransforms.TransformType displayMode = ItemTransforms.TransformType.NONE;
+    private ItemCameraTransforms.TransformType displayMode = ItemCameraTransforms.TransformType.NONE;
     private boolean left = false;
     private int cachedComplexity;
 
@@ -38,19 +37,21 @@ public class ItemTask extends RenderTask {
     }
 
     @Override
-    public void renderTask(PoseStack poseStack, MultiBufferSource buffer, int light, int overlay) {
-        poseStack.scale(-16, 16, -16);
+    public void renderTask(RenderTypes.FiguraBufferSource buffer, int light, int overlay) {
+        GlStateManager.pushMatrix();
+        GlStateManager.scale(-16, 16, -16);
 
-        LivingEntity entity = owner.renderer.entity instanceof LivingEntity ? (LivingEntity) owner.renderer.entity : null;
+        EntityLivingBase entity = owner.renderer.entity instanceof EntityLivingBase ? (EntityLivingBase) owner.renderer.entity : null;
         int newLight = this.customization.light != null ? this.customization.light : light;
         int newOverlay = this.customization.overlay != null ? this.customization.overlay : overlay;
-        int seed = entity != null ? entity.getId() + displayMode.ordinal() : 0;
 
-        Minecraft.getInstance().getItemRenderer().renderStatic(
-                entity, item, displayMode, left,
-                poseStack, buffer, WorldAPI.getCurrentWorld(),
-                newLight, newOverlay
+        float f = (float)(newLight & 65535);
+        float g = (float)(newLight >> 16);
+        OpenGlHelper.setLightmapTextureCoords(OpenGlHelper.lightmapTexUnit, f, g);
+        Minecraft.getMinecraft().getItemRenderer().renderItemSide(
+                entity, item, displayMode, left
         );
+        GlStateManager.popMatrix();
     }
 
     @Override
@@ -83,9 +84,9 @@ public class ItemTask extends RenderTask {
     )
     public ItemTask setItem(Object item) {
         this.item = LuaUtils.parseItemStack("item", item);
-        Minecraft client = Minecraft.getInstance();
-        Random random = client.level != null ? client.level.random : new Random();
-        cachedComplexity = client.getItemRenderer().getModel(this.item, null, null).getQuads(null, null, random).size();
+        Minecraft client = Minecraft.getMinecraft();
+        Random random = client.world != null ? client.world.rand : new Random();
+        cachedComplexity = client.getRenderItem().getItemModelWithOverrides(this.item, null, null).getQuads(null, null, random.nextLong()).size();
         return this;
     }
 
@@ -111,8 +112,8 @@ public class ItemTask extends RenderTask {
     )
     public ItemTask setDisplayMode(@LuaNotNil String mode) {
         try {
-            this.displayMode = ItemTransforms.TransformType.valueOf(mode.toUpperCase());
-            this.left = this.displayMode == ItemTransforms.TransformType.FIRST_PERSON_LEFT_HAND || this.displayMode == ItemTransforms.TransformType.THIRD_PERSON_LEFT_HAND;
+            this.displayMode = ItemCameraTransforms.TransformType.valueOf(mode.toUpperCase());
+            this.left = this.displayMode == ItemCameraTransforms.TransformType.FIRST_PERSON_LEFT_HAND || this.displayMode == ItemCameraTransforms.TransformType.THIRD_PERSON_LEFT_HAND;
             return this;
         } catch (Exception ignored) {
             throw new LuaError("Illegal display mode: \"" + mode + "\".");

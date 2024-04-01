@@ -1,19 +1,17 @@
 package org.figuramc.figura.utils;
 
 import com.google.gson.*;
-import com.mojang.brigadier.StringReader;
-import net.minecraft.commands.arguments.SlotArgument;
-import net.minecraft.commands.arguments.blocks.BlockStateArgument;
-import net.minecraft.commands.arguments.item.ItemArgument;
-import net.minecraft.inventory.IInventory;
+import net.minecraft.block.state.IBlockState;
+import net.minecraft.command.CommandBase;
+import net.minecraft.command.CommandException;
+import net.minecraft.entity.player.InventoryPlayer;
+import net.minecraft.init.Blocks;
+import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.world.World;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
 import org.figuramc.figura.lua.api.json.FiguraJsonSerializer;
 import org.figuramc.figura.lua.api.world.BlockStateAPI;
 import org.figuramc.figura.lua.api.world.ItemStackAPI;
@@ -22,6 +20,7 @@ import org.figuramc.figura.math.vector.FiguraVec2;
 import org.figuramc.figura.math.vector.FiguraVec3;
 import org.figuramc.figura.math.vector.FiguraVec4;
 import org.figuramc.figura.math.vector.FiguraVector;
+import org.figuramc.figura.mixin.CommandReplaceItemAccessor;
 import org.luaj.vm2.LuaError;
 import org.luaj.vm2.LuaString;
 import org.luaj.vm2.LuaTable;
@@ -244,7 +243,10 @@ public class LuaUtils {
             String string = (String) item;
             try {
                 World level = WorldAPI.getCurrentWorld();
-                return new ItemArgument().parse(new StringReader(string)).createItemStack(1, false);
+                String[] strings = string.split(" ");
+                Item itemOb = CommandBase.getItemByText(null, strings[0]);
+                // TODO implement meta convertion, for blocks and items
+                return new ItemStack(itemOb, 1);
             } catch (Exception e) {
                 throw new LuaError("Could not parse item stack from string: " + string);
             }
@@ -253,17 +255,19 @@ public class LuaUtils {
         throw new LuaError("Illegal argument to " + methodName + "(): " + item);
     }
 
-    public static BlockState parseBlockState(String methodName, Object block) {
+    public static IBlockState parseBlockState(String methodName, Object block) {
         if (block == null)
-            return Blocks.AIR.defaultBlockState();
+            return Blocks.AIR.getDefaultState();
         else if (block instanceof BlockStateAPI) {
             BlockStateAPI wrapper = (BlockStateAPI) block;
             return wrapper.blockState;
         } else if (block instanceof String) {
             String string = (String) block;
             try {
-                Level level = WorldAPI.getCurrentWorld();
-                return new BlockStateArgument().parse(new StringReader(string)).getState();
+                World level = WorldAPI.getCurrentWorld();
+                //TODO: Fix this, i need to check how the strings are split
+                String[] strings = string.split(" ");
+                return FiguraFlattenerUtils.stateUnflattinator2000(new ResourceLocation(strings[0]));
             } catch (Exception e) {
                 throw new LuaError("Could not parse block state from string: " + string);
             }
@@ -288,18 +292,26 @@ public class LuaUtils {
         return null;
     }
 
-    public static int parseSlot(Object slot, IInventory inventory) {
+    public static int parseSlot(Object slot, InventoryPlayer inventory) {
         if (slot instanceof String) {
             String s = (String) slot;
             try {
-                return SlotArgument.slot().parse(new StringReader(s));
+                if (!CommandReplaceItemAccessor.figura$getShortcuts().containsKey(s)) {
+                    throw new CommandException("commands.generic.parameter.invalid", s);
+                } else {
+                    return CommandReplaceItemAccessor.figura$getShortcuts().get(s);
+                }
             } catch (Exception e) {
                 throw new LuaError("Unable to get slot \"" + slot + "\"");
             }
         } else if (slot instanceof Integer) {
             int i = (Integer) slot;
             if (i == -1 && inventory != null) {
-                return inventory.getFreeSlot();
+                for (int index = 0; index < inventory.mainInventory.size(); ++index) {
+                    if (!inventory.mainInventory.get(index).isEmpty()) continue;
+                    return index;
+                }
+                return -1;
             } else {
                 return i;
             }

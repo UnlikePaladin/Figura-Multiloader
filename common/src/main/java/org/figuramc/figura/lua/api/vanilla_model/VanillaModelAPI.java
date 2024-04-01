@@ -1,8 +1,7 @@
 package org.figuramc.figura.lua.api.vanilla_model;
 
-import com.mojang.datafixers.util.Pair;
-import net.minecraft.client.model.EntityModel;
-import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.model.ModelBase;
+import net.minecraft.client.model.ModelRenderer;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.entries.FiguraVanillaPart;
 import org.figuramc.figura.lua.LuaWhitelist;
@@ -10,6 +9,7 @@ import org.figuramc.figura.lua.docs.LuaFieldDoc;
 import org.figuramc.figura.lua.docs.LuaTypeDoc;
 import org.figuramc.figura.model.ParentType;
 import org.figuramc.figura.model.VanillaModelProvider;
+import org.figuramc.figura.utils.Pair;
 
 import java.util.*;
 import java.util.function.Function;
@@ -287,7 +287,7 @@ public class VanillaModelAPI {
             String ID = entrypoint.getID().toUpperCase();
 
             // Iterate over parts added by the current entrypoint
-            for (Pair<String, Function<EntityModel<?>, ModelPart>> part : entrypoint.getParts()) {
+            for (Pair<String, Function<ModelBase, ModelRenderer>> part : entrypoint.getParts()) {
                 String name = ID + "_" + part.getFirst().toUpperCase();
                 VanillaModelPart model = new VanillaModelPart(owner, name, ParentType.None, part.getSecond());
                 allParts.put(name, model);

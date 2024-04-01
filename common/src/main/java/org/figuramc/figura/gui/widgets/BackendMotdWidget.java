@@ -1,48 +1,36 @@
 package org.figuramc.figura.gui.widgets;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.google.common.collect.ImmutableList;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.*;
-import com.mojang.datafixers.util.Pair;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
-import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.components.AbstractWidget;
-import net.minecraft.client.gui.components.Widget;
-import net.minecraft.client.gui.components.events.GuiEventListener;
-import net.minecraft.client.sounds.SoundManager;
-import net.minecraft.client.renderer.GameRenderer;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TextComponent;
+import net.minecraft.client.audio.SoundHandler;
+import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.client.renderer.BufferBuilder;
+import net.minecraft.client.renderer.Tessellator;
+import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.TextComponentString;
 import org.figuramc.figura.utils.ClickableTextHelper;
-import net.minecraft.network.chat.FormattedText;
-import net.minecraft.util.Mth;
 import org.figuramc.figura.utils.VertexFormatMode;
 import org.figuramc.figura.utils.ui.UIHelper;
 
-import java.util.Arrays;
-import java.util.List;
 import java.util.Objects;
 
-public class BackendMotdWidget extends AbstractWidget implements Widget, GuiEventListener {
-    private final Font font;
+public class BackendMotdWidget extends AbstractFiguraWidget implements FiguraRenderable, FiguraGuiEventListener {
+    private final FontRenderer font;
     private final ClickableTextHelper textHelper;
     private int maxWidth;
     private double scrollAmount;
     private boolean scrolling;
 
-    public BackendMotdWidget(int i, int j, int k, int l, Component text, Font font) {
-        super(i, j, k, l, text);
+    public BackendMotdWidget(int x, int y, int width, int height, ITextComponent text, FontRenderer font) {
+        super(x, y, width, height, text);
         this.font = font;
         this.textHelper = new ClickableTextHelper();
         this.maxWidth = this.getWidth() - this.totalInnerPadding();
     }
 
     @Override
-    public void setMessage(Component message) {
+    public void setMessage(ITextComponent message) {
         super.setMessage(message);
         textHelper.setMessage(message);
     }
@@ -61,51 +49,51 @@ public class BackendMotdWidget extends AbstractWidget implements Widget, GuiEven
 
     protected int getInnerHeight() {
         Objects.requireNonNull(font);
-        return textHelper.lineCount() * font.lineHeight;
+        return textHelper.lineCount() * font.FONT_HEIGHT;
     }
 
     protected double scrollRate() {
         Objects.requireNonNull(this.font);
-        return font.lineHeight;
+        return font.FONT_HEIGHT;
     }
 
     protected int innerPadding() {
         return 4;
     }
 
-    protected void renderBorder(PoseStack stack, int x, int y, int width, int height) {
-        UIHelper.renderSliced(stack, this.x - this.innerPadding(), this.y - this.innerPadding(), this.getWidth() + this.totalInnerPadding(), this.getHeight() + this.totalInnerPadding(), UIHelper.OUTLINE_FILL);
+    protected void renderBorder(Minecraft mc, int x, int y, int width, int height) {
+        UIHelper.renderSliced(this.x - this.innerPadding(), this.y - this.innerPadding(), this.getWidth() + this.totalInnerPadding(), this.getHeight() + this.totalInnerPadding(), UIHelper.OUTLINE_FILL);
     }
 
-    protected void renderBackground(PoseStack pose) {
-        UIHelper.renderSliced(pose, this.x - this.innerPadding(), this.y - this.innerPadding(), this.getWidth() + this.totalInnerPadding(), this.getHeight() + this.totalInnerPadding(), UIHelper.OUTLINE_FILL);
+    protected void renderBackground() {
+        UIHelper.renderSliced(this.x - this.innerPadding(), this.y - this.innerPadding(), this.getWidth() + this.totalInnerPadding(), this.getHeight() + this.totalInnerPadding(), UIHelper.OUTLINE_FILL);
     }
 
     @Override
-    public void renderButton(PoseStack pose, int mouseX, int mouseY, float delta) {
+    public void drawWidget(Minecraft minecraft, int mouseX, int mouseY, float delta) {
         if (this.visible) {
             if (!scrollbarVisible()) {
-                renderBackground(pose);
-                renderContents(pose, mouseX, mouseY, delta);
+                renderBackground();
+                renderContents(minecraft, mouseX, mouseY, delta);
             } else {
-                super.renderButton(pose, mouseX, mouseY, delta);
+                super.drawWidget(minecraft, mouseX, mouseY, delta);
             }
         }
     }
 
-    protected void renderContents(PoseStack pose, int mouseX, int mouseY, float delta) {
+    protected void renderContents(Minecraft mc, int mouseX, int mouseY, float delta) {
         int xx = this.x + this.innerPadding();
         int yy = this.y + this.innerPadding();
 
         int scroll = (int)scrollAmount();
         textHelper.update(font, maxWidth);
 
-        textHelper.visit((text, style, x, y, textWidth, textHeight) -> UIHelper.drawString(pose, font, new TextComponent(text).setStyle(style), xx + x, yy + y, 0xFFFFFFFF));
+        textHelper.visit((text, style, x, y, textWidth, textHeight) -> drawString(font, new TextComponentString(text).setStyle(style).getFormattedText(), xx + x, yy + y, 0xFFFFFFFF));
 
         //textHelper.renderDebug(graphics, xx, yy, mouseX, mouseY + scroll);
 
         if (withinContentAreaPoint(mouseX, mouseY)) {
-            Component tooltip = textHelper.getHoverTooltip(xx, yy, mouseX, mouseY + scroll);
+            ITextComponent tooltip = textHelper.getHoverTooltip(xx, yy, mouseX, mouseY + scroll);
             if (tooltip != null)
                 UIHelper.setTooltip(tooltip);
 
@@ -119,15 +107,14 @@ public class BackendMotdWidget extends AbstractWidget implements Widget, GuiEven
         }
     }
 
-    @Override
-    public void playDownSound(SoundManager soundManager) {
+    public void playPressedSound(SoundHandler handler) {
         // Don't play the button click sound
     }
 
     private boolean mouseDown = false;
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseButtonClicked(int mouseX, int mouseY, int button) {
         mouseDown = mouseClickedScroll(mouseX, mouseY, button);
         return mouseDown;
     }
@@ -154,7 +141,7 @@ public class BackendMotdWidget extends AbstractWidget implements Widget, GuiEven
     }
 
     protected void setScrollAmount(double scrollAmount) {
-        this.scrollAmount = Mth.clamp(scrollAmount, 0.0, (double)this.getMaxScrollAmount());
+        this.scrollAmount = MathHelper.clamp(scrollAmount, 0.0, (double)this.getMaxScrollAmount());
     }
 
     protected int getMaxScrollAmount() {
@@ -171,24 +158,24 @@ public class BackendMotdWidget extends AbstractWidget implements Widget, GuiEven
         int k = this.x + this.width + 8;
         int l = Math.max(this.y, (int)this.scrollAmount * (this.height - i) / this.getMaxScrollAmount() + this.y);
         int m = l + i;
-        Tesselator tesselator = Tesselator.getInstance();
-        BufferBuilder bufferBuilder = tesselator.getBuilder();
-        bufferBuilder.begin(VertexFormatMode.QUADS.asGLMode, DefaultVertexFormat.POSITION_COLOR);
-        bufferBuilder.vertex(j, m, 0.0).color(128, 128, 128, 255).endVertex();
-        bufferBuilder.vertex(k, m, 0.0).color(128, 128, 128, 255).endVertex();
-        bufferBuilder.vertex(k, l, 0.0).color(128, 128, 128, 255).endVertex();
-        bufferBuilder.vertex(j, l, 0.0).color(128, 128, 128, 255).endVertex();
-        bufferBuilder.vertex(j, (m - 1), 0.0).color(192, 192, 192, 255).endVertex();
-        bufferBuilder.vertex((k - 1), (m - 1), 0.0).color(192, 192, 192, 255).endVertex();
-        bufferBuilder.vertex((k - 1), l, 0.0).color(192, 192, 192, 255).endVertex();
-        bufferBuilder.vertex(j, l, 0.0).color(192, 192, 192, 255).endVertex();
-        tesselator.end();
+        Tessellator tesselator = Tessellator.getInstance();
+        BufferBuilder bufferBuilder = tesselator.getBuffer();
+        bufferBuilder.begin(VertexFormatMode.QUADS.asGLMode, DefaultVertexFormats.POSITION_COLOR);
+        bufferBuilder.pos(j, m, 0.0).color(128, 128, 128, 255).endVertex();
+        bufferBuilder.pos(k, m, 0.0).color(128, 128, 128, 255).endVertex();
+        bufferBuilder.pos(k, l, 0.0).color(128, 128, 128, 255).endVertex();
+        bufferBuilder.pos(j, l, 0.0).color(128, 128, 128, 255).endVertex();
+        bufferBuilder.pos(j, (m - 1), 0.0).color(192, 192, 192, 255).endVertex();
+        bufferBuilder.pos((k - 1), (m - 1), 0.0).color(192, 192, 192, 255).endVertex();
+        bufferBuilder.pos((k - 1), l, 0.0).color(192, 192, 192, 255).endVertex();
+        bufferBuilder.pos(j, l, 0.0).color(192, 192, 192, 255).endVertex();
+        tesselator.draw();
     }
     private int getScrollBarHeight() {
-        return Mth.clamp((int)((float)(this.height * this.height) / (float)this.getContentHeight()), 32, this.height);
+        return MathHelper.clamp((int)((float)(this.height * this.height) / (float)this.getContentHeight()), 32, this.height);
     }
 
-    protected void renderDecorations(PoseStack matrices) {
+    protected void renderDecorations(Minecraft mc) {
         if (this.scrollbarVisible()) {
             this.renderScrollBar();
         }
@@ -218,15 +205,16 @@ public class BackendMotdWidget extends AbstractWidget implements Widget, GuiEven
         }
     }
 
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    @Override
+    public boolean mouseButtonReleased(int mouseX, int mouseY, int button) {
         if (button == 0) {
             this.scrolling = false;
         }
-
-        return super.mouseReleased(mouseX, mouseY, button);
+        return super.mouseButtonReleased(mouseX, mouseY, button);
     }
 
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+    @Override
+    public void mouseDragged(Minecraft mc, int mouseX, int mouseY, int button, double deltaX, double deltaY) {
         if (this.visible && this.isFocused() && this.scrolling) {
             if (mouseY < (double)this.y) {
                 this.setScrollAmount(0.0);
@@ -238,13 +226,11 @@ public class BackendMotdWidget extends AbstractWidget implements Widget, GuiEven
                 this.setScrollAmount(this.scrollAmount + deltaY * d);
             }
 
-            return true;
-        } else {
-            return false;
         }
     }
 
-    public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
+    @Override
+    public boolean mouseScroll(double mouseX, double mouseY, double amount) {
         if (this.visible && this.isFocused()) {
             this.setScrollAmount(this.scrollAmount - amount * this.scrollRate());
             return true;

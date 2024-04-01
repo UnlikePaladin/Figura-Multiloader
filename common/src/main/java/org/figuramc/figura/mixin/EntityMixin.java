@@ -1,7 +1,7 @@
 package org.figuramc.figura.mixin;
 
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.entity.Entity;
+import net.minecraft.util.math.Vec3d;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.avatar.AvatarManager;
 import org.figuramc.figura.math.vector.FiguraVec3;
@@ -14,13 +14,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(Entity.class)
 public class EntityMixin {
 
-    @Inject(method = "getEyePosition(F)Lnet/minecraft/world/phys/Vec3;", at = @At("RETURN"), cancellable = true)
-    private void getEyePosition(float tickDelta, CallbackInfoReturnable<Vec3> cir) {
+    @Inject(method = "getPositionEyes", at = @At("RETURN"), cancellable = true)
+    private void getEyePosition(float tickDelta, CallbackInfoReturnable<Vec3d> cir) {
         figura$offsetEyePos(cir);
     }
 
     @Intrinsic
-    private void figura$offsetEyePos(CallbackInfoReturnable<Vec3> cir) {
+    private void figura$offsetEyePos(CallbackInfoReturnable<Vec3d> cir) {
         Avatar avatar = AvatarManager.getAvatar((Entity) (Object) this);
         if (avatar == null || avatar.luaRuntime == null)
             return;

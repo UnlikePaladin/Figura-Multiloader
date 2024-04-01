@@ -47,7 +47,7 @@ public class Badges {
                 // mark
                 mark: {
                     // pride (mark skins)
-                    BitSet prideSet = pair.first();
+                    BitSet prideSet = pair.getFirst();
                     Pride[] pride = Pride.values();
                     for (int i = pride.length - 1; i >= 0; i--) {
                         if (prideSet.get(i)) {
@@ -87,7 +87,7 @@ public class Badges {
         // -- special -- //
         if (avatar != null) {
             // special badges
-            BitSet specialSet = pair.second();
+            BitSet specialSet = pair.getSecond();
             Special[] specialValues = Special.values();
             for (int i = specialValues.length - 1; i >= 0; i--) {
                 if (specialSet.get(i)) {

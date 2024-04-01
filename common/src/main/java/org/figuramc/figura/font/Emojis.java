@@ -7,6 +7,7 @@ import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.Style;
 import net.minecraft.util.text.TextComponentString;
 import org.figuramc.figura.FiguraMod;
+import org.figuramc.figura.platform.Services;
 import org.figuramc.figura.utils.FiguraResourceListener;
 import org.figuramc.figura.utils.TextUtils;
 
@@ -28,7 +29,7 @@ public class Emojis {
     private static final JsonParser parser = new JsonParser();
 
     // listener to load emojis from the resource pack
-    public static final FiguraResourceListener RESOURCE_LISTENER = FiguraResourceListener.createResourceListener("emojis", manager -> {
+    public static final FiguraResourceListener RESOURCE_LISTENER = Services.FIGURA_RESOURCE_LISTENER.createResourceListener("emojis", manager -> {
         EMOJIS.clear();
 
         for (String space : manager.getResourceDomains()) {
@@ -107,11 +108,7 @@ public class Emojis {
         ITextComponent newText = TextUtils.parseLegacyFormatting(text);
         ITextComponent ret = new TextComponentString("");
 
-        List<ITextComponent> components = new ArrayList<>();
-        components.add(text);
-        components.addAll(text.getSiblings());
-
-        for (ITextComponent textComponent : components) {
+        for (ITextComponent textComponent : newText) {
             String string = textComponent.getUnformattedComponentText();
             Style style = textComponent.getStyle();
             ret.appendSibling(convertEmoji(string, style));

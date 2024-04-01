@@ -1,14 +1,13 @@
 package org.figuramc.figura.gui.screens;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.resources.sounds.SimpleSoundInstance;
-import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.Style;
-import net.minecraft.network.chat.TextComponent;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.sounds.SoundEvents;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.audio.PositionedSoundRecord;
+import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.init.SoundEvents;
+import net.minecraft.util.EnumParticleTypes;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.text.Style;
+import net.minecraft.util.text.TextComponentString;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.config.Configs;
 import org.figuramc.figura.gui.widgets.Button;
@@ -27,70 +26,70 @@ public class HelpScreen extends AbstractPanelScreen {
 
     private IconButton kofi;
 
-    public HelpScreen(Screen parentScreen) {
+    public HelpScreen(GuiScreen parentScreen) {
         super(parentScreen, new FiguraText("gui.panels.title.help"));
     }
 
     @Override
-    protected void init() {
-        super.init();
+    public void initGui() {
+        super.initGui();
 
-        int lineHeight = this.minecraft.font.lineHeight;
+        int lineHeight = this.mc.fontRenderer.FONT_HEIGHT;
         int middle = width / 2;
         int labelWidth = Math.min(width - 8, 420);
         int y = 28;
         Style color = FiguraMod.getAccentColor();
 
         // in-game docs
-        this.addRenderableWidget(new Title(new FiguraText("gui.help.docs").withStyle(color), middle, y, labelWidth));
+        this.addRenderableWidget(new Title(new FiguraText("gui.help.docs").setStyle(color), middle, y, labelWidth));
 
         IconButton docs;
-        this.addRenderableWidget(docs = new IconButton(middle - 60, y += lineHeight + 4, 120, 24, 20, 0, 20, ICONS, 60, 40, new FiguraText("gui.help.ingame_docs"), null, button -> this.minecraft.setScreen(new DocsScreen(this))));
+        this.addRenderableWidget(docs = new IconButton(middle - 60, y += lineHeight + 4, 120, 24, 20, 0, 20, ICONS, 60, 40, new FiguraText("gui.help.ingame_docs"), null, button -> this.mc.displayGuiScreen(new DocsScreen(this))));
         docs.setActive(false);
         this.addRenderableWidget(new IconButton(middle - 60, y += 28, 120, 24, 0, 0, 20, ICONS, 60, 40, new FiguraText("gui.help.lua_manual"), null, bx -> UIHelper.openURL(FiguraMod.Links.LuaManual.url).run()));
         this.addRenderableWidget(new IconButton(middle - 60, y += 28, 120, 24, 40, 0, 20, ICONS, 60, 40, new FiguraText("gui.help.external_wiki"), null, bx -> UIHelper.openURL(FiguraMod.Links.Wiki.url).run()));
 
         // links
-        this.addRenderableWidget(new Title(new FiguraText("gui.help.links").withStyle(color), middle, y += 28, labelWidth));
+        this.addRenderableWidget(new Title(new FiguraText("gui.help.links").setStyle(color), middle, y += 28, labelWidth));
 
-        this.addRenderableWidget(new IconButton(middle - 124, y += lineHeight + 4, 80, 24, 0, 20, 20, ICONS, 60, 40, new TextComponent("Discord"), null, bx -> UIHelper.openURL(FiguraMod.Links.Discord.url).run()));
-        this.addRenderableWidget(new IconButton(middle - 40, y, 80, 24, 20, 20, 20, ICONS, 60, 40, new TextComponent("GitHub"), null, bx -> UIHelper.openURL(FiguraMod.Links.Github.url).run()) {
+        this.addRenderableWidget(new IconButton(middle - 124, y += lineHeight + 4, 80, 24, 0, 20, 20, ICONS, 60, 40, new TextComponentString("Discord"), null, bx -> UIHelper.openURL(FiguraMod.Links.Discord.url).run()));
+        this.addRenderableWidget(new IconButton(middle - 40, y, 80, 24, 20, 20, 20, ICONS, 60, 40, new TextComponentString("GitHub"), null, bx -> UIHelper.openURL(FiguraMod.Links.Github.url).run()) {
             @Override
-            public boolean mouseClicked(double mouseX, double mouseY, int button) {
-                if (Configs.EASTER_EGGS.value && (this.isHovered() || this.isFocused()) && this.isMouseOver(mouseX, mouseY) && button == 1) {
+            public boolean mouseButtonClicked(int mouseX, int mouseY, int button) {
+                if (Configs.EASTER_EGGS.value && (this.isHovered()) && this.mouseOver(mouseX, mouseY) && button == 1) {
                     int dim = getTextureSize();
                     int x = (int) (Math.random() * dim) + getX() + 2;
                     int y = (int) (Math.random() * dim) + getY() + 2;
-                    addRenderableOnly(new ParticleWidget(x, y, ParticleTypes.HEART));
+                    addRenderableOnly(new ParticleWidget(x, y, EnumParticleTypes.HEART));
 
                     boolean purr = Math.random() < 0.95;
-                    minecraft.getSoundManager().play(SimpleSoundInstance.forUI(purr ? SoundEvents.CAT_PURR : SoundEvents.CAT_AMBIENT, 1f));
+                    mc.getSoundHandler().playSound(PositionedSoundRecord.getMasterRecord(purr ? SoundEvents.ENTITY_CAT_PURR : SoundEvents.ENTITY_CAT_AMBIENT, 1f));
                     return false;
                 }
 
-                return super.mouseClicked(mouseX, mouseY, button);
+                return super.mouseButtonClicked(mouseX, mouseY, button);
             }
         });
-        this.addRenderableWidget(kofi = new IconButton(middle + 44, y, 80, 24, 40, 20, 20, ICONS, 60, 40, new TextComponent("Ko-fi"), null, b -> UIHelper.openURL(FiguraMod.Links.Kofi.url).run()));
+        this.addRenderableWidget(kofi = new IconButton(middle + 44, y, 80, 24, 40, 20, 20, ICONS, 60, 40, new TextComponentString("Ko-fi"), null, b -> UIHelper.openURL(FiguraMod.Links.Kofi.url).run()));
 
         // texts
-        this.addRenderableWidget(new Title(new FiguraText("gui.help.about").withStyle(color), middle, y += 28, labelWidth));
+        this.addRenderableWidget(new Title(new FiguraText("gui.help.about").setStyle(color), middle, y += 28, labelWidth));
 
-        this.addRenderableWidget(new Label(new FiguraText("gui.help.lua_version", new TextComponent(LUA_VERSION).withStyle(color)), middle, y += lineHeight + 4, TextUtils.Alignment.CENTER));
-        this.addRenderableWidget(new Label(new FiguraText("gui.help.figura_version", new TextComponent(FiguraMod.VERSION.toString()).withStyle(color)), middle, y += lineHeight + 4, TextUtils.Alignment.CENTER));
+        this.addRenderableWidget(new Label(new FiguraText("gui.help.lua_version", new TextComponentString(LUA_VERSION).setStyle(color)), middle, y += lineHeight + 4, TextUtils.Alignment.CENTER));
+        this.addRenderableWidget(new Label(new FiguraText("gui.help.figura_version", new TextComponentString(FiguraMod.VERSION.toString()).setStyle(color)), middle, y += lineHeight + 4, TextUtils.Alignment.CENTER));
 
         // back
-        addRenderableWidget(new Button(middle - 60, height - 24, 120, 20, new FiguraText("gui.done"), null, bx -> onClose()));
+        addRenderableWidget(new Button(middle - 60, height - 24, 120, 20, new FiguraText("gui.done"), null, bx -> onGuiClosed()));
     }
 
     @Override
     public void tick() {
         super.tick();
 
-        if (FiguraMod.ticks % 5 == 0 && (kofi.isHovered() || kofi.isFocused())) {
+        if (FiguraMod.ticks % 5 == 0 && (kofi.isHovered())) {
             int x = (int) (Math.random() * kofi.getWidth()) + kofi.getX();
             int y = (int) (Math.random() * kofi.getHeight()) + kofi.getY();
-            addRenderableOnly(new ParticleWidget(x, y, ParticleTypes.HAPPY_VILLAGER));
+            addRenderableOnly(new ParticleWidget(x, y, EnumParticleTypes.VILLAGER_HAPPY));
         }
     }
 
@@ -104,7 +103,7 @@ public class HelpScreen extends AbstractPanelScreen {
         }
 
         @Override
-        public void render(PoseStack pose, int mouseX, int mouseY, float delta) {
+        public void draw(Minecraft mc, int mouseX, int mouseY, float delta) {
             int x = getRawX();
             int y = getRawY();
 
@@ -114,14 +113,14 @@ public class HelpScreen extends AbstractPanelScreen {
 
             int x0 = x - width / 2;
             int x1 = x - getWidth() / 2 - 4;
-            UIHelper.fill(pose, x0, y0, x1, y1, 0xFFFFFFFF);
+            UIHelper.fill(x0, y0, x1, y1, 0xFFFFFFFF);
 
             x0 = x + getWidth() / 2 + 4;
             x1 = x + width / 2;
-            UIHelper.fill(pose, x0, y0, x1, y1, 0xFFFFFFFF);
+            UIHelper.fill( 0, y0, x1, y1, 0xFFFFFFFF);
 
             // text
-            super.render(pose, mouseX, mouseY, delta);
+            super.draw(mc, mouseX, mouseY, delta);
         }
     }
 }

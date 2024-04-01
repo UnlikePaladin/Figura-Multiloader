@@ -11,7 +11,7 @@ import org.figuramc.figura.lua.ReadOnlyLuaTable;
 import org.figuramc.figura.lua.docs.LuaFieldDoc;
 import org.figuramc.figura.lua.docs.LuaMethodDoc;
 import org.figuramc.figura.lua.docs.LuaTypeDoc;
-import org.figuramc.figura.utils.RegistryUtils;
+import org.figuramc.figura.utils.FiguraFlattenerUtils;
 import org.luaj.vm2.LuaTable;
 
 import java.util.ArrayList;
@@ -48,7 +48,7 @@ public class ItemStackAPI {
 
     public ItemStackAPI(ItemStack itemStack) {
         this.itemStack = itemStack;
-        this.id = RegistryUtils.getResourceLocationForRegistryObj(Item.class, itemStack.getItem()).toString();
+        this.id = FiguraFlattenerUtils.theStackFlattinator2000(itemStack).toString();
         this.tag = new ReadOnlyLuaTable(itemStack.getTagCompound() != null ? NbtToLua.convert(itemStack.getTagCompound()) : new LuaTable());
     }
 
@@ -90,18 +90,8 @@ public class ItemStackAPI {
 
     @LuaWhitelist
     @LuaMethodDoc("itemstack.get_tags")
-    public List<String> getTags() {
-        List<String> list = new ArrayList<>();
-
-        Registry<Item> registry = WorldAPI.getCurrentWorld().registryAccess().registryOrThrow(Registry.ITEM_REGISTRY);
-        Optional<ResourceKey<Item>> key = registry.getResourceKey(itemStack.getItem());
-        if (Minecraft.getInstance().getConnection() == null || Minecraft.getInstance().getConnection().getTags() == null)
-            return list;
-
-        for (ResourceLocation resourceLocation : Minecraft.getMinecraft().getConnection().getTags().getItems().getMatchingTags(itemStack.getItem()))
-            list.add(resourceLocation.toString());
-
-        return list;
+    public List<String> getTags() { //TODO: implement default tags
+        return new ArrayList<>();
     }
 
     @LuaWhitelist
@@ -179,10 +169,9 @@ public class ItemStackAPI {
     @LuaWhitelist
     @LuaMethodDoc("itemstack.to_stack_string")
     public String toStackString() {
-        ItemStack stack = itemStack;
-        String ret = RegistryUtils.getResourceLocationForRegistryObj(Item.class, stack.getItem()).toString();
+        String ret = id;
 
-        NBTTagCompound nbt = stack.getTagCompound();
+        NBTTagCompound nbt = itemStack.getTagCompound();
         if (nbt != null)
             ret += nbt.toString();
 

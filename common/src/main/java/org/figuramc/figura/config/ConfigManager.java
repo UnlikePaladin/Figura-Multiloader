@@ -1,8 +1,8 @@
 package org.figuramc.figura.config;
 
 import com.google.gson.*;
-import com.mojang.blaze3d.platform.InputConstants;
 import org.figuramc.figura.FiguraMod;
+import org.figuramc.figura.lua.api.keybind.FiguraKeybind;
 import org.figuramc.figura.utils.PlatformUtils;
 
 import java.io.BufferedReader;
@@ -52,7 +52,7 @@ public final class ConfigManager {
                         String obj = object.getAsString();
                         if (config instanceof ConfigType.KeybindConfig) {
                             ConfigType.KeybindConfig keybind = (ConfigType.KeybindConfig) config;
-                            keybind.keyBind.setKey(InputConstants.getKey(obj));
+                            keybind.keyBind.setKeyCode(FiguraKeybind.parseStringKey(obj));
                         } else if (config instanceof ConfigType.InputConfig<?>) {
                             ConfigType.InputConfig<?> input = (ConfigType.InputConfig<?>) config;
                             if (input.inputType.validator.test(obj))

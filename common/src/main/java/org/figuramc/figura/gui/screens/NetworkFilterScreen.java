@@ -1,9 +1,7 @@
 package org.figuramc.figura.gui.screens;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
-import net.minecraft.client.gui.screens.Screen;
 import org.figuramc.figura.config.ConfigManager;
 import org.figuramc.figura.config.ConfigType;
 import org.figuramc.figura.config.Configs;
@@ -22,7 +20,7 @@ public class NetworkFilterScreen extends AbstractPanelScreen {
     }
 
     @Override
-    protected void init() {
+    public void initGui() {
         titleLabel.setX(width / 2);
         titleLabel.setY(8 + titleLabel.getHeight() / 2 );
         int listWidth = Math.min(420, this.width - 8);
@@ -33,8 +31,8 @@ public class NetworkFilterScreen extends AbstractPanelScreen {
     }
 
     @Override
-    public void render(PoseStack stack, int mouseX, int mouseY, float delta) {
-        super.render(stack, mouseX, mouseY, delta);
+    public void drawScreen(int mouseX, int mouseY, float delta) {
+        super.drawScreen(mouseX, mouseY, delta);
     }
 
     protected void repositionElements() {
@@ -48,14 +46,15 @@ public class NetworkFilterScreen extends AbstractPanelScreen {
     }
 
     @Override
-    public void resize(Minecraft client, int width, int height) {
-        super.resize(client, width, height);
+    public void onResize(Minecraft minecraft, int width, int height) {
+        super.onResize(minecraft, width, height);
         repositionElements();
     }
 
     @Override
-    public void removed() {
+    public void onGuiClosed() {
         ConfigManager.applyConfig();
         ConfigManager.saveConfig();
+        super.onGuiClosed();
     }
 }

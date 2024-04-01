@@ -1,49 +1,30 @@
 package org.figuramc.figura.lua.api;
 
 import com.google.common.base.Suppliers;
-import com.mojang.blaze3d.platform.Window;
-import com.mojang.math.Vector3f;
-import net.minecraft.SharedConstants;
 import net.minecraft.client.ClientBrandRetriever;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.MouseHandler;
-import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.ScaledResolution;
-import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.network.NetworkPlayerInfo;
 import net.minecraft.client.resources.ResourcePackRepository;
-import net.minecraft.client.server.IntegratedServer;
-import net.minecraft.core.Registry;
-import net.minecraft.core.SerializableUUID;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TranslatableComponent;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.scoreboard.Score;
 import net.minecraft.scoreboard.ScoreObjective;
 import net.minecraft.scoreboard.ScorePlayerTeam;
 import net.minecraft.scoreboard.Scoreboard;
 import net.minecraft.server.integrated.IntegratedServer;
-import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.util.MouseHelper;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.registry.IRegistry;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.TextComponentTranslation;
-import net.minecraft.world.phys.Vec3;
-import org.figuramc.figura.lua.LuaWhitelist;
-import org.figuramc.figura.utils.*;
-import org.luaj.vm2.LuaError;
-import org.luaj.vm2.LuaValue;
-import net.minecraft.world.scores.Objective;
-import net.minecraft.world.scores.PlayerTeam;
-import net.minecraft.world.scores.Score;
-import net.minecraft.world.scores.Scoreboard;
 import org.figuramc.figura.FiguraMod;
+import org.figuramc.figura.ducks.SoundManagerAccessor;
 import org.figuramc.figura.lua.LuaNotNil;
+import org.figuramc.figura.lua.LuaWhitelist;
 import org.figuramc.figura.lua.api.entity.EntityAPI;
 import org.figuramc.figura.lua.api.entity.ViewerAPI;
 import org.figuramc.figura.lua.docs.FiguraListDocs;
@@ -54,6 +35,11 @@ import org.figuramc.figura.math.vector.FiguraVec2;
 import org.figuramc.figura.math.vector.FiguraVec3;
 import org.figuramc.figura.mixin.gui.GuiIngameAccessor;
 import org.figuramc.figura.mixin.gui.PlayerTabOverlayAccessor;
+import org.figuramc.figura.mixin.sound.SoundHandlerAccessor;
+import org.figuramc.figura.utils.*;
+import org.luaj.vm2.LuaError;
+import org.luaj.vm2.LuaValue;
+import org.lwjgl.input.Mouse;
 import org.lwjgl.util.vector.Vector3f;
 
 import java.lang.reflect.Field;
@@ -166,7 +152,7 @@ public class ClientAPI {
     @LuaWhitelist
     @LuaMethodDoc("client.get_sound_statistics")
     public static String getSoundStatistics() {
-        return Minecraft.getMinecraft().getSoundHandler().getSoundManager().getDebugString();
+        return ((SoundManagerAccessor)((SoundHandlerAccessor)Minecraft.getMinecraft().getSoundHandler()).getSoundEngine()).getSoundStatistics();
     }
 
     @LuaWhitelist
@@ -258,7 +244,7 @@ public class ClientAPI {
     @LuaMethodDoc("client.get_mouse_pos")
     public static FiguraVec2 getMousePos() {
         MouseHelper mouse = Minecraft.getMinecraft().mouseHelper;
-        return FiguraVec2.of(mouse.xpos(), mouse.ypos());
+        return FiguraVec2.of(Mouse.getX(), Mouse.getY());
     }
 
     @LuaWhitelist
@@ -284,8 +270,8 @@ public class ClientAPI {
     @LuaWhitelist
     @LuaMethodDoc("client.get_camera_rot")
     public static FiguraVec3 getCameraRot() {
-        double f = 180d / Math.PI;
-        return MathUtils.quaternionToYXZ(Minecraft.getInstance().gameRenderer.getMainCamera().rotation()).multiply(f, -f, f); //degrees, and negate y
+        double f = 180d / Math.PI; // TODO : check whether this is necessary, also check whether i should use from the entity view or render manager
+        return new FiguraVec3().set(Minecraft.getMinecraft().getRenderManager().playerViewX, Minecraft.getMinecraft().getRenderManager().playerViewY, Minecraft.getMinecraft().getRenderViewEntity().getLook(1.0f).z).multiply(1, -1, 1); //degrees, and negate y
     }
 
     @LuaWhitelist
@@ -303,7 +289,7 @@ public class ClientAPI {
             value = "client.get_text_width"
     )
     public static int getTextWidth(@LuaNotNil String text) {
-        return TextUtils.getWidth(TextUtils.splitText(TextUtils.tryParseJson(text), "\n"), Minecraft.getInstance().font);
+        return TextUtils.getWidth(TextUtils.splitText(TextUtils.tryParseJson(text), "\n"), Minecraft.getMinecraft().fontRenderer);
     }
 
     @LuaWhitelist
@@ -315,7 +301,7 @@ public class ClientAPI {
             value = "client.get_text_height"
     )
     public static int getTextHeight(String text) {
-        return TextUtils.getHeight(TextUtils.splitText(TextUtils.tryParseJson(text), "\n"), Minecraft.getInstance().font);
+        return TextUtils.getHeight(TextUtils.splitText(TextUtils.tryParseJson(text), "\n"), Minecraft.getMinecraft().fontRenderer);
     }
 
     @LuaWhitelist
@@ -648,7 +634,7 @@ public class ClientAPI {
     public static TextureAtlasAPI getAtlas(@LuaNotNil String atlas) {
         ResourceLocation path = LuaUtils.parsePath(atlas);
         try {
-            return new TextureAtlasAPI(Minecraft.getMinecraft().getTextureMapBlocks().getModelManager().getAtlas(path));
+            return new TextureAtlasAPI(Minecraft.getMinecraft().getTextureMapBlocks());
         } catch (Exception ignored) {
             return null;
         }
@@ -719,10 +705,10 @@ public class ClientAPI {
             value = "client.get_registry"
     )
     public static List<String> getRegistry(@LuaNotNil String registryName) {
-        Registry<?> registry = Registry.REGISTRY.get(new ResourceLocation(registryName));
+        IRegistry<ResourceLocation, ?> registry = RegistryUtils.getRegistry(new ResourceLocation(registryName));
 
         if (registry != null) {
-            return registry.keySet().stream()
+            return registry.getKeys().stream()
                     .map(ResourceLocation::toString)
                     .collect(Collectors.toList());
         } else {

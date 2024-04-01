@@ -1,11 +1,14 @@
 package org.figuramc.figura.model.rendertasks;
 
-import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.block.BlockAir;
+import net.minecraft.block.material.Material;
+import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.resources.model.BakedModel;
-import net.minecraft.core.Direction;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.client.renderer.OpenGlHelper;
+import net.minecraft.client.renderer.Tessellator;
+import net.minecraft.client.renderer.block.model.IBakedModel;
+import net.minecraft.util.EnumFacing;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.lua.LuaWhitelist;
 import org.figuramc.figura.lua.api.world.BlockStateAPI;
@@ -14,6 +17,7 @@ import org.figuramc.figura.lua.docs.LuaMethodOverload;
 import org.figuramc.figura.lua.docs.LuaTypeDoc;
 import org.figuramc.figura.model.FiguraModelPart;
 import org.figuramc.figura.model.PartCustomization;
+import org.figuramc.figura.model.rendering.texture.RenderTypes;
 import org.figuramc.figura.utils.LuaUtils;
 
 import java.util.Random;
@@ -25,7 +29,7 @@ import java.util.Random;
 )
 public class BlockTask extends RenderTask {
 
-    private BlockState block;
+    private IBlockState block;
     private int cachedComplexity;
 
     public BlockTask(String name, Avatar owner, FiguraModelPart parent) {
@@ -33,13 +37,18 @@ public class BlockTask extends RenderTask {
     }
 
     @Override
-    public void renderTask(PoseStack poseStack, MultiBufferSource buffer, int light, int overlay) {
-        poseStack.scale(16, 16, 16);
-
+    public void renderTask(RenderTypes.FiguraBufferSource buffer, int light, int overlay) {
+        GlStateManager.pushMatrix();
+        GlStateManager.scale(16, 16, 16);
+    //TODO: check if this has to actually be scaled
         int newLight = this.customization.light != null ? this.customization.light : light;
         int newOverlay = this.customization.overlay != null ? this.customization.overlay : overlay;
 
-        Minecraft.getInstance().getBlockRenderer().renderSingleBlock(block, poseStack, buffer, newLight, newOverlay);
+        float f = (float)(newLight & 65535);
+        float g = (float)(newLight >> 16);
+        OpenGlHelper.setLightmapTextureCoords(OpenGlHelper.lightmapTexUnit, f, g);
+        Minecraft.getMinecraft().getBlockRendererDispatcher().renderBlock(block, getPos().asBlockPos(), Minecraft.getMinecraft().world, Tessellator.getInstance().getBuffer());
+        GlStateManager.popMatrix();
     }
 
     @Override
@@ -49,7 +58,7 @@ public class BlockTask extends RenderTask {
 
     @Override
     public boolean shouldRender() {
-        return super.shouldRender() && block != null && !block.isAir();
+        return super.shouldRender() && block != null && !(block.getMaterial() == Material.AIR);
     }
 
     // -- lua -- //
@@ -72,13 +81,13 @@ public class BlockTask extends RenderTask {
     )
     public BlockTask setBlock(Object block) {
         this.block = LuaUtils.parseBlockState("block", block);
-        Minecraft client = Minecraft.getInstance();
-        Random random = client.level != null ? client.level.random : new Random();
+        Minecraft client = Minecraft.getMinecraft();
+        Random random = client.world != null ? client.world.rand : new Random();
 
-        BakedModel blockModel = client.getBlockRenderer().getBlockModel(this.block);
-        cachedComplexity = blockModel.getQuads(this.block, null, random).size();
-        for (Direction dir : Direction.values())
-            cachedComplexity += blockModel.getQuads(this.block, dir, random).size();
+        IBakedModel blockModel = client.getBlockRendererDispatcher().getModelForState(this.block);
+        cachedComplexity = blockModel.getQuads(this.block, null, random.nextLong()).size();
+        for (EnumFacing dir : EnumFacing.values())
+            cachedComplexity += blockModel.getQuads(this.block, dir, random.nextLong()).size();
 
         return this;
     }

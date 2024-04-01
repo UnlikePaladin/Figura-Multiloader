@@ -1,9 +1,7 @@
 package org.figuramc.figura.permissions;
 
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
-import net.minecraft.nbt.TagTypes;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.config.Configs;
 import org.figuramc.figura.entries.FiguraPermissions;
@@ -48,14 +46,14 @@ public class PermissionManager {
     }
 
     // read permissions from nbt, adding them into the hash maps
-    private static void readNbt(CompoundTag nbt) {
+    private static void readNbt(NBTTagCompound nbt) {
         // get nbt lists
-        ListTag groupList = nbt.getList("groups", NbtType.COMPOUND.getValue());
-        ListTag playerList = nbt.getList("players", NbtType.COMPOUND.getValue());
+        NBTTagList groupList = nbt.getTagList("groups", NbtType.COMPOUND.getValue());
+        NBTTagList playerList = nbt.getTagList("players", NbtType.COMPOUND.getValue());
 
         // groups
-        for (Tag nbtElement : groupList) {
-            CompoundTag compound = (CompoundTag) nbtElement;
+        for (int i = 0; i < groupList.tagCount(); i++) {
+            NBTTagCompound compound = groupList.getCompoundTagAt(i);
 
             // parse permissions
             String name = compound.getString("name");
@@ -70,8 +68,8 @@ public class PermissionManager {
         }
 
         // players
-        for (Tag value : playerList) {
-            CompoundTag compound = (CompoundTag) value;
+        for (int play = 0; play < playerList.tagCount(); play++) {
+            NBTTagCompound compound = playerList.getCompoundTagAt(play);
 
             // parse permissions
             String name = compound.getString("name");
@@ -96,17 +94,17 @@ public class PermissionManager {
     public static void saveToDisk() {
         IOUtils.saveCacheFile("permissions", nbt -> {
             // create dummy lists for later
-            ListTag groupList = new ListTag();
-            ListTag playerList = new ListTag();
+            NBTTagList groupList = new NBTTagList();
+            NBTTagList playerList = new NBTTagList();
 
             // get groups nbt
             for (PermissionPack group : CATEGORIES.values()) {
                 if (!group.hasChanges())
                     continue;
 
-                CompoundTag container = new CompoundTag();
+                NBTTagCompound container = new NBTTagCompound();
                 group.writeNbt(container);
-                groupList.add(container);
+                groupList.appendTag(container);
             }
 
             // get players nbt
@@ -116,14 +114,14 @@ public class PermissionManager {
                 if (!pack.hasChanges() && pack.getCategory() == category)
                     continue;
 
-                CompoundTag container = new CompoundTag();
+                NBTTagCompound container = new NBTTagCompound();
                 pack.writeNbt(container);
-                playerList.add(container);
+                playerList.appendTag(container);
             }
 
             // add lists to nbt
-            nbt.put("groups", groupList);
-            nbt.put("players", playerList);
+            nbt.setTag("groups", groupList);
+            nbt.setTag("players", playerList);
 
             FiguraMod.debug("Saved Permissions");
         });

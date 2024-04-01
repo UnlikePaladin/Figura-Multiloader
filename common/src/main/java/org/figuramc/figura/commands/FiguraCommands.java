@@ -1,87 +1,152 @@
 package org.figuramc.figura.commands;
 
-import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import com.mojang.brigadier.context.CommandContext;
+import net.minecraft.command.CommandBase;
+import net.minecraft.command.CommandException;
+import net.minecraft.command.ICommandSender;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.util.math.BlockPos;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.avatar.AvatarManager;
 import org.figuramc.figura.backend2.BackendCommands;
-import org.figuramc.figura.config.Configs;
 import org.figuramc.figura.lua.FiguraLuaRuntime;
 import org.figuramc.figura.lua.docs.FiguraDocsManager;
 import org.figuramc.figura.model.rendering.AvatarRenderer;
 import org.figuramc.figura.utils.FiguraClientCommandSource;
 import org.figuramc.figura.utils.FiguraText;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.*;
 
 public class FiguraCommands {
 
-    public static LiteralArgumentBuilder<FiguraClientCommandSource> getCommandRoot() {
-        // root
-        LiteralArgumentBuilder<FiguraClientCommandSource> root = LiteralArgumentBuilder.literal(FiguraMod.MOD_ID);
+    private static Map<String, FiguraSubCommand> subCommands = new HashMap<>();
 
+    public static class FiguraRootCommand extends CommandBase {
+        FiguraRootCommand() {
+            registerSubCommands();
+        }
+
+        @Override
+        public String getName() {
+            return FiguraMod.MOD_ID;
+        }
+
+        @Override
+        public String getUsage(ICommandSender sender) {
+            return "";
+        } // TODO : add usage for commands
+
+        @Override
+        public void execute(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] args) throws CommandException {
+            if (args.length > 0) {
+                if (subCommands.containsKey(args[0])) {
+                    subCommands.get(args[0]).execute(minecraftServer, iCommandSender, Arrays.copyOfRange(args, 1, args.length));
+                }
+            }
+        }
+
+        @Override
+        public List<String> getTabCompletions(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] args, @Nullable BlockPos targetPos) {
+            if (args.length > 0) {
+                if (subCommands.containsKey(args[0])) {
+                    subCommands.get(args[0]).getTabCompletions(minecraftServer, iCommandSender, Arrays.copyOfRange(args, 1, args.length), targetPos);
+                }
+            }
+            return super.getTabCompletions(minecraftServer, iCommandSender, args, targetPos);
+        }
+    }
+
+    public static void registerSubCommands() {
         // docs
-        root.then(FiguraDocsManager.getCommand());
+        new FiguraDocsManager.DocsCommand().registerSubCommand();
 
         // links
-        root.then(LinkCommand.getCommand());
+        new LinkCommand.LinkSubCommand().registerSubCommand();
 
         // run
-        root.then(RunCommand.getCommand());
+        new RunCommand.RunSubCommand().registerSubCommand();
 
         // load
-        root.then(LoadCommand.getCommand());
+        new LoadCommand.LoadSubCommand().registerSubCommand();
 
         // reload
-        root.then(ReloadCommand.getCommand());
+        new ReloadCommand.ReloadSubCommand().registerSubCommand();
 
         // debug
-        root.then(DebugCommand.getCommand());
+        new DebugCommand.DebugSubCommand().registerSubCommand();
 
         // export
-        root.then(ExportCommand.getCommand());
+        new ExportCommand.ExportSubCommand().registerSubCommand();
 
         if (FiguraMod.debugModeEnabled()) {
             // backend debug
-            root.then(BackendCommands.getCommand());
+            new BackendCommands.BackendSubCommand().registerSubCommand();
 
             // set avatar command
-            root.then(AvatarManager.getCommand());
+            new AvatarManager.SetAvatarCommand().registerSubCommand();
         }
 
         // emoji list
-        root.then(EmojiListCommand.getCommand());
-
-        return root;
+        new EmojiListCommand.EmojiListSubCommand().registerSubCommand();
     }
 
-    protected static Avatar checkAvatar(CommandContext<FiguraClientCommandSource> context) {
+    protected static Avatar checkAvatar(ICommandSender context) {
         Avatar avatar = AvatarManager.getAvatarForPlayer(FiguraMod.getLocalPlayerUUID());
         if (avatar == null) {
-            context.getSource().figura$sendError(new FiguraText("command.no_avatar_error"));
+            ((FiguraClientCommandSource)context).figura$sendError(new FiguraText("command.no_avatar_error"));
             return null;
         }
         return avatar;
     }
 
-    protected static FiguraLuaRuntime getRuntime(CommandContext<FiguraClientCommandSource> context) {
+    protected static FiguraLuaRuntime getRuntime(ICommandSender context) {
         Avatar avatar = checkAvatar(context);
         if (avatar == null)
             return null;
         if (avatar.luaRuntime == null || avatar.scriptError) {
-            context.getSource().figura$sendError(new FiguraText("command.no_script_error"));
+            ((FiguraClientCommandSource)context).figura$sendError(new FiguraText("command.no_script_error"));
             return null;
         }
         return avatar.luaRuntime;
     }
 
-    protected static AvatarRenderer getRenderer(CommandContext<FiguraClientCommandSource> context) {
+    protected static AvatarRenderer getRenderer(ICommandSender context) {
         Avatar avatar = checkAvatar(context);
         if (avatar == null)
             return null;
         if (avatar.renderer == null) {
-            context.getSource().figura$sendError(new FiguraText("command.no_renderer_error"));
+            ((FiguraClientCommandSource)context).figura$sendError(new FiguraText("command.no_renderer_error"));
             return null;
         }
         return avatar.renderer;
+    }
+
+
+    /**
+     * Helper class used for sub commands in Figura
+     */
+    public abstract static class FiguraSubCommand {
+        String name;
+        public FiguraSubCommand(String name) {
+            this.name = name;
+        }
+        public String getName() {
+            return name;
+        }
+
+        /**
+         * This method adds the command to the main figura root, it should only be called on
+         * sub commands that follow it such as docs, avatar, etc...
+         */
+        public void registerSubCommand() {
+            subCommands.put(this.getName(), this);
+        }
+
+        public abstract void execute(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] args) throws CommandException;
+
+        public List<String> getTabCompletions(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] strings, @Nullable BlockPos targetPos) {
+            return Collections.emptyList();
+        }
     }
 }

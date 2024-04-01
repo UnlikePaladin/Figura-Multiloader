@@ -1,18 +1,17 @@
 package org.figuramc.figura.gui.widgets.lists;
 
-import com.mojang.blaze3d.platform.InputConstants;
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TranslatableComponent;
-import net.minecraft.util.Mth;
+import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.Style;
+import net.minecraft.util.text.TextComponentTranslation;
+import net.minecraft.util.text.TextFormatting;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.gui.widgets.*;
 import org.figuramc.figura.lua.api.keybind.FiguraKeybind;
 import org.figuramc.figura.utils.FiguraText;
+import org.figuramc.figura.utils.MathUtils;
 import org.figuramc.figura.utils.TextUtils;
 import org.figuramc.figura.utils.ui.UIHelper;
 
@@ -34,8 +33,8 @@ public class KeybindList extends AbstractList {
         updateList();
 
         Label noOwner, noKeys;
-        this.children.add(noOwner = new Label(new FiguraText("gui.error.no_avatar").withStyle(ChatFormatting.YELLOW), x + width / 2, y + height / 2, TextUtils.Alignment.CENTER, 0));
-        this.children.add(noKeys = new Label(new FiguraText("gui.error.no_keybinds").withStyle(ChatFormatting.YELLOW), x + width / 2, y + height / 2, TextUtils.Alignment.CENTER, 0));
+        this.children.add(noOwner = new Label(new FiguraText("gui.error.no_avatar").setStyle(new Style().setColor(TextFormatting.YELLOW)), x + width / 2, y + height / 2, TextUtils.Alignment.CENTER, 0));
+        this.children.add(noKeys = new Label(new FiguraText("gui.error.no_keybinds").setStyle(new Style().setColor(TextFormatting.YELLOW)), x + width / 2, y + height / 2, TextUtils.Alignment.CENTER, 0));
         noOwner.centerVertically = noKeys.centerVertically = true;
 
         noOwner.setVisible(owner == null);
@@ -43,16 +42,16 @@ public class KeybindList extends AbstractList {
     }
 
     @Override
-    public void render(PoseStack stack, int mouseX, int mouseY, float delta) {
+    public void draw(Minecraft mc, int mouseX, int mouseY, float delta) {
         // background and scissors
-        UIHelper.renderSliced(stack, getX(), getY(), getWidth(), getHeight(), UIHelper.OUTLINE_FILL);
+        UIHelper.renderSliced(getX(), getY(), getWidth(), getHeight(), UIHelper.OUTLINE_FILL);
         UIHelper.setupScissor(getX() + scissorsX, getY() + scissorsY, getWidth() + scissorsWidth, getHeight() + scissorsHeight);
 
         if (!keybinds.isEmpty())
             updateEntries();
 
         // children
-        super.render(stack, mouseX, mouseY, delta);
+        super.draw(mc, mouseX, mouseY, delta);
 
         // reset scissor
         UIHelper.disableScissor();
@@ -70,7 +69,7 @@ public class KeybindList extends AbstractList {
 
         //render list
         int xOffset = scrollBar.isVisible() ? 4 : 11;
-        int yOffset = scrollBar.isVisible() ? (int) -(Mth.lerp(scrollBar.getScrollProgress(), -4, totalHeight - getHeight())) : 4;
+        int yOffset = scrollBar.isVisible() ? (int) -(MathUtils.lerp(scrollBar.getScrollProgress(), -4, totalHeight - getHeight())) : 4;
         for (KeybindElement keybind : keybinds) {
             keybind.setX(getX() + xOffset);
             keybind.setY(getY() + yOffset);
@@ -95,7 +94,7 @@ public class KeybindList extends AbstractList {
         updateBindings();
     }
 
-    public boolean updateKey(InputConstants.Key key) {
+    public boolean updateKey(int key) {
         if (focusedKeybind == null)
             return false;
 
@@ -140,40 +139,40 @@ public class KeybindList extends AbstractList {
             }));
 
             // reset button
-            children.add(resetButton = new ParentedButton(0, 0, 60, 20, new TranslatableComponent("controls.reset"), this, button -> {
+            children.add(resetButton = new ParentedButton(0, 0, 60, 20, new TextComponentTranslation("controls.reset"), this, button -> {
                 keybind.resetDefaultKey();
                 parent.updateBindings();
             }));
         }
 
         @Override
-        public void render(PoseStack stack, int mouseX, int mouseY, float delta) {
+        public void draw(Minecraft mc, int mouseX, int mouseY, float delta) {
             if (!this.isVisible()) return;
 
-            helper.renderConflictBars(stack, keybindButton.x - 8, keybindButton.y + 2, 4, 16);
+            helper.renderConflictBars(keybindButton.getX() - 8, keybindButton.getY() + 2, 4, 16);
 
             // vars
-            Font font = Minecraft.getInstance().font;
-            int textY = getY() + getHeight() / 2 - font.lineHeight / 2;
+            FontRenderer font = Minecraft.getMinecraft().fontRenderer;
+            int textY = getY() + getHeight() / 2 - font.FONT_HEIGHT / 2;
 
             // hovered arrow
-            setHovered(isMouseOver(mouseX, mouseY));
+            setHovered(mouseOver(mouseX, mouseY));
             if (isHovered()) {
-                font.draw(stack, HOVERED_ARROW, getX() + 4, textY, 0xFFFFFF);
-                if ((keybindButton.isHovered() || keybindButton.isFocused()))
+                font.drawString(HOVERED_ARROW.getFormattedText(), getX() + 4, textY, 0xFFFFFF);
+                if ((keybindButton.isHovered()))
                     helper.renderTooltip();
             }
 
             // render name
-            font.draw(stack, this.keybind.getName(), getX() + 16, textY, 0xFFFFFF);
+            font.drawString(this.keybind.getName(), getX() + 16, textY, 0xFFFFFF);
 
             // render children
-            super.render(stack, mouseX, mouseY, delta);
+            super.draw(mc, mouseX, mouseY, delta);
         }
 
         @Override
-        public boolean isMouseOver(double mouseX, double mouseY) {
-            return this.parent.isInsideScissors(mouseX, mouseY) && super.isMouseOver(mouseX, mouseY);
+        public boolean mouseOver(double mouseX, double mouseY) {
+            return this.parent.isInsideScissors(mouseX, mouseY) && super.mouseOver(mouseX, mouseY);
         }
 
         @Override
@@ -203,7 +202,7 @@ public class KeybindList extends AbstractList {
 
             // text
             boolean selected = parent.focusedKeybind == this.keybind;
-            Component text = helper.getText(isDefault, selected, this.keybind.getTranslatedKeyMessage());
+            ITextComponent text = helper.getText(isDefault, selected, this.keybind.getTranslatedKeyMessage());
             keybindButton.setMessage(text);
         }
     }

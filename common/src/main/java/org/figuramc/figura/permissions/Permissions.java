@@ -1,8 +1,10 @@
 package org.figuramc.figura.permissions;
 
-import net.minecraft.ChatFormatting;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.network.chat.Style;
+import net.minecraft.client.Minecraft;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.Style;
+import net.minecraft.util.text.TextFormatting;
+import org.figuramc.figura.mixin.font.FontRendererAccessor;
 import org.figuramc.figura.utils.ColorUtils;
 import org.figuramc.figura.utils.FiguraText;
 
@@ -123,29 +125,29 @@ public class Permissions {
     }
 
     public enum Category {
-        BLOCKED(0, ChatFormatting.RED),
-        LOW(1, ChatFormatting.YELLOW),
-        DEFAULT(2, ChatFormatting.WHITE),
-        HIGH(3, ChatFormatting.GREEN),
+        BLOCKED(0, TextFormatting.RED),
+        LOW(1, TextFormatting.YELLOW),
+        DEFAULT(2, TextFormatting.WHITE),
+        HIGH(3, TextFormatting.GREEN),
         MAX(4, ColorUtils.Colors.LUA_PING);
 
         public final int index;
         public final int color;
-        public final MutableComponent text, info;
+        public final ITextComponent text, info;
 
         Category(int index, ColorUtils.Colors color) {
             this(index, color.hex, color.style);
         }
 
-        Category(int index, ChatFormatting formatting) {
-            this(index, formatting.getColor(), Style.EMPTY.applyFormat(formatting));
+        Category(int index, TextFormatting formatting) {
+            this(index, ((FontRendererAccessor)Minecraft.getMinecraft().fontRenderer).getColors()[formatting.getColorIndex()], new Style().setColor(formatting));
         }
 
         Category(int index, int color, Style style) {
             this.index = index;
             this.color = color;
             String name = "permissions.category." + name().toLowerCase();
-            text = new FiguraText(name).withStyle(style);
+            text = new FiguraText(name).setStyle(style);
             info = new FiguraText(name + ".info");
         }
 

@@ -1,6 +1,5 @@
 package org.figuramc.figura.entries;
 
-import dev.architectury.injectables.annotations.ExpectPlatform;
 import org.figuramc.figura.gui.widgets.PanelSelectorWidget;
 import org.figuramc.figura.lua.FiguraAPIManager;
 import org.figuramc.figura.lua.api.vanilla_model.VanillaModelAPI;
@@ -9,9 +8,9 @@ import org.figuramc.figura.permissions.PermissionManager;
 
 import java.util.Set;
 
-public class EntryPointManager {
+public abstract class EntryPointManager {
 
-    public static void init() {
+    public void init() {
         // APIs
         Set<FiguraAPI> apis = load("figura_api", FiguraAPI.class);
         FiguraAPIManager.initEntryPoints(apis);
@@ -23,8 +22,6 @@ public class EntryPointManager {
         VanillaModelAPI.initEntryPoints(load("figura_vanilla_part", FiguraVanillaPart.class));
     }
 
-    @ExpectPlatform
-    private static <T> Set<T> load(String name, Class<T> clazz) {
-        throw new AssertionError();
-    }
+    // TODO :create a service for entry points
+    protected abstract <T> Set<T> load(String name, Class<T> clazz);
 }

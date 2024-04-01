@@ -1,22 +1,25 @@
 package org.figuramc.figura.utils.forge;
 
-import net.minecraft.server.packs.resources.ResourceManager;
-import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
+import net.minecraft.client.resources.IResourceManager;
+import net.minecraftforge.client.resource.IResourceType;
+import net.minecraftforge.client.resource.ISelectiveResourceReloadListener;
 import org.figuramc.figura.utils.FiguraResourceListener;
 
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
-public class FiguraResourceListenerImpl extends FiguraResourceListener implements ResourceManagerReloadListener {
-    public FiguraResourceListenerImpl(String id, Consumer<ResourceManager> reloadConsumer) {
+public class FiguraResourceListenerImpl extends FiguraResourceListener implements ISelectiveResourceReloadListener {
+    public FiguraResourceListenerImpl(String id, Consumer<IResourceManager> reloadConsumer) {
         super(id, reloadConsumer);
     }
 
-    public static FiguraResourceListener createResourceListener(String id, Consumer<ResourceManager> reloadConsumer) {
+    @Override
+    public FiguraResourceListener createResourceListener(String id, Consumer<IResourceManager> reloadConsumer) {
         return new FiguraResourceListenerImpl(id, reloadConsumer);
     }
 
     @Override
-    public void onResourceManagerReload(ResourceManager manager) {
+    public void onResourceManagerReload(IResourceManager manager, Predicate<IResourceType> predicate) {
         reloadConsumer().accept(manager);
     }
 }

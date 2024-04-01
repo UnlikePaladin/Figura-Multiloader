@@ -1,16 +1,17 @@
 package org.figuramc.figura.gui.widgets;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.Mth;
-import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.gui.ScaledResolution;
+import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.util.ResourceLocation;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.gui.screens.AvatarScreen;
 import org.figuramc.figura.model.rendering.EntityRenderMode;
 import org.figuramc.figura.utils.FiguraIdentifier;
 import org.figuramc.figura.utils.FiguraText;
+import org.figuramc.figura.utils.MathUtils;
 import org.figuramc.figura.utils.ui.UIHelper;
 
 public class EntityPreview extends AbstractContainerElement {
@@ -19,7 +20,7 @@ public class EntityPreview extends AbstractContainerElement {
     public static final ResourceLocation OVERLAY = new FiguraIdentifier("textures/gui/entity_overlay.png");
 
     // properties
-    private LivingEntity entity;
+    private EntityLivingBase entity;
     private final float pitch, yaw, scale;
     private SwitchButton button;
 
@@ -41,7 +42,7 @@ public class EntityPreview extends AbstractContainerElement {
     private float dragDeltaX, dragDeltaY;
     private float dragAnchorX, dragAnchorY;
 
-    public EntityPreview(int x, int y, int width, int height, float scale, float pitch, float yaw, LivingEntity entity, Screen parentScreen) {
+    public EntityPreview(int x, int y, int width, int height, float scale, float pitch, float yaw, EntityLivingBase entity, GuiScreen parentScreen) {
         super(x, y, width, height);
 
         this.scale = scale;
@@ -63,15 +64,15 @@ public class EntityPreview extends AbstractContainerElement {
                 new FiguraText("gui.expand"),
                 bx -> {
                     if (button.isToggled()) {
-                        Minecraft.getInstance().setScreen(new AvatarScreen(scale, pitch, yaw, this.entity, parentScreen));
+                        Minecraft.getMinecraft().displayGuiScreen(new AvatarScreen(scale, pitch, yaw, this.entity, parentScreen));
                     } else {
-                        Minecraft.getInstance().setScreen(parentScreen);
+                        Minecraft.getMinecraft().displayGuiScreen(parentScreen);
                     }
                 }));
     }
 
     @Override
-    public void render(PoseStack stack, int mouseX, int mouseY, float delta) {
+    public void draw(Minecraft minecraft, int mouseX, int mouseY, float delta) {
         if (!this.isVisible())
             return;
 
@@ -82,9 +83,9 @@ public class EntityPreview extends AbstractContainerElement {
 
         if (!button.isToggled()) {
             // border
-            UIHelper.renderSliced(stack, x, y, width, height, UIHelper.OUTLINE_FILL);
+            UIHelper.renderSliced(x, y, width, height, UIHelper.OUTLINE_FILL);
             // overlay
-            UIHelper.renderTexture(stack, x + 1, y + 1, width - 2, height - 2, OVERLAY);
+            UIHelper.renderTexture(x + 1, y + 1, width - 2, height - 2, OVERLAY);
         }
 
         // scissors
@@ -92,28 +93,28 @@ public class EntityPreview extends AbstractContainerElement {
 
         // render entity
         if (entity != null) {
-            stack.pushPose();
-            scaledValue = Mth.lerp((float) (1f - Math.pow(0.5f, delta)), scaledValue, scaledPrecise);
-            UIHelper.drawEntity(x + modelX, y + modelY, scale + scaledValue, angleX, angleY, entity, stack, EntityRenderMode.FIGURA_GUI);
-            stack.popPose();
+            GlStateManager.pushMatrix();
+            scaledValue = (float) MathUtils.lerp((float) (1f - Math.pow(0.5f, delta)), scaledValue, scaledPrecise);
+            UIHelper.drawEntity(x + modelX, y + modelY, scale + scaledValue, angleX, angleY, entity, EntityRenderMode.FIGURA_GUI);
+            GlStateManager.popMatrix();
         } else {
             // draw
             int s = Math.min(width, height) * 2 / 3;
             UIHelper.setupTexture(UNKNOWN);
-            UIHelper.blit(stack, x + (width - s) / 2, y + (height - s) / 2, s, s, 0f, 64 * ((int) (FiguraMod.ticks / 3f) % 8), 64, 64, 64, 512);
+            UIHelper.blit(x + (width - s) / 2, y + (height - s) / 2, s, s, 0f, 64 * ((int) (FiguraMod.ticks / 3f) % 8), 64, 64, 64, 512);
         }
 
         UIHelper.disableScissor();
 
-        super.render(stack, mouseX, mouseY, delta);
+        super.draw(minecraft, mouseX, mouseY, delta);
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (!this.isVisible() || !this.isMouseOver(mouseX, mouseY))
+    public boolean mouseButtonClicked(int mouseX, int mouseY, int button) {
+        if (!this.isVisible() || !this.mouseOver(mouseX, mouseY))
             return false;
 
-        if (super.mouseClicked(mouseX, mouseY, button))
+        if (super.mouseButtonClicked(mouseX, mouseY, button))
             return true;
 
         switch (button) {
@@ -169,7 +170,7 @@ public class EntityPreview extends AbstractContainerElement {
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    public boolean mouseButtonReleased(int mouseX, int mouseY, int button) {
         // left click - stop rotating
         if (button == 0) {
             isRotating = false;
@@ -182,16 +183,17 @@ public class EntityPreview extends AbstractContainerElement {
             return true;
         }
 
-        return super.mouseReleased(mouseX, mouseY, button);
+        return super.mouseButtonReleased(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+    public void mouseDragged(Minecraft minecraft, int mouseX, int mouseY, int button, double dragX, double dragY) {
         // left click - rotate
         if (isRotating) {
             // get starter rotation angle then get hot much is moved and divided by a slow factor
-            angleX = (float) (anchorAngleX + (anchorY - mouseY) / (3 / Minecraft.getInstance().getWindow().getGuiScale()));
-            angleY = (float) (anchorAngleY - (anchorX - mouseX) / (3 / Minecraft.getInstance().getWindow().getGuiScale()));
+            ScaledResolution scaledResolution = new ScaledResolution(minecraft);
+            angleX = (float) (anchorAngleX + (anchorY - mouseY) / (3 / scaledResolution.getScaleFactor()));
+            angleY = (float) (anchorAngleY - (anchorX - mouseX) / (3 / scaledResolution.getScaleFactor()));
 
             // cap to 360, so we don't get extremely high unnecessary rotation values
             if (angleX >= 360 || angleX <= -360) {
@@ -205,7 +207,7 @@ public class EntityPreview extends AbstractContainerElement {
                 angleY = 0;
             }
 
-            return true;
+            return;
         }
 
         // right click - move
@@ -219,18 +221,18 @@ public class EntityPreview extends AbstractContainerElement {
             modelX = (int) (dragAnchorX + x);
             modelY = (int) (dragAnchorY + y);
 
-            return true;
+            return;
         }
 
-        return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+        super.mouseDragged(minecraft, mouseX, mouseY, button, dragX, dragY);
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
+    public boolean mouseScroll(double mouseX, double mouseY, double amount) {
         if (!this.isVisible())
             return false;
 
-        if (super.mouseScrolled(mouseX, mouseY, amount))
+        if (super.mouseScroll(mouseX, mouseY, amount))
             return true;
 
         // scroll - scale
@@ -244,7 +246,7 @@ public class EntityPreview extends AbstractContainerElement {
         return true;
     }
 
-    public void setEntity(LivingEntity entity) {
+    public void setEntity(EntityLivingBase entity) {
         this.entity = entity;
     }
 

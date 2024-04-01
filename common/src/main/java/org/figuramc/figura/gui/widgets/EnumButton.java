@@ -1,9 +1,8 @@
 package org.figuramc.figura.gui.widgets;
 
-import net.minecraft.ChatFormatting;
-import net.minecraft.client.gui.components.AbstractWidget;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TextComponent;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.Style;
+import net.minecraft.util.text.TextComponentString;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.utils.FiguraText;
 import org.figuramc.figura.utils.ui.UIHelper;
@@ -17,12 +16,12 @@ public class EnumButton extends AbstractContainerElement {
     private int value;
     private final ContextMenu contextMenu;
     private final Consumer<Integer> onSelect;
-    private final ArrayList<Component> names = new ArrayList<>();
+    private final ArrayList<ITextComponent> names = new ArrayList<>();
 
     public EnumButton(int x, int y, int width, int height, String translationString, int defaultValue, int length, Consumer<Integer> onSelect) {
         super(x, y, width, height);
         value = defaultValue;
-        ArrayList<Component> tooltips = new ArrayList<>();
+        ArrayList<ITextComponent> tooltips = new ArrayList<>();
         for (int i = 0; i < length; i++) {
             names.add(new FiguraText(String.format("%s.%s", translationString, i)));
             tooltips.add(new FiguraText(String.format("%s.%s.tooltip", translationString, i)));
@@ -34,11 +33,11 @@ public class EnumButton extends AbstractContainerElement {
 
         this.onSelect = onSelect;
         for (int i = 0; i < length; i++) {
-            Component c = names.get(i);
-            Component t = tooltips.get(i);
+            ITextComponent c = names.get(i);
+            ITextComponent t = tooltips.get(i);
             int finalI = i;
             contextMenu.addAction(c, t, b -> {
-                button.setMessage(c);
+                button.setMessage(c);;
                 button.setTooltip(t);
                 onSelect.accept(finalI);
                 updateContextText();
@@ -76,24 +75,24 @@ public class EnumButton extends AbstractContainerElement {
 
     private void updateContextText() {
         // cache entries
-        List<? extends AbstractWidget> entries = contextMenu.getEntries();
+        List<? extends AbstractFiguraWidget> entries = contextMenu.getEntries();
 
         // entries should have the same size as names
         // otherwise something went really wrong
         for (int i = 0; i < names.size(); i++) {
             // get text
-            Component text = names.get(i);
+            ITextComponent text = names.get(i);
 
             // selected entry
             if (i == (int) this.value % this.names.size())
-                text = TextComponent.EMPTY.copy().setStyle(FiguraMod.getAccentColor()).withStyle(ChatFormatting.UNDERLINE).append(text);
+                text = new TextComponentString("").setStyle(FiguraMod.getAccentColor()).setStyle(new Style().setUnderlined(true)).appendSibling(text);
 
             // apply text
             entries.get(i).setMessage(text);
         }
     }
 
-    private void onClick(net.minecraft.client.gui.components.Button button) {
+    private void onClick(Button button) {
         contextMenu.setVisible(!contextMenu.isVisible());
 
         if (contextMenu.isVisible()) {

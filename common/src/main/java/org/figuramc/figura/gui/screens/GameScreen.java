@@ -1,17 +1,17 @@
 package org.figuramc.figura.gui.screens;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.client.gui.components.Widget;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.network.chat.Component;
-import org.figuramc.figura.utils.ui.UIHelper;
-import net.minecraft.network.chat.TextComponent;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.util.text.TextComponentString;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.gui.widgets.Button;
+import org.figuramc.figura.gui.widgets.FiguraRenderable;
 import org.figuramc.figura.gui.widgets.Label;
 import org.figuramc.figura.utils.FiguraIdentifier;
 import org.figuramc.figura.utils.FiguraText;
-import org.lwjgl.glfw.GLFW;
+import org.figuramc.figura.utils.ui.UIHelper;
+import org.lwjgl.input.Keyboard;
 
 import java.util.ArrayList;
 
@@ -27,38 +27,38 @@ public class GameScreen extends AbstractPanelScreen {
     private boolean paused = false;
     private static int scale = 5;
 
-    protected GameScreen(Screen parentScreen) {
-        super(parentScreen, TextComponent.EMPTY.copy());
+    protected GameScreen(GuiScreen parentScreen) {
+        super(parentScreen, new TextComponentString(""));
     }
 
     @Override
-    public Class<? extends Screen> getSelectedPanel() {
+    public Class<? extends GuiScreen> getSelectedPanel() {
         return parentScreen.getClass();
     }
 
-    protected void init() {
-        super.init();
+    public void initGui() {
+        super.initGui();
         this.removeWidget(panels);
 
         addRenderableOnly(grid = new Grid(width, height));
 
         // back button
-        addRenderableWidget(new Button(this.width - 20, 4, 16, 16, 0, 0, 16, new FiguraIdentifier("textures/gui/search_clear.png"), 48, 16, new FiguraText("gui.done"), bx -> onClose()));
+        addRenderableWidget(new Button(this.width - 20, 4, 16, 16, 0, 0, 16, new FiguraIdentifier("textures/gui/search_clear.png"), 48, 16, new FiguraText("gui.done"), bx -> onGuiClosed()));
 
         // text
         addRenderableWidget(keys = new Label(
-                TextComponent.EMPTY.copy()
-                        .append(new TextComponent("[R]").withStyle(FiguraMod.getAccentColor()))
-                        .append(" restart, ")
-                        .append(new TextComponent("[P]").withStyle(FiguraMod.getAccentColor()))
-                        .append(" pause, ")
-                        .append(new TextComponent("[SPACE]").withStyle(FiguraMod.getAccentColor()))
-                        .append(" step")
-                        .append("\n")
-                        .append(new TextComponent("[F1]").withStyle(FiguraMod.getAccentColor()))
-                        .append(" hide text, ")
-                        .append(new TextComponent("[Scroll]").withStyle(FiguraMod.getAccentColor()))
-                        .append(" scale (restarts)"),
+                new TextComponentString("")
+                        .appendSibling(new TextComponentString("[R]").setStyle(FiguraMod.getAccentColor()))
+                        .appendText(" restart, ")
+                        .appendSibling(new TextComponentString("[P]").setStyle(FiguraMod.getAccentColor()))
+                        .appendText(" pause, ")
+                        .appendSibling(new TextComponentString("[SPACE]").setStyle(FiguraMod.getAccentColor()))
+                        .appendText(" step")
+                        .appendText("\n")
+                        .appendSibling(new TextComponentString("[F1]").setStyle(FiguraMod.getAccentColor()))
+                        .appendText(" hide text, ")
+                        .appendSibling(new TextComponentString("[Scroll]").setStyle(FiguraMod.getAccentColor()))
+                        .appendText(" scale (restarts)"),
                 4, 4, 0)
         );
         addRenderableWidget(stats = new Label("", 4, keys.getRawY() + keys.getHeight(), 0));
@@ -69,34 +69,33 @@ public class GameScreen extends AbstractPanelScreen {
         super.tick();
         if (!paused) grid.tick();
         stats.setText(
-                new TextComponent("Generation")
-                        .append(new TextComponent(" " + grid.gen).withStyle(FiguraMod.getAccentColor()))
-                        .append(", Scale")
-                        .append(new TextComponent(" " + scale).withStyle(FiguraMod.getAccentColor()))
+                new TextComponentString("Generation")
+                        .appendSibling(new TextComponentString(" " + grid.gen).setStyle(FiguraMod.getAccentColor()))
+                        .appendText(", Scale")
+                        .appendSibling(new TextComponentString(" " + scale).setStyle(FiguraMod.getAccentColor()))
         );
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        switch (keyCode) {
-            case GLFW.GLFW_KEY_R:
+    public void keyTyped(char keyCode, int scanCode) {
+        switch (scanCode) {
+            case Keyboard.KEY_R:
                 grid.init();
                 break;
-            case GLFW.GLFW_KEY_P:
+            case Keyboard.KEY_P:
                 paused = !paused;
                 break;
-            case GLFW.GLFW_KEY_SPACE:
+            case Keyboard.KEY_SPACE:
                 grid.tick();
                 break;
-            case GLFW.GLFW_KEY_F1:
+            case Keyboard.KEY_F1:
                 keys.setVisible(!keys.isVisible());
                 stats.setVisible(!stats.isVisible());
                 break;
             default:
-                return super.keyPressed(keyCode, scanCode, modifiers);
+                super.keyTyped(keyCode, scanCode);
         }
 
-        return true;
     }
 
     @Override
@@ -106,7 +105,7 @@ public class GameScreen extends AbstractPanelScreen {
         return true;
     }
 
-    private static class Grid implements Widget {
+    private static class Grid implements FiguraRenderable {
 
         private Cell[][] grid;
         private final int width, height;
@@ -152,17 +151,17 @@ public class GameScreen extends AbstractPanelScreen {
         }
 
         @Override
-        public void render(PoseStack pose, int mouseX, int mouseY, float delta) {
-            pose.pushPose();
-            pose.scale(scale, scale, scale);
+        public void draw(Minecraft mc, int mouseX, int mouseY, float delta) {
+            GlStateManager.pushMatrix();
+            GlStateManager.scale(scale, scale, scale);
 
             for (Cell[] cells : grid) {
                 for (Cell cell : cells) {
-                    cell.render(pose);
+                    cell.draw(mc);
                 }
             }
 
-            pose.popPose();
+            GlStateManager.popMatrix();
         }
     }
 
@@ -191,10 +190,10 @@ public class GameScreen extends AbstractPanelScreen {
             this.future = RULES[this.alive][neigh];
         }
 
-        private void render(PoseStack pose) {
+        private void draw(Minecraft mc) {
             this.alive = this.future;
             if (this.alive == 1)
-                UIHelper.fill(pose, this.x, this.y, this.x + 1, this.y + 1, color);
+                UIHelper.fill(this.x, this.y, this.x + 1, this.y + 1, color);
         }
     }
 }

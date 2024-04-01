@@ -1,53 +1,58 @@
 package org.figuramc.figura.commands;
 
-import com.mojang.brigadier.arguments.StringArgumentType;
-import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import com.mojang.brigadier.builder.RequiredArgumentBuilder;
-import com.mojang.brigadier.context.CommandContext;
-import com.mojang.brigadier.suggestion.Suggestions;
-import com.mojang.brigadier.suggestion.SuggestionsBuilder;
-import net.minecraft.ChatFormatting;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TextComponent;
+import net.minecraft.command.CommandBase;
+import net.minecraft.command.CommandException;
+import net.minecraft.command.ICommandSender;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.Style;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextFormatting;
 import org.figuramc.figura.font.EmojiContainer;
 import org.figuramc.figura.font.EmojiUnicodeLookup;
 import org.figuramc.figura.font.Emojis;
 import org.figuramc.figura.utils.ColorUtils;
 import org.figuramc.figura.utils.FiguraClientCommandSource;
+import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 class EmojiListCommand {
-    private static final Component COMMA_SPACE = new TextComponent(", ").withStyle(ChatFormatting.GRAY);
+    private static final ITextComponent COMMA_SPACE = new TextComponentString(", ").setStyle(new Style().setColor(TextFormatting.GRAY));
 
-    public static LiteralArgumentBuilder<FiguraClientCommandSource> getCommand() {
-        LiteralArgumentBuilder<FiguraClientCommandSource> load = LiteralArgumentBuilder.literal("emojis");
+    public static class EmojiListSubCommand extends FiguraCommands.FiguraSubCommand {
 
-        RequiredArgumentBuilder<FiguraClientCommandSource, String> path = RequiredArgumentBuilder.argument("category", StringArgumentType.greedyString());
-        path.suggests(EmojiListCommand::getSuggestions);
-        path.executes(EmojiListCommand::listCategory);
+        public EmojiListSubCommand() {
+            super("emojis");
+        }
 
-        return load.then(path);
+        @Override
+        public void execute(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] args) throws CommandException {
+            if (args.length > 0)
+                listCategory(iCommandSender, args[0]);
+        }
+
+        @Override
+        public List<String> getTabCompletions(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] strings, @Nullable BlockPos targetPos) {
+            List<String> suggestions = new ArrayList<>(Emojis.getCategoryNames());
+            suggestions.add("all");
+            return CommandBase.getListOfStringsMatchingLastWord(strings, suggestions);
+        }
     }
 
-    public static CompletableFuture<Suggestions> getSuggestions(CommandContext<FiguraClientCommandSource> context, SuggestionsBuilder builder) {
-        builder.suggest("all");
-        Emojis.getCategoryNames().forEach(builder::suggest);
-        return builder.buildFuture();
-    }
-
-    private static int listCategory(CommandContext<FiguraClientCommandSource> context) {
-        FiguraClientCommandSource src = context.getSource();
-        String category = context.getArgument("category", String.class);
+    private static int listCategory(ICommandSender context, String category) {
+        FiguraClientCommandSource src = (FiguraClientCommandSource) context;
         if (Objects.equals(category, "all")) {
             for (String curCategory : Emojis.getCategoryNames()) {
                 if (!printEmojis(curCategory, src::figura$sendFeedback, src::figura$sendError)) {
                     return 0;
                 }
-                src.figura$sendFeedback(new TextComponent(""));
+                src.figura$sendFeedback(new TextComponentString(""));
             }
 
             return 1;
@@ -56,9 +61,9 @@ class EmojiListCommand {
     }
 
 
-    private static boolean printEmojis(String category, Consumer<Component> feedback, Consumer<Component> error) {
+    private static boolean printEmojis(String category, Consumer<ITextComponent> feedback, Consumer<ITextComponent> error) {
         if (!Emojis.hasCategory(category)) {
-            error.accept(new TextComponent("Emoji category \"" + category + "\" doesn't exist!"));
+            error.accept(new TextComponentString("Emoji category \"" + category + "\" doesn't exist!"));
             return false;
         }
 
@@ -67,23 +72,23 @@ class EmojiListCommand {
         EmojiUnicodeLookup lookup = container.getLookup();
 
         // give the category a title
-        feedback.accept(new TextComponent(String.format("--- %s (%s) ---", container.name, unicodeValues.size())).withStyle(ColorUtils.Colors.AWESOME_BLUE.style));
+        feedback.accept(new TextComponentString(String.format("--- %s (%s) ---", container.name, unicodeValues.size())).setStyle(ColorUtils.Colors.AWESOME_BLUE.style));
 
 
         // Gather each emoji name and append it into a single message
-        TextComponent comp = new TextComponent("");
+        TextComponentString comp = new TextComponentString("");
         unicodeValues.stream().sorted().forEach(unicode -> {
             String[] aliases = lookup.getNames(unicode);
             if (aliases != null) {
-                TextComponent msg = new TextComponent("");
+                TextComponentString msg = new TextComponentString("");
                 for (int i = 0; i < aliases.length; i++) {
-                    msg.append(new TextComponent(aliases[i]).withStyle(ColorUtils.Colors.AWESOME_BLUE.style));
+                    msg.appendSibling(new TextComponentString(aliases[i]).setStyle(ColorUtils.Colors.AWESOME_BLUE.style));
                     if (i < aliases.length - 1) {
-                        msg.append(COMMA_SPACE);
+                        msg.appendSibling(COMMA_SPACE);
                     }
                 }
-                msg.append(new TextComponent("\ncodepoint: " + unicode.codePointAt(0)).withStyle(ChatFormatting.GRAY));
-                comp.append(Emojis.getEmoji(aliases[0], msg));
+                msg.appendSibling(new TextComponentString("\ncodepoint: " + unicode.codePointAt(0)).setStyle(new Style().setColor(TextFormatting.GRAY)));
+                comp.appendSibling(Emojis.getEmoji(aliases[0], msg));
             }
         });
 

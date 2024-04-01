@@ -1,39 +1,40 @@
 package org.figuramc.figura.utils.forge;
 
-import net.minecraftforge.fml.ModList;
-import net.minecraftforge.forgespi.language.IModInfo;
+import net.minecraftforge.fml.common.Loader;
+import net.minecraftforge.fml.common.ModContainer;
 import org.figuramc.figura.utils.FiguraModMetadata;
 import org.figuramc.figura.utils.Version;
 
-public class FiguraModMetadataImpl extends FiguraModMetadata {
-    private final IModInfo modInfo;
+public class FiguraModMetadataImpl implements FiguraModMetadata {
+    private final ModContainer modInfo;
+    private String modID;
     protected FiguraModMetadataImpl(String modID) {
-        super(modID);
-        this.modInfo = ModList.get().getModContainerById(modID).get().getModInfo();
+        this.modID = modID;
+        this.modInfo =  Loader.instance().getIndexedModList().get(modID);
     }
 
-    public static FiguraModMetadata getMetadataForMod(String modID) {
+    public FiguraModMetadata getMetadataForMod(String modID) {
         return new FiguraModMetadataImpl(modID);
     }
 
     @Override
     public String getCustomValueAsString(String key) {
-        return modInfo.getModProperties().get(key).toString();
+        return modInfo.getCustomModProperties().get(key).toString();
     }
 
     @Override
     public Number getCustomValueAsNumber(String key) {
-        return (Number) modInfo.getModProperties().get(key);
+        return Double.parseDouble(modInfo.getCustomModProperties().get(key));
     }
 
     @Override
     public Boolean getCustomValueAsBoolean(String key) {
-        return (Boolean) modInfo.getModProperties().get(key);
+        return Boolean.parseBoolean(modInfo.getCustomModProperties().get(key));
     }
 
     @Override
     public Object getCustomValueAsObject(String key) {
-        return modInfo.getModProperties().get(key);
+        return modInfo.getCustomModProperties().get(key);
     }
 
 
@@ -42,5 +43,8 @@ public class FiguraModMetadataImpl extends FiguraModMetadata {
         return new Version(modInfo.getVersion().toString());
     }
 
-
+    @Override
+    public String getModId() {
+        return modID;
+    }
 }

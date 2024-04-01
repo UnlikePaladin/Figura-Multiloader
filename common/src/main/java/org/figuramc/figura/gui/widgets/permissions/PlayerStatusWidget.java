@@ -1,7 +1,6 @@
 package org.figuramc.figura.gui.widgets.permissions;
 
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.util.text.ITextComponent;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.avatar.AvatarManager;
@@ -18,23 +17,23 @@ import java.util.function.Function;
 
 public class PlayerStatusWidget extends StatusWidget {
 
-    private static final List<Function<Avatar, MutableComponent>> HOVER_TEXT = Arrays.asList(
+    private static final List<Function<Avatar, ITextComponent>> HOVER_TEXT = Arrays.asList(
             avatar -> new FiguraText("gui.permissions.size")
-                    .append("\n• ").append(MathUtils.asFileSize(avatar.fileSize)),
+                    .appendText("\n• ").appendText(MathUtils.asFileSize(avatar.fileSize)),
             avatar -> new FiguraText("gui.permissions.complexity")
-                    .append("\n• ").append(String.valueOf(avatar.complexity.pre)),
+                    .appendText("\n• ").appendText(String.valueOf(avatar.complexity.pre)),
             avatar -> new FiguraText("gui.permissions.init")
-                    .append("\n• ").append(new FiguraText("gui.permissions.init.root", avatar.init.pre))
-                    .append("\n• ").append(new FiguraText("gui.permissions.init.entity", avatar.init.post)),
+                    .appendText("\n• ").appendSibling(new FiguraText("gui.permissions.init.root", avatar.init.pre))
+                    .appendText("\n• ").appendSibling(new FiguraText("gui.permissions.init.entity", avatar.init.post)),
             avatar -> new FiguraText("gui.permissions.tick")
-                    .append("\n• ").append(new FiguraText("gui.permissions.tick.world", avatar.worldTick.pre))
-                    .append("\n• ").append(new FiguraText("gui.permissions.tick.entity", avatar.tick.pre)),
+                    .appendText("\n• ").appendSibling(new FiguraText("gui.permissions.tick.world", avatar.worldTick.pre))
+                    .appendText("\n• ").appendSibling(new FiguraText("gui.permissions.tick.entity", avatar.tick.pre)),
             avatar -> new FiguraText("gui.permissions.render")
-                    .append("\n• ").append(new FiguraText("gui.permissions.render.world", avatar.worldRender.pre))
-                    .append("\n• ").append(new FiguraText("gui.permissions.render.entity", avatar.render.pre))
-                    .append("\n• ").append(new FiguraText("gui.permissions.render.post_entity", avatar.render.post))
-                    .append("\n• ").append(new FiguraText("gui.permissions.render.post_world", avatar.worldRender.post))
-                    .append("\n• ").append(new FiguraText("gui.permissions.render.animations", avatar.animation.pre))
+                    .appendText("\n• ").appendSibling(new FiguraText("gui.permissions.render.world", avatar.worldRender.pre))
+                    .appendText("\n• ").appendSibling(new FiguraText("gui.permissions.render.entity", avatar.render.pre))
+                    .appendText("\n• ").appendSibling(new FiguraText("gui.permissions.render.post_entity", avatar.render.post))
+                    .appendText("\n• ").appendSibling(new FiguraText("gui.permissions.render.post_world", avatar.worldRender.post))
+                    .appendText("\n• ").appendSibling(new FiguraText("gui.permissions.render.animations", avatar.animation.pre))
     );
 
     private final UUID owner;
@@ -76,7 +75,7 @@ public class PlayerStatusWidget extends StatusWidget {
     }
 
     @Override
-    public Component getTooltipFor(int i) {
+    public ITextComponent getTooltipFor(int i) {
         return avatar == null ? null : HOVER_TEXT.get(i).apply(avatar).setStyle(TEXT_COLORS.get(status >> (i * 2) & 3));
     }
 }

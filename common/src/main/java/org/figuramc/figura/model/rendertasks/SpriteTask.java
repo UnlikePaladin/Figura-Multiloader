@@ -1,12 +1,9 @@
 package org.figuramc.figura.model.rendertasks;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.math.Matrix3f;
-import com.mojang.math.Matrix4f;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.texture.MissingTextureAtlasSprite;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.client.renderer.BufferBuilder;
+import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.client.renderer.texture.TextureMap;
+import net.minecraft.util.ResourceLocation;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.lua.LuaNotNil;
 import org.figuramc.figura.lua.LuaWhitelist;
@@ -48,30 +45,29 @@ public class SpriteTask extends RenderTask {
     }
 
     @Override
-    public void renderTask(PoseStack poseStack, MultiBufferSource buffer, int light, int overlay) {
+    public void renderTask(RenderTypes.FiguraBufferSource buffer, int light, int overlay) {
+        GlStateManager.pushMatrix();
         if (a == 0) return;
-        poseStack.scale(-1, -1, 1);
-
-        // prepare variables
-        Matrix4f pose = poseStack.last().pose();
-        Matrix3f normal = poseStack.last().normal();
+        GlStateManager.scale(-1, -1, 1);
 
         int newLight = this.customization.light != null ? this.customization.light : light;
         int newOverlay = this.customization.overlay != null ? this.customization.overlay : overlay;
 
         // setup texture render
-        VertexConsumer consumer = buffer.getBuffer(renderType.get(texture));
+        BufferBuilder consumer = buffer.getBuffer(renderType.get(texture));
 
         // create vertices
         for (Vertex v : vertices) {
-            consumer.vertex(pose, v.x, v.y, v.z)
+            consumer.pos(v.x, v.y, v.z)
                     .color(r, g, b, a)
-                    .uv(v.u, v.v)
-                    .overlayCoords(newOverlay)
-                    .uv2(newLight)
-                    .normal(normal, v.nx, v.ny, v.nz)
+                    .tex(v.u, v.v)
+                    .lightmap(newLight & 0xFFFF, newLight >> 16 & 0xFFFF)
+                    .normal(v.nx, v.ny, v.nz)
                     .endVertex();
         }
+        buffer.endBatch();
+        renderType.get(texture).clearState.run();
+        GlStateManager.popMatrix();
     }
 
     @Override
@@ -135,7 +131,7 @@ public class SpriteTask extends RenderTask {
             try {
                 this.texture = new ResourceLocation(s);
             } catch (Exception e) {
-                this.texture = MissingTextureAtlasSprite.getLocation();
+                this.texture = TextureMap.LOCATION_MISSING_TEXTURE;
             }
             if (width == null || height == null)
                 throw new LuaError("Texture dimensions cannot be null");

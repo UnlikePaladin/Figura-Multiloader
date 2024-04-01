@@ -1,13 +1,17 @@
 package org.figuramc.figura.model;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.datafixers.util.Pair;
+import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.client.renderer.Matrix4f;
 import org.figuramc.figura.math.matrix.FiguraMat3;
 import org.figuramc.figura.math.matrix.FiguraMat4;
 import org.figuramc.figura.math.vector.FiguraVec3;
-import org.figuramc.figura.model.rendering.texture.FiguraTextureSet;
 import org.figuramc.figura.model.rendering.texture.RenderTypes;
+import org.figuramc.figura.utils.MathUtils;
+import org.lwjgl.BufferUtils;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.util.vector.Matrix3f;
 
+import java.nio.FloatBuffer;
 import java.util.Stack;
 
 public class PartCustomization {
@@ -53,11 +57,6 @@ public class PartCustomization {
 
     private RenderTypes primaryRenderType, secondaryRenderType;
     public TextureCustomization primaryTexture, secondaryTexture;
-
-    public void applyToStack(PoseStack stack) {
-        stack.last().pose.multiply(positionMatrix.toMatrix4f());
-        stack.last().normal().mul(normalMatrix.toMatrix3f());
-    }
 
     /**
      * Recalculates the matrix if necessary.
@@ -382,13 +381,55 @@ public class PartCustomization {
         needsMatrixRecalculation = false;
     }
 
-    public static final PoseStack GLOBAL_CUSTOMIZATION_POSE_STACK = new PoseStack();
 
-    public PoseStack copyIntoGlobalPoseStack() {
+    public static FloatBuffer posBuf = BufferUtils.createFloatBuffer(16);
+    public Matrix4f copyIntoGlobalPoseStack() {
         recalculate();
-        positionMatrix.copyDataTo(GLOBAL_CUSTOMIZATION_POSE_STACK.last().pose());
-        normalMatrix.copyDataTo(GLOBAL_CUSTOMIZATION_POSE_STACK.last().normal());
-        return GLOBAL_CUSTOMIZATION_POSE_STACK;
+        positionMatrix.toMatrix4f().store(posBuf);
+        GlStateManager.multMatrix(posBuf);
+        //positionMatrix.copyDataTo(GLOBAL_CUSTOMIZATION_POSE_STACK.position);
+        //normalMatrix.copyDataTo(GLOBAL_CUSTOMIZATION_POSE_STACK.normal);
+        GlStateManager.getFloat(GL11.GL_MODELVIEW_MATRIX, posBuf);
+        Matrix4f transformedPos = new Matrix4f();
+        transformedPos.load(posBuf);
+        return transformedPos;
+    }
+
+    public static class RenderContainer {
+        public Matrix4f position = new Matrix4f();
+        public Matrix3f normal = new Matrix3f();
+
+        public void scale(float x, float y, float z) {
+            Matrix4f.mul(position, createScaleMatrix4f(x, y, z), position);
+            if (x == y && y == z) {
+                if (x > 0.0f) {
+                    return;
+                }
+                normal.negate();
+            }
+            float f = 1.0f / x;
+            float g = 1.0f / y;
+            float h = 1.0f / z;
+            float i = MathUtils.fastInvCubeRoot(f * g * h);
+            Matrix3f.mul(normal, createScaleMatrix3f(i * f, i * g, i * h), normal);
+        }
+
+        private static Matrix4f createScaleMatrix4f(float f, float g, float h) {
+            Matrix4f matrix4f = new Matrix4f();
+            matrix4f.m00 = f;
+            matrix4f.m11 = g;
+            matrix4f.m22 = h;
+            matrix4f.m33 = 1.0f;
+            return matrix4f;
+        }
+
+        private static Matrix3f createScaleMatrix3f(float m00, float m11, float m22) {
+            Matrix3f matrix3f = new Matrix3f();
+            matrix3f.m00 = m00;
+            matrix3f.m11 = m11;
+            matrix3f.m22 = m22;
+            return matrix3f;
+        }
     }
 
     public enum PartType {

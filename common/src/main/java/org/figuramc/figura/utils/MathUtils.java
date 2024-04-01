@@ -5,7 +5,7 @@ import net.minecraft.client.renderer.ActiveRenderInfo;
 import net.minecraft.client.renderer.Matrix4f;
 import net.minecraft.util.math.Vec3d;
 import org.figuramc.figura.config.Configs;
-import org.figuramc.figura.ducks.GameRendererAccessor;
+import org.figuramc.figura.ducks.extensions.QuaternionExtension;
 import org.figuramc.figura.ducks.extensions.Vector3fExtension;
 import org.figuramc.figura.ducks.extensions.Vector4fExtension;
 import org.figuramc.figura.math.matrix.FiguraMat2;
@@ -18,6 +18,7 @@ import org.figuramc.figura.math.vector.FiguraVec4;
 import org.figuramc.figura.math.vector.FiguraVector;
 import org.figuramc.figura.config.Configs;
 import org.figuramc.figura.mixin.render.ActiveRenderInfoAccessor;
+import org.figuramc.figura.utils.ui.UIHelper;
 import org.lwjgl.util.vector.Matrix3f;
 import org.lwjgl.util.vector.Quaternion;
 import org.lwjgl.util.vector.Vector3f;
@@ -88,9 +89,7 @@ public class MathUtils {
     }
 
     public static FiguraVec3 toCameraSpace(FiguraVec3 vec) {
-        ActiveRenderInfo camera = Minecraft.getMinecraft().renderGlobal.r();
-
-        FiguraMat3 transformMatrix = FiguraMat3.of().set(new Matrix3f(camera.rotation()));
+        FiguraMat3 transformMatrix = FiguraMat3.of().set(Matrix3f(getRotation()));
         Vec3d pos = ActiveRenderInfoAccessor.getPos();
         transformMatrix.invert();
 
@@ -102,9 +101,19 @@ public class MathUtils {
         return ret;
     }
 
+    public static Quaternion getRotation() {
+        float pitch  = Minecraft.getMinecraft().getRenderManager().playerViewX;
+        float yaw  = Minecraft.getMinecraft().getRenderManager().playerViewY;
+
+        Quaternion rotation = new Quaternion(0.0f, 0.0f, 0.0f, 1.0f);
+        Quaternion.mul(rotation, ((Vector3fExtension)UIHelper.YP).figura$rotationDegrees(-pitch), rotation);
+        Quaternion.mul(rotation, ((Vector3fExtension)UIHelper.XP).figura$rotationDegrees(yaw), rotation);
+        return rotation;
+    }
+
     public static FiguraVec4 worldToScreenSpace(FiguraVec3 worldSpace) {
         Minecraft minecraft = Minecraft.getMinecraft();
-        Matrix3f transformMatrix = new Matrix3f(ActiveRenderInfo.rotation());
+        Matrix3f transformMatrix = Matrix3f(getRotation());
         transformMatrix.invert();
 
         Vec3d camPos = ActiveRenderInfoAccessor.getPos();
@@ -267,5 +276,41 @@ public class MathUtils {
 
     public static float triangleWave(float f, float g) {
         return (Math.abs(f % g - g * 0.5f) - g * 0.25f) / (g * 0.25f);
+    }
+
+    public static float fastInvCubeRoot(float number) {
+        int i = Float.floatToIntBits(number);
+        i = 1419967116 - i / 3;
+        float f = Float.intBitsToFloat(i);
+        f = 0.6666667f * f + 1.0f / (3.0f * f * f * number);
+        f = 0.6666667f * f + 1.0f / (3.0f * f * f * number);
+        return f;
+    }
+
+    static Matrix3f Matrix3f(Quaternion quaternion) {
+        Matrix3f matrix3f = new Matrix3f();
+        float f = quaternion.x;
+        float g = quaternion.y;
+        float h = quaternion.z;
+        float i = quaternion.w;
+        float j = 2.0f * f * f;
+        float k = 2.0f * g * g;
+        float l = 2.0f * h * h;
+        matrix3f.m00 = 1.0f - k - l;
+        matrix3f.m11 = 1.0f - l - j;
+        matrix3f.m22 = 1.0f - j - k;
+        float m = f * g;
+        float n = g * h;
+        float o = h * f;
+        float p = f * i;
+        float q = g * i;
+        float r = h * i;
+        matrix3f.m10 = 2.0f * (m + r);
+        matrix3f.m01 = 2.0f * (m - r);
+        matrix3f.m20 = 2.0f * (o - q);
+        matrix3f.m02 = 2.0f * (o + q);
+        matrix3f.m21 = 2.0f * (n + p);
+        matrix3f.m12 = 2.0f * (n - p);
+        return matrix3f;
     }
 }

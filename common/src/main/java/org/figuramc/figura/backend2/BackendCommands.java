@@ -1,75 +1,77 @@
 package org.figuramc.figura.backend2;
 
-import com.mojang.brigadier.arguments.StringArgumentType;
-import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import com.mojang.brigadier.builder.RequiredArgumentBuilder;
-import com.mojang.brigadier.context.CommandContext;
-import net.minecraft.ChatFormatting;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TextComponent;
-import org.figuramc.figura.utils.FiguraClientCommandSource;
+import net.minecraft.command.CommandBase;
+import net.minecraft.command.CommandException;
+import net.minecraft.command.ICommandSender;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.util.text.Style;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextFormatting;
 import org.figuramc.figura.FiguraMod;
+import org.figuramc.figura.commands.FiguraCommands;
 import org.figuramc.figura.resources.FiguraRuntimeResources;
 import org.figuramc.figura.utils.FiguraClientCommandSource;
 
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+
 public class BackendCommands {
+    public static class BackendSubCommand extends FiguraCommands.FiguraSubCommand {
+        public Map<String, FiguraCommands.FiguraSubCommand> subCommandMap = new HashMap<>();
+        public BackendSubCommand() {
+            super("backend2");
+            subCommandMap.put("connect", new FiguraCommands.FiguraSubCommand("connect") {
+                @Override
+                public void execute(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] args) throws CommandException {
+                    NetworkStuff.reAuth();
+                }
+            });
 
-    public static LiteralArgumentBuilder<FiguraClientCommandSource> getCommand() {
-        // root
-        LiteralArgumentBuilder<FiguraClientCommandSource> backend = LiteralArgumentBuilder.literal("backend2");
+            subCommandMap.put("run", new FiguraCommands.FiguraSubCommand("run") {
+                @Override
+                public void execute(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] args) throws CommandException {
+                    if (args.length == 0) {
+                        runRequest(iCommandSender, "");
+                    }
+                    runRequest(iCommandSender, CommandBase.buildString(args, 0));
+                }
+            });
 
-        // force backend connection
-        LiteralArgumentBuilder<FiguraClientCommandSource> connect = LiteralArgumentBuilder.literal("connect");
-        connect.executes(context -> {
-            NetworkStuff.reAuth();
-            return 1;
-        });
+            subCommandMap.put("debug", new FiguraCommands.FiguraSubCommand("debug") {
+                @Override
+                public void execute(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] args) throws CommandException {
+                    NetworkStuff.debug = !NetworkStuff.debug;
+                    FiguraMod.sendChatMessage(new TextComponentString("Backend Debug Mode set to: " + NetworkStuff.debug).setStyle(new Style().setColor(NetworkStuff.debug ? TextFormatting.GREEN : TextFormatting.RED)));
+                }
+            });
 
-        backend.then(connect);
+            subCommandMap.put("checkResources", new FiguraCommands.FiguraSubCommand("checkResources") {
+                @Override
+                public void execute(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] args) throws CommandException {
+                    ((FiguraClientCommandSource)iCommandSender).figura$sendFeedback(new TextComponentString("Checking for resources..."));
+                    FiguraRuntimeResources.init().thenRun(() -> ((FiguraClientCommandSource)iCommandSender).figura$sendFeedback(new TextComponentString("Resources checked!")));
+                }
+            });
+        }
 
-        // run
-        LiteralArgumentBuilder<FiguraClientCommandSource> run = LiteralArgumentBuilder.literal("run");
-        run.executes(context -> runRequest(context, ""));
-
-        RequiredArgumentBuilder<FiguraClientCommandSource, String> request = RequiredArgumentBuilder.argument("request", StringArgumentType.greedyString());
-        request.executes(context -> runRequest(context, StringArgumentType.getString(context, "request")));
-
-        run.then(request);
-        backend.then(run);
-
-        // debug mode
-        LiteralArgumentBuilder<FiguraClientCommandSource> debug = LiteralArgumentBuilder.literal("debug");
-        debug.executes(context -> {
-            NetworkStuff.debug = !NetworkStuff.debug;
-            FiguraMod.sendChatMessage(new TextComponent("Backend Debug Mode set to: " + NetworkStuff.debug).withStyle(NetworkStuff.debug ? ChatFormatting.GREEN : ChatFormatting.RED));
-            return 1;
-        });
-
-        backend.then(debug);
-
-        // check resources
-        LiteralArgumentBuilder<FiguraClientCommandSource> resources = LiteralArgumentBuilder.literal("checkResources");
-        resources.executes(context -> {
-            context.getSource().figura$sendFeedback(new TextComponent("Checking for resources..."));
-            FiguraRuntimeResources.init().thenRun(() -> context.getSource().figura$sendFeedback(new TextComponent("Resources checked!")));
-            return 1;
-        });
-
-        backend.then(resources);
-
-        // return
-        return backend;
+        @Override
+        public void execute(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] args) throws CommandException {
+            if (args.length > 0 && subCommandMap.containsKey(args[0])) {
+                subCommandMap.get(args[0]).execute(minecraftServer, iCommandSender, Arrays.copyOfRange(args, 1, args.length));
+            }
+        }
     }
 
-    private static int runRequest(CommandContext<FiguraClientCommandSource> context, String request) {
+    private static int runRequest(ICommandSender context, String request) {
         try {
             HttpAPI.runString(
                     NetworkStuff.api.header(request),
-                    (code, data) -> FiguraMod.sendChatMessage(new TextComponent(data))
+                    (code, data) -> FiguraMod.sendChatMessage(new TextComponentString(data))
             );
             return 1;
         } catch (Exception e) {
-            context.getSource().figura$sendError(new TextComponent(e.getMessage()));
+            ((FiguraClientCommandSource)context).figura$sendError(new TextComponentString(e.getMessage()));
             return 0;
         }
     }

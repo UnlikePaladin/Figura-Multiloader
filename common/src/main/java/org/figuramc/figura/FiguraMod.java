@@ -25,6 +25,7 @@ import org.figuramc.figura.lua.FiguraLuaPrinter;
 import org.figuramc.figura.lua.docs.FiguraDocsManager;
 import org.figuramc.figura.mixin.TileEntitySkullAccessor;
 import org.figuramc.figura.permissions.PermissionManager;
+import org.figuramc.figura.platform.Services;
 import org.figuramc.figura.resources.FiguraRuntimeResources;
 import org.figuramc.figura.utils.*;
 import org.figuramc.figura.wizards.AvatarWizard;
@@ -40,7 +41,7 @@ public class FiguraMod {
 
     public static final String MOD_ID = "figura";
     public static final String MOD_NAME = "Figura";
-    public static final FiguraModMetadata METADATA = FiguraModMetadata.getMetadataForMod(MOD_ID);
+    public static final FiguraModMetadata METADATA = Services.FIGURA_MOD_METADATA.getMetadataForMod(MOD_ID);
     public static final Version VERSION = new Version(PlatformUtils.getFiguraModVersionString());
     public static final Calendar CALENDAR = Calendar.getInstance();
     public static final Path GAME_DIR = PlatformUtils.getGameDir().normalize();
@@ -62,7 +63,7 @@ public class FiguraMod {
 
     public static void onClientInit() {
         // init managers
-        EntryPointManager.init();
+        Services.ENTRYPOINT_MANAGER.init();
         PermissionManager.init();
         LocalAvatarFetcher.init();
         CacheAvatarLoader.init();

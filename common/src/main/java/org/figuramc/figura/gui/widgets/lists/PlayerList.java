@@ -1,16 +1,15 @@
 package org.figuramc.figura.gui.widgets.lists;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.components.events.GuiEventListener;
-import net.minecraft.client.multiplayer.ClientPacketListener;
-import net.minecraft.client.multiplayer.PlayerInfo;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.Mth;
+import net.minecraft.client.gui.GuiPageButtonList;
+import net.minecraft.client.network.NetHandlerPlayClient;
+import net.minecraft.client.network.NetworkPlayerInfo;
+import net.minecraft.util.ResourceLocation;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.avatar.AvatarManager;
 import org.figuramc.figura.gui.screens.PermissionsScreen;
+import org.figuramc.figura.gui.widgets.FiguraGuiEventListener;
 import org.figuramc.figura.gui.widgets.SearchBar;
 import org.figuramc.figura.gui.widgets.SwitchButton;
 import org.figuramc.figura.gui.widgets.permissions.AbstractPermPackElement;
@@ -20,9 +19,11 @@ import org.figuramc.figura.permissions.PermissionManager;
 import org.figuramc.figura.permissions.PermissionPack;
 import org.figuramc.figura.utils.FiguraIdentifier;
 import org.figuramc.figura.utils.FiguraText;
+import org.figuramc.figura.utils.MathUtils;
 import org.figuramc.figura.utils.ui.UIHelper;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class PlayerList extends AbstractList {
 
@@ -50,14 +51,21 @@ public class PlayerList extends AbstractList {
         this.entryWidth = Math.min(width - scrollBar.getWidth() - 12, 174);
 
         // fix scrollbar y and height
-        scrollBar.y = y + 28;
+        scrollBar.setY(y + 28);
         scrollBar.setHeight(height - 32);
 
         // search bar
-        children.add(searchBar = new SearchBar(x + 4, y + 4, width - 56, 20, s -> {
-            if (!filter.equals(s))
-                scrollBar.setScrollProgress(0f);
-            filter = s;
+        children.add(searchBar = new SearchBar(x + 4, y + 4, width - 56, 20, new GuiPageButtonList.GuiResponder() {
+            @Override
+            public void setEntryValue(int i, boolean value) {}
+            @Override
+            public void setEntryValue(int i, float value) {}
+            @Override
+            public void setEntryValue(int i, String value) {
+                if (!filter.equals(value))
+                    scrollBar.setScrollProgress(0f);
+                filter = value;
+            }
         }));
 
         // show figura only button
@@ -84,14 +92,14 @@ public class PlayerList extends AbstractList {
     }
 
     @Override
-    public void render(PoseStack stack, int mouseX, int mouseY, float delta) {
+    public void draw(Minecraft mc, int mouseX, int mouseY, float delta) {
         int x = getX();
         int y = getY();
         int width = getWidth();
         int height = getHeight();
 
         // background
-        UIHelper.renderSliced(stack, x, y, width, height, UIHelper.OUTLINE_FILL);
+        UIHelper.renderSliced(x, y, width, height, UIHelper.OUTLINE_FILL);
 
         totalHeight = 0;
         for (AbstractPermPackElement pack : permissionsList) {
@@ -110,7 +118,7 @@ public class PlayerList extends AbstractList {
 
         // render stuff
         int xOffset = (width - entryWidth - (scrollBar.isVisible() ? 13 : 0)) / 2;
-        int playerY = scrollBar.isVisible() ? (int) -(Mth.lerp(scrollBar.getScrollProgress(), -32, totalHeight - height)) : 32;
+        int playerY = scrollBar.isVisible() ? (int) -(MathUtils.lerp(scrollBar.getScrollProgress(), -32, totalHeight - height)) : 32;
 
         int minY = y + scissorsY;
         int maxY = minY + height + scissorsHeight;
@@ -122,7 +130,7 @@ public class PlayerList extends AbstractList {
             pack.setY(y + playerY);
 
             if (pack.getY() + pack.getHeight() > minY && pack.getY() < maxY)
-                pack.render(stack, mouseX, mouseY, delta);
+                pack.draw(mc, mouseX, mouseY, delta);
 
             playerY += pack.getHeight() + 8;
         }
@@ -131,11 +139,11 @@ public class PlayerList extends AbstractList {
         UIHelper.disableScissor();
 
         // render children
-        super.render(stack, mouseX, mouseY, delta);
+        super.draw(mc, mouseX, mouseY, delta);
     }
 
     @Override
-    public List<? extends GuiEventListener> contents() {
+    public List<? extends FiguraGuiEventListener> contents() {
         return permissionsList;
     }
 
@@ -154,17 +162,17 @@ public class PlayerList extends AbstractList {
         missingPlayers.addAll(players.keySet());
 
         // for all players
-        ClientPacketListener connection = Minecraft.getInstance().getConnection();
-        List<UUID> playerList = connection == null ? new ArrayList<>() : new ArrayList<>(connection.getOnlinePlayerIds());
+        NetHandlerPlayClient connection = Minecraft.getMinecraft().getConnection();
+        List<UUID> playerList = connection == null ? new ArrayList<>() : new ArrayList<>(connection.getPlayerInfoMap().stream().map(networkPlayerInfo -> networkPlayerInfo.getGameProfile().getId()).collect(Collectors.toList()));
         for (UUID uuid : playerList) {
             // get player
-            PlayerInfo player = connection.getPlayerInfo(uuid);
+            NetworkPlayerInfo player = connection.getPlayerInfo(uuid);
             if (player == null)
                 continue;
 
             // get player data
-            String name = player.getProfile().getName();
-            ResourceLocation skin = player.getSkinLocation();
+            String name = player.getGameProfile().getName();
+            ResourceLocation skin = player.getLocationSkin();
             Avatar avatar = AvatarManager.getAvatarForPlayer(uuid);
 
             // filter check
@@ -235,11 +243,11 @@ public class PlayerList extends AbstractList {
     }
 
     private void selectLocalPlayer() {
-        PlayerPermPackElement local = Minecraft.getInstance().player != null ? players.get(Minecraft.getInstance().player.getUUID()) : null;
+        PlayerPermPackElement local = Minecraft.getMinecraft().player != null ? players.get(Minecraft.getMinecraft().player.getUniqueID()) : null;
         if (local != null) {
-            local.onPress();
+            local.widgetPressed(0,0);
         } else {
-            maxCategory.onPress();
+            maxCategory.widgetPressed(0,0);
         }
 
         scrollToSelected();

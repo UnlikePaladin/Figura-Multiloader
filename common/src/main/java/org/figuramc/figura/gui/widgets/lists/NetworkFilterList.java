@@ -1,8 +1,8 @@
 package org.figuramc.figura.gui.widgets.lists;
 
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiPageButtonList;
+import net.minecraft.util.ResourceLocation;
 import org.figuramc.figura.config.ConfigType;
 import org.figuramc.figura.gui.widgets.*;
 import org.figuramc.figura.lua.api.net.NetworkingAPI;
@@ -34,7 +34,16 @@ public class NetworkFilterList extends AbstractList {
             entries.add(entry = new NetworkFilterEntry(this, x,y, width - 8 - scrollBar.getWidth(), 20, filter));
             children.add(entry);
         }
-        children.add(searchTextField = new TextField(x + 4, y + 4, width - 8, 20, TextField.HintType.SEARCH, this::onSearch));
+        children.add(searchTextField = new TextField(x + 4, y + 4, width - 8, 20, TextField.HintType.SEARCH, new GuiPageButtonList.GuiResponder() {
+            @Override
+            public void setEntryValue(int i, boolean value) {}
+            @Override
+            public void setEntryValue(int i, float value) {}
+            @Override
+            public void setEntryValue(int i, String value) {
+                onSearch(value);
+            }
+        }));
         repositionContents();
         updateContentsHeightDiff();
         updateScrollBar();
@@ -62,7 +71,7 @@ public class NetworkFilterList extends AbstractList {
         updateScrollBar();
     }
 
-    private void onEntryAddClick(net.minecraft.client.gui.components.Button button) {
+    private void onEntryAddClick(Button button) {
         NetworkFilterEntry entry = new NetworkFilterEntry(this, getX() + 4, entries.size() * 24,  getWidth() - 22,20);
         entries.add(entry);
         children.add(entry);
@@ -73,22 +82,22 @@ public class NetworkFilterList extends AbstractList {
     }
 
     @Override
-    public void render(PoseStack stack, int mouseX, int mouseY, float delta) {
+    public void draw(Minecraft mc, int mouseX, int mouseY, float delta) {
         int x = getX();
         int y = getY();
         int width = getWidth();
         int height = getHeight();
 
         // background and scissors
-        UIHelper.renderSliced(stack, x, y, width, height, UIHelper.OUTLINE_FILL);
+        UIHelper.renderSliced(x, y, width, height, UIHelper.OUTLINE_FILL);
 
-        super.render(stack, mouseX, mouseY, delta);
+        super.draw(mc, mouseX, mouseY, delta);
         updateScissors(4,28, -18, -56);
         UIHelper.setupScissor(x + scissorsX, y + scissorsY, width + scissorsWidth, height + scissorsHeight);
         for (NetworkFilterEntry entry :
                 contents()) {
             if (!entry.isVisible()) continue;
-            entry.render(stack, mouseX, mouseY, delta);
+            entry.draw(mc, mouseX, mouseY, delta);
         }
         UIHelper.disableScissor();
     }
@@ -199,23 +208,32 @@ public class NetworkFilterList extends AbstractList {
                     new EnumButton(x+width-114, y, 90, 20, "gui.network_filter.list.filter_mode"
                             ,sourceFilter.getMode().getId(), 5, this::onEnumSelect)
             );
-            children.add(filterTextField = new TextField(x, y, width - 118, 20, TextField.HintType.IP, this::onSourceChange));
+            children.add(filterTextField = new TextField(x, y, width - 118, 20, TextField.HintType.IP, new GuiPageButtonList.GuiResponder() {
+                @Override
+                public void setEntryValue(int i, boolean value) {}
+                @Override
+                public void setEntryValue(int i, float value) {}
+                @Override
+                public void setEntryValue(int i, String value) {
+                    onSourceChange(value);
+                }
+            }));
             children.add(
                     deleteButton = new IconButton(x + width - 20, y, 20, 20,
                             0,0, 24,
                             deleteButtonLocation,72, 24,
                             new FiguraText("gui.network_filter.list.delete"), null, this::onDelete)
             );
-            filterTextField.getField().setValue(sourceFilter.getSource());
+            filterTextField.getField().setText(sourceFilter.getSource());
         }
 
-        private void onDelete(net.minecraft.client.gui.components.Button button) {
+        private void onDelete(Button button) {
             parent.onDelete(this);
         }
 
         @Override
-        public void render(PoseStack stack, int mouseX, int mouseY, float delta) {
-            super.render(stack, mouseX, mouseY, delta);
+        public void draw(Minecraft mc, int mouseX, int mouseY, float delta) {
+            super.draw(mc, mouseX, mouseY, delta);
         }
 
         @Override

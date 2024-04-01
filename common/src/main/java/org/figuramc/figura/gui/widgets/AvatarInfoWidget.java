@@ -1,14 +1,10 @@
 package org.figuramc.figura.gui.widgets;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.components.events.GuiEventListener;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.network.chat.Style;
-import net.minecraft.network.chat.TextComponent;
+import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.Style;
+import net.minecraft.util.text.TextComponentString;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.avatar.AvatarManager;
@@ -24,15 +20,15 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-public class AvatarInfoWidget implements FiguraWidget, FiguraTickable, GuiEventListener {
+public class AvatarInfoWidget implements FiguraWidget, FiguraTickable, FiguraGuiEventListener {
 
-    private static final MutableComponent UNKNOWN = new TextComponent("?").setStyle(ColorUtils.Colors.AWESOME_BLUE.style);
-    private static final MutableComponent ELLIPSIS = TextUtils.ELLIPSIS.copy().setStyle(ColorUtils.Colors.AWESOME_BLUE.style);
-    private static final List<Component> TITLES = Arrays.asList(
-            new FiguraText("gui.name").withStyle(ChatFormatting.UNDERLINE),
-            new FiguraText("gui.authors").withStyle(ChatFormatting.UNDERLINE),
-            new FiguraText("gui.size").withStyle(ChatFormatting.UNDERLINE),
-            new FiguraText("gui.complexity").withStyle(ChatFormatting.UNDERLINE)
+    private static final ITextComponent UNKNOWN = new TextComponentString("?").setStyle(ColorUtils.Colors.AWESOME_BLUE.style);
+    private static final ITextComponent ELLIPSIS = TextUtils.ELLIPSIS.createCopy().setStyle(ColorUtils.Colors.AWESOME_BLUE.style);
+    private static final List<ITextComponent> TITLES = Arrays.asList(
+            new FiguraText("gui.name").setStyle(new Style().setUnderlined(true)),
+            new FiguraText("gui.authors").setStyle(new Style().setUnderlined(true)),
+            new FiguraText("gui.size").setStyle(new Style().setUnderlined(true)),
+            new FiguraText("gui.complexity").setStyle(new Style().setUnderlined(true))
     );
 
     private int x, y;
@@ -40,19 +36,19 @@ public class AvatarInfoWidget implements FiguraWidget, FiguraTickable, GuiEventL
     private boolean visible = true;
     private final int maxSize;
 
-    private final Font font;
-    private final List<Component> values = new ArrayList<Component>() {{
-        for (Component ignored : TITLES)
+    private final FontRenderer font;
+    private final List<ITextComponent> values = new ArrayList<ITextComponent>() {{
+        for (ITextComponent ignored : TITLES)
             this.add(UNKNOWN);
     }};
 
     public AvatarInfoWidget(int x, int y, int width, int maxSize) {
         this.x = x;
         this.y = y;
-        this.font = Minecraft.getInstance().font;
+        this.font = Minecraft.getMinecraft().fontRenderer;
 
         this.width = width;
-        this.height = (font.lineHeight + 4) * TITLES.size() * 2 + 4; // font + spacing + border
+        this.height = (font.FONT_HEIGHT + 4) * TITLES.size() * 2 + 4; // font + spacing + border
         this.maxSize = maxSize;
     }
 
@@ -67,10 +63,10 @@ public class AvatarInfoWidget implements FiguraWidget, FiguraTickable, GuiEventL
         // update values
         Avatar avatar = AvatarManager.getAvatarForPlayer(FiguraMod.getLocalPlayerUUID());
         if (avatar != null && avatar.nbt != null) {
-            values.set(0, avatar.name == null || avatar.name.trim().isEmpty() ? UNKNOWN : Emojis.applyEmojis(new TextComponent(avatar.name).setStyle(accent))); // name
-            values.set(1, avatar.authors == null || avatar.authors.trim().isEmpty() ? UNKNOWN : Emojis.applyEmojis(new TextComponent(avatar.authors).setStyle(accent))); // authors
-            values.set(2, new TextComponent(MathUtils.asFileSize(avatar.fileSize)).setStyle(accent)); // size
-            values.set(3, new TextComponent(String.valueOf(avatar.complexity.pre)).setStyle(accent)); // complexity
+            values.set(0, avatar.name == null || avatar.name.trim().isEmpty() ? UNKNOWN : Emojis.applyEmojis(new TextComponentString(avatar.name).setStyle(accent))); // name
+            values.set(1, avatar.authors == null || avatar.authors.trim().isEmpty() ? UNKNOWN : Emojis.applyEmojis(new TextComponentString(avatar.authors).setStyle(accent))); // authors
+            values.set(2, new TextComponentString(MathUtils.asFileSize(avatar.fileSize)).setStyle(accent)); // size
+            values.set(3, new TextComponentString(String.valueOf(avatar.complexity.pre)).setStyle(accent)); // complexity
         } else {
             for (int i = 0; i < TITLES.size(); i++) {
                 values.set(i, UNKNOWN);
@@ -79,19 +75,19 @@ public class AvatarInfoWidget implements FiguraWidget, FiguraTickable, GuiEventL
     }
 
     @Override
-    public void render(PoseStack pose, int mouseX, int mouseY, float delta) {
+    public void draw(Minecraft mc, int mouseX, int mouseY, float delta) {
         if (!visible) return;
 
         // prepare vars
         int x = this.x + width / 2;
         int y = this.y + 4;
-        int height = font.lineHeight + 4;
+        int height = font.FONT_HEIGHT + 4;
         int maxLines = (maxSize - 8) / height;
 
         // special author stuff
         int authorFreeLines = maxLines - 7;
-        Component authors = values.get(1);
-        List<Component> authorLines = authors == null ? Collections.emptyList() : TextUtils.splitText(authors, "\n");
+        ITextComponent authors = values.get(1);
+        List<ITextComponent> authorLines = authors == null ? Collections.emptyList() : TextUtils.splitText(authors, "\n");
         int authorUsedLines = Math.min(authorLines.size(), authorFreeLines);
 
         // set new widget height
@@ -100,20 +96,20 @@ public class AvatarInfoWidget implements FiguraWidget, FiguraTickable, GuiEventL
         y += (this.height - newHeight) / 2;
 
         //render background
-        UIHelper.renderSliced(pose, this.x, this.y, this.width, this.height, UIHelper.OUTLINE_FILL);
+        UIHelper.renderSliced(this.x, this.y, this.width, this.height, UIHelper.OUTLINE_FILL);
 
         // render texts
         for (int i = 0; i < TITLES.size(); i++) {
             // -- title -- //
 
-            Component title = TITLES.get(i);
+            ITextComponent title = TITLES.get(i);
             if (title != null)
-                UIHelper.drawCenteredString(pose, font, title, x, y, 0xFFFFFF);
+                UIHelper.drawCenteredString(font, title, x, y, 0xFFFFFF);
             y += height;
 
             // -- value -- //
 
-            Component value = values.get(i);
+            ITextComponent value = values.get(i);
             if (value == null) {
                 y += height;
                 continue;
@@ -121,8 +117,8 @@ public class AvatarInfoWidget implements FiguraWidget, FiguraTickable, GuiEventL
 
             // default rendering
             if (i != 1) {
-                Component toRender = TextUtils.trimToWidthEllipsis(font, value, width - 10, ELLIPSIS);
-                UIHelper.drawCenteredString(pose, font, toRender, x, y, 0xFFFFFF);
+                ITextComponent toRender = TextUtils.trimToWidthEllipsis(font, value, width - 10, ELLIPSIS);
+                UIHelper.drawCenteredString(font, toRender, x, y, 0xFFFFFF);
 
                 // tooltip
                 if (value != toRender && UIHelper.isMouseOver(this.x, y - height, width, height * 2 - 4, mouseX, mouseY))
@@ -134,8 +130,8 @@ public class AvatarInfoWidget implements FiguraWidget, FiguraTickable, GuiEventL
 
             // author special rendering
             for (int j = 0; j < authorUsedLines; j++) {
-                Component text = authorLines.get(j);
-                Component newText = TextUtils.trimToWidthEllipsis(font, text, width - 10, ELLIPSIS);
+                ITextComponent text = authorLines.get(j);
+                ITextComponent newText = TextUtils.trimToWidthEllipsis(font, text, width - 10, ELLIPSIS);
 
                 if (j == authorUsedLines - 1 && authorLines.size() > authorUsedLines) {
                     text = value;
@@ -145,7 +141,7 @@ public class AvatarInfoWidget implements FiguraWidget, FiguraTickable, GuiEventL
                 if (text != newText && UIHelper.isMouseOver(this.x, y, width, height, mouseX, mouseY))
                     UIHelper.setTooltip(text);
 
-                UIHelper.drawCenteredString(pose, font, newText, x, y, 0xFFFFFF);
+                UIHelper.drawCenteredString(font, newText, x, y, 0xFFFFFF);
                 y += height;
             }
         }

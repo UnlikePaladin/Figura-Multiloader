@@ -1,18 +1,18 @@
 package org.figuramc.figura.gui.widgets;
 
-import net.minecraft.ChatFormatting;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.network.chat.Style;
-import net.minecraft.network.chat.TextComponent;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.Style;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextFormatting;
 import org.figuramc.figura.avatar.AvatarManager;
 import org.figuramc.figura.avatar.local.LocalAvatarLoader;
+import org.figuramc.figura.ducks.extensions.StyleExtension;
 import org.figuramc.figura.utils.FiguraText;
 import org.figuramc.figura.utils.ui.UIHelper;
 
 public class LoadingErrorWidget extends StatusWidget {
 
-    private static final MutableComponent ICON = new TextComponent("=").withStyle(Style.EMPTY.withFont(UIHelper.UI_FONT).withColor(ChatFormatting.WHITE));
+    private static final ITextComponent ICON = new TextComponentString("=").setStyle(((StyleExtension)new Style()).setFont(UIHelper.UI_FONT).setColor(TextFormatting.WHITE));
 
     private String string;
 
@@ -27,18 +27,18 @@ public class LoadingErrorWidget extends StatusWidget {
     }
 
     @Override
-    public MutableComponent getStatusIcon(int type) {
+    public ITextComponent getStatusIcon(int type) {
         return ICON;
     }
 
     @Override
-    public Component getTooltipFor(int i) {
-        return string == null ? TextComponent.EMPTY.copy() : new FiguraText("gui.load_error").withStyle(ChatFormatting.RED)
-                .append("\n\n")
-                .append(new FiguraText("gui.status.reason"))
-                .append("\n• ")
-                .append(new FiguraText("gui.load_error." + LocalAvatarLoader.getLoadState()))
-                .append("\n• ")
-                .append(new TextComponent(string));
+    public ITextComponent getTooltipFor(int i) {
+        return string == null ? new TextComponentString("") : new FiguraText("gui.load_error").setStyle(new Style().setColor(TextFormatting.RED))
+                .appendText("\n\n")
+                .appendSibling(new FiguraText("gui.status.reason"))
+                .appendText("\n• ")
+                .appendSibling(new FiguraText("gui.load_error." + LocalAvatarLoader.getLoadState()))
+                .appendText("\n• ")
+                .appendSibling(new TextComponentString(string));
     }
 }

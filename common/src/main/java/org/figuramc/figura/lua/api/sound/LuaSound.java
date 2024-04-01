@@ -1,16 +1,9 @@
 package org.figuramc.figura.lua.api.sound;
 
-import com.mojang.blaze3d.audio.Channel;
-import com.mojang.blaze3d.audio.Library;
-import com.mojang.blaze3d.audio.SoundBuffer;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.audio.*;
-import net.minecraft.client.resources.sounds.Sound;
-import net.minecraft.client.sounds.ChannelAccess;
-import net.minecraft.client.sounds.SoundBufferLibrary;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TextComponent;
-import net.minecraft.sounds.SoundSource;
+import net.minecraft.client.audio.ISound;
+import net.minecraft.client.audio.Sound;
+import net.minecraft.client.audio.SoundHandler;
 import net.minecraft.util.SoundCategory;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
@@ -22,9 +15,11 @@ import org.figuramc.figura.lua.docs.LuaMethodDoc;
 import org.figuramc.figura.lua.docs.LuaMethodOverload;
 import org.figuramc.figura.lua.docs.LuaTypeDoc;
 import org.figuramc.figura.math.vector.FiguraVec3;
+import org.figuramc.figura.mixin.sound.SoundHandlerAccessor;
 import org.figuramc.figura.permissions.Permissions;
 import org.figuramc.figura.utils.LuaUtils;
 import org.figuramc.figura.utils.TextUtils;
+import org.jetbrains.annotations.Nullable;
 import org.luaj.vm2.LuaError;
 
 @LuaWhitelist
@@ -36,7 +31,8 @@ public class LuaSound {
 
     private final Avatar owner;
     private final String id;
-    private final ISound sound;
+    public final byte[] buffer;
+    public final Sound sound;
 
     private boolean playing = false;
 
@@ -47,12 +43,20 @@ public class LuaSound {
     private boolean loop = false;
     private ITextComponent subtitleText;
     private String subtitle;
-    private SoundHandler soundHandler;
-    public LuaSound(SoundBuffer buffer, String id, Avatar owner) {
+    private final SoundHandler soundHandler;
+
+    @Nullable
+    public String handle;
+
+    public LuaSound(byte[] buffer, String id, Avatar owner) {
         this(null, buffer, id, new TextComponentString(id), owner);
     }
 
-    public LuaSound(ISound sound, String id, ITextComponent subtitle, Avatar owner) {
+    public LuaSound(Sound sound, String id, ITextComponent subtitle, Avatar owner) {
+        this(sound, null, id, subtitle, owner);
+    }
+
+    public LuaSound(Sound sound, byte[] buffer, String id, ITextComponent subtitle, Avatar owner) {
         this.owner = owner;
         this.id = id;
         this.buffer = buffer;
@@ -62,8 +66,8 @@ public class LuaSound {
         this.soundHandler = Minecraft.getMinecraft().getSoundHandler();
     }
 
-    public Sound getHandle() {
-        return sound.getSound();
+    public String getHandle() {
+        return handle;
     }
 
     public ITextComponent getSubtitleText() {
@@ -90,11 +94,10 @@ public class LuaSound {
         }
 
         owner.noPermissions.remove(Permissions.SOUNDS);
-        String name = ((SoundManagerAccessor)((org.figuramc.figura.mixin.sound.SoundManagerAccessor)soundHandler).getSoundEngine()).figura$getSoundBuffersInv().get(sound);
+        String name = ((SoundManagerAccessor)((SoundHandlerAccessor)soundHandler).getSoundEngine()).figura$getSoundBuffersInv().get(sound);
         // if handle exists, the sound was previously played. Unpause it
         if (sound != null && name != null) {
-            ((SoundManagerAccessor) ((org.figuramc.figura.mixin.sound.SoundManagerAccessor)soundHandler).getSoundEngine()).getSoundSystem().play(name);
-            ((SoundManagerAccessor) ((org.figuramc.figura.mixin.sound.SoundManagerAccessor)soundHandler).getSoundEngine()).getPausedSounds().remove(name);
+            ((SoundManagerAccessor) ((SoundHandlerAccessor)soundHandler).getSoundEngine()).figura$playLuaSound(this);
             this.playing = true;
             return this;
         }
@@ -135,9 +138,9 @@ public class LuaSound {
         }
 
         if (buffer != null)
-            this.handle = SoundAPI.getSoundEngine().figura$createHandle(owner.owner, id, Library.Pool.STATIC);
+            this.handle = SoundAPI.getSoundEngine().figura$createHandle(owner.owner, id, this);
         else
-            this.handle = SoundAPI.getSoundEngine().figura$createHandle(owner.owner, id, sound.shouldStream() ? Library.Pool.STREAMING : Library.Pool.STATIC);
+            this.handle = SoundAPI.getSoundEngine().figura$createHandle(owner.owner, id, this);
 
         // I dunno why this check was here in the first place and I aint about to ruin things by removing it.
         if (handle == null) {
@@ -148,38 +151,22 @@ public class LuaSound {
         SoundAPI.getSoundEngine().figura$addSound(this);
 
         if (buffer != null) {
-            handle.execute(channel -> {
-                channel.setPitch(pitch);
-                channel.setVolume(volume * vol);
-                channel.linearAttenuation(attenuation * 16f);
-                channel.setLooping(loop);
-                channel.setSelfPosition(pos.asVec3());
-                channel.setRelative(false);
-                channel.attachStaticBuffer(buffer);
-                channel.play();
-            });
+            ((SoundManagerAccessor)((SoundHandlerAccessor)soundHandler).getSoundEngine()).getSoundSystem().setPitch(handle, pitch);
+            ((SoundManagerAccessor)((SoundHandlerAccessor)soundHandler).getSoundEngine()).getSoundSystem().setVolume(handle, volume * vol);
+            ((SoundManagerAccessor)((SoundHandlerAccessor)soundHandler).getSoundEngine()).getSoundSystem().setAttenuation(handle, ISound.AttenuationType.LINEAR.getTypeInt());
+            ((SoundManagerAccessor)((SoundHandlerAccessor)soundHandler).getSoundEngine()).getSoundSystem().setLooping(handle, loop);
+            ((SoundManagerAccessor)((SoundHandlerAccessor)soundHandler).getSoundEngine()).getSoundSystem().setPosition(handle, (float) pos.x, (float) pos.y, (float) pos.z);
+            ((SoundManagerAccessor)((SoundHandlerAccessor)soundHandler).getSoundEngine()).getSoundSystem().setDistOrRoll(handle, attenuation * 16.0f);
+            ((SoundManagerAccessor)((SoundHandlerAccessor)soundHandler).getSoundEngine()).getSoundSystem().feedRawAudioData(handle, buffer);
+            ((SoundManagerAccessor) ((SoundHandlerAccessor)soundHandler).getSoundEngine()).figura$playLuaSound(this);
         } else {
-            handle.execute(channel -> {
-                channel.setPitch(pitch);
-                channel.setVolume(volume * vol);
-                channel.linearAttenuation(attenuation * 16f);
-                channel.setLooping(loop && !sound.shouldStream());
-                channel.setSelfPosition(pos.asVec3());
-                channel.setRelative(false);
-            });
-
-            SoundBufferLibrary lib = SoundAPI.getSoundEngine().figura$getSoundBuffersInv();
-            if (!sound.shouldStream()) {
-                lib.getCompleteBuffer(sound.getPath()).thenAccept(buffer -> handle.execute(channel -> {
-                    channel.attachStaticBuffer(buffer);
-                    channel.play();
-                }));
-            } else {
-                lib.getStream(sound.getPath(), loop).thenAccept(stream -> handle.execute(channel -> {
-                    channel.attachBufferStream(stream);
-                    channel.play();
-                }));
-            }
+            ((SoundManagerAccessor)((SoundHandlerAccessor)soundHandler).getSoundEngine()).getSoundSystem().setPitch(handle, pitch);
+            ((SoundManagerAccessor)((SoundHandlerAccessor)soundHandler).getSoundEngine()).getSoundSystem().setVolume(handle, volume * vol);
+            ((SoundManagerAccessor)((SoundHandlerAccessor)soundHandler).getSoundEngine()).getSoundSystem().setAttenuation(handle, ISound.AttenuationType.LINEAR.getTypeInt());
+            ((SoundManagerAccessor)((SoundHandlerAccessor)soundHandler).getSoundEngine()).getSoundSystem().setLooping(handle, loop && !sound.isStreaming());
+            ((SoundManagerAccessor)((SoundHandlerAccessor)soundHandler).getSoundEngine()).getSoundSystem().setPosition(handle, (float) pos.x, (float) pos.y, (float) pos.z);
+            ((SoundManagerAccessor)((SoundHandlerAccessor)soundHandler).getSoundEngine()).getSoundSystem().setDistOrRoll(handle, attenuation * 16.0f);
+            ((SoundManagerAccessor) ((SoundHandlerAccessor)soundHandler).getSoundEngine()).figura$playLuaSound(this);
         }
 
         return this;
@@ -189,7 +176,7 @@ public class LuaSound {
     @LuaMethodDoc("sound.is_playing")
     public boolean isPlaying() {
         if (sound != null) {
-            this.playing = soundHandler.isSoundPlaying(sound);
+            this.playing = ((SoundManagerAccessor)((SoundHandlerAccessor)soundHandler).getSoundEngine()).isFiguraSoundPlaying(this);
         }
         return this.playing;
     }
@@ -199,11 +186,7 @@ public class LuaSound {
     public LuaSound pause() {
         this.playing = false;
         if (sound != null) {
-            String name = ((SoundManagerAccessor)((org.figuramc.figura.mixin.sound.SoundManagerAccessor)soundHandler).getSoundEngine()).figura$getSoundBuffersInv().get(sound);
-            if (name != null) {
-                ((SoundManagerAccessor) ((org.figuramc.figura.mixin.sound.SoundManagerAccessor)soundHandler).getSoundEngine()).getSoundSystem().pause(name);
-                ((SoundManagerAccessor) ((org.figuramc.figura.mixin.sound.SoundManagerAccessor)soundHandler).getSoundEngine()).getPausedSounds().add(name);
-            }
+            ((SoundManagerAccessor) ((SoundHandlerAccessor)soundHandler).getSoundEngine()).figura$pauseLuaSound(this);
         }
         return this;
     }
@@ -212,9 +195,10 @@ public class LuaSound {
     @LuaMethodDoc("sound.stop")
     public LuaSound stop() {
         this.playing = false;
-        if (sound != null){
-            soundHandler.stopSound(sound);
+        if (handle != null){
+            ((SoundManagerAccessor) ((SoundHandlerAccessor)soundHandler).getSoundEngine()).figura$stopLuaSound(this);
         }
+        handle = null;
         return this;
     }
 
@@ -240,10 +224,8 @@ public class LuaSound {
             value = "sound.set_pos")
     public LuaSound setPos(Object x, Double y, Double z) {
         this.pos = LuaUtils.parseVec3("setPos", x, y, z);
-        if (sound != null) {
-            String name = ((SoundManagerAccessor)((org.figuramc.figura.mixin.sound.SoundManagerAccessor)soundHandler).getSoundEngine()).figura$getSoundBuffersInv().get(sound);
-            if (name != null)
-                ((SoundManagerAccessor)((org.figuramc.figura.mixin.sound.SoundManagerAccessor)soundHandler).getSoundEngine()).getSoundSystem().setPosition(name, (float) pos.x, (float) pos.y, (float) pos.z)
+        if (handle != null) {
+            ((SoundManagerAccessor)((SoundHandlerAccessor)soundHandler).getSoundEngine()).getSoundSystem().setPosition(handle, (float) pos.x, (float) pos.y, (float) pos.z);
         }
         return this;
     }
@@ -269,26 +251,14 @@ public class LuaSound {
             value = "sound.set_volume")
     public LuaSound setVolume(float volume) {
         this.volume = Math.min(volume, 1);
-        if (sound != null) {
-            String name = ((SoundManagerAccessor)((org.figuramc.figura.mixin.sound.SoundManagerAccessor)soundHandler).getSoundEngine()).figura$getSoundBuffersInv().get(sound);
-            if (name != null) {
-                float f = calculateVolume();
-                if (f <= 0) {
-                    ((SoundManagerAccessor)((org.figuramc.figura.mixin.sound.SoundManagerAccessor)soundHandler).getSoundEngine()).getSoundSystem().stop(name);
-                } else {
-                    ((SoundManagerAccessor)((org.figuramc.figura.mixin.sound.SoundManagerAccessor)soundHandler).getSoundEngine()).getSoundSystem().setVolume(name, f);
-                }
+        if (handle != null) {
+            float f = calculateVolume();
+            if (f <= 0) {
+                ((SoundManagerAccessor)((SoundHandlerAccessor)soundHandler).getSoundEngine()).getSoundSystem().stop(handle);
+            } else {
+                ((SoundManagerAccessor)((SoundHandlerAccessor)soundHandler).getSoundEngine()).getSoundSystem().setVolume(handle, this.volume * f);
             }
         }
-        if (handle != null)
-            handle.execute(channel -> {
-                float f = calculateVolume();
-                if (f <= 0) {
-                    channel.stop();
-                } else {
-                    channel.setVolume(this.volume * f);
-                }
-            });
         return this;
     }
 
@@ -314,7 +284,7 @@ public class LuaSound {
     public LuaSound setAttenuation(float attenuation) {
         this.attenuation = Math.max(attenuation, 1);
         if (handle != null)
-            handle.execute(channel -> channel.linearAttenuation(this.attenuation * 16f));
+            ((SoundManagerAccessor)((SoundHandlerAccessor)soundHandler).getSoundEngine()).getSoundSystem().setDistOrRoll(handle, this.attenuation * 16.0f);
         return this;
     }
 
@@ -340,7 +310,7 @@ public class LuaSound {
     public LuaSound setPitch(float pitch) {
         this.pitch = Math.max(pitch, 0);
         if (handle != null)
-            handle.execute(channel -> channel.setPitch(this.pitch));
+            ((SoundManagerAccessor)((SoundHandlerAccessor)soundHandler).getSoundEngine()).getSoundSystem().setPitch(handle, this.pitch);
         return this;
     }
 
@@ -366,7 +336,7 @@ public class LuaSound {
     public LuaSound setLoop(boolean loop) {
         this.loop = loop;
         if (handle != null)
-            handle.execute(channel -> channel.setLooping(this.loop));
+            ((SoundManagerAccessor)((SoundHandlerAccessor)soundHandler).getSoundEngine()).getSoundSystem().setLooping(handle, this.loop);
         return this;
     }
 
@@ -395,7 +365,7 @@ public class LuaSound {
             this.subtitleText = null;
         } else {
             this.subtitleText = TextUtils.tryParseJson(subtitle);
-            if (this.subtitleText.getString().length() > 48)
+            if (this.subtitleText.getUnformattedText().length() > 48)
                 throw new LuaError("Text length exceeded limit of 48 characters");
         }
         return this;

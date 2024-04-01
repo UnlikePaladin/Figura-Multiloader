@@ -1,25 +1,14 @@
 package org.figuramc.figura.utils;
 
-import dev.architectury.injectables.annotations.ExpectPlatform;
+public interface FiguraModMetadata {
+    String getCustomValueAsString(String key);
+    Number getCustomValueAsNumber(String key);
+    Boolean getCustomValueAsBoolean(String key);
+    Object getCustomValueAsObject(String key);
 
-public abstract class FiguraModMetadata {
-    private final String modId;
-    protected FiguraModMetadata(String modID) {
-        this.modId = modID;
-    }
+    Version getModVersion();
 
-    public abstract String getCustomValueAsString(String key);
-    public abstract Number getCustomValueAsNumber(String key);
-    public abstract Boolean getCustomValueAsBoolean(String key);
-    public abstract Object getCustomValueAsObject(String key);
+    String getModId();
 
-    public abstract Version getModVersion();
-
-    public String getModId() {
-        return this.modId;
-    }
-    @ExpectPlatform
-    public static FiguraModMetadata getMetadataForMod(String modID) {
-        throw new AssertionError();
-    }
+    FiguraModMetadata getMetadataForMod(String modID);
 }

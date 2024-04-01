@@ -2,17 +2,21 @@ package org.figuramc.figura.lua.docs;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import net.minecraft.ChatFormatting;
-import net.minecraft.locale.Language;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.network.chat.TextComponent;
+import net.minecraft.command.CommandBase;
+import net.minecraft.command.CommandException;
+import net.minecraft.command.ICommandSender;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.Style;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextFormatting;
 import org.figuramc.figura.FiguraMod;
+import org.figuramc.figura.commands.FiguraCommands;
 import org.figuramc.figura.utils.ColorUtils;
-import org.figuramc.figura.utils.FiguraClientCommandSource;
 import org.figuramc.figura.utils.FiguraText;
 import org.figuramc.figura.utils.TextUtils;
+import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -21,9 +25,9 @@ import java.util.*;
 
 public abstract class FiguraDoc {
 
-    public static final MutableComponent HEADER = TextComponent.EMPTY.copy().withStyle(ColorUtils.Colors.AWESOME_BLUE.style)
-                .append(new TextComponent("\n•*+•* ").append(new FiguraText()).append(" Docs *•+*•")
-                        .withStyle(ChatFormatting.UNDERLINE));
+    public static final ITextComponent HEADER = new TextComponentString("").setStyle(ColorUtils.Colors.AWESOME_BLUE.style)
+                .appendSibling(new TextComponentString("\n•*+•* ").appendSibling(new FiguraText()).appendText(" Docs *•+*•")
+                        .setStyle(new Style().setUnderlined(true)));
 
     public final String name;
     public final String description;
@@ -37,26 +41,34 @@ public abstract class FiguraDoc {
 
     public abstract int print();
 
-    public LiteralArgumentBuilder<FiguraClientCommandSource> getCommand() {
-        LiteralArgumentBuilder<FiguraClientCommandSource> command = LiteralArgumentBuilder.literal(name);
-        command.executes(context -> print());
+    public FiguraDocSubCommand getCommand() {
+        return new FiguraDocSubCommand(name);
+    }
 
-        return command;
+    public class FiguraDocSubCommand extends FiguraCommands.FiguraSubCommand {
+        public FiguraDocSubCommand(String name) {
+            super(name);
+        }
+
+        @Override
+        public void execute(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] args) throws CommandException {
+            print();
+        }
     }
 
     public JsonObject toJson(boolean translate) {
         JsonObject json = new JsonObject();
         json.addProperty("name", name);
-        json.addProperty("description", translate ? Language.getInstance().getOrDefault(new FiguraText("docs." + description).getString()) : FiguraMod.MOD_ID + "." + "docs." + description);
+        json.addProperty("description", translate ? new FiguraText("docs." + description).getFormattedText() : FiguraMod.MOD_ID + "." + "docs." + description);
         return json;
     }
 
     // -- Special prints :p -- //
 
     public static int printRoot() {
-        FiguraMod.sendChatMessage(HEADER.copy()
-                .append("\n\n")
-                .append(new FiguraText("docs").withStyle(ColorUtils.Colors.BLUE.style)));
+        FiguraMod.sendChatMessage(HEADER.createCopy()
+                .appendText("\n\n")
+                .appendSibling(new FiguraText("docs").setStyle(ColorUtils.Colors.BLUE.style)));
 
         return 1;
     }
@@ -126,55 +138,80 @@ public abstract class FiguraDoc {
         @Override
         public int print() {
             // header
-            MutableComponent message = HEADER.copy()
-                    .append("\n\n")
-                    .append(new TextComponent("• ")
-                            .append(new FiguraText("docs.text.type"))
-                            .append(":")
-                            .withStyle(ColorUtils.Colors.PURPLE.style));
+            ITextComponent message = HEADER.createCopy()
+                    .appendText("\n\n")
+                    .appendSibling(new TextComponentString("• ")
+                            .appendSibling(new FiguraText("docs.text.type"))
+                            .appendText(":")
+                            .setStyle(ColorUtils.Colors.PURPLE.style));
 
             // type
-            message.append("\n\t")
-                    .append(new TextComponent("• " + name).withStyle(ColorUtils.Colors.BLUE.style));
+            message.appendText("\n\t")
+                    .appendSibling(new TextComponentString("• " + name).setStyle(ColorUtils.Colors.BLUE.style));
 
             if (superclass != null) {
-                message.append(" (")
-                        .append(new FiguraText("docs.text.extends"))
-                        .append(" ")
-                        .append(FiguraDocsManager.getClassText(superclass).withStyle(ChatFormatting.YELLOW))
-                        .append(")");
+                message.appendText(" (")
+                        .appendSibling(new FiguraText("docs.text.extends"))
+                        .appendText(" ")
+                        .appendSibling(FiguraDocsManager.getClassText(superclass).setStyle(new Style().setColor(TextFormatting.YELLOW)))
+                        .appendText(")");
             }
 
             // description
-            message.append("\n\n")
-                    .append(new TextComponent("• ")
-                            .append(new FiguraText("docs.text.description"))
-                            .append(":")
-                            .withStyle(ColorUtils.Colors.PURPLE.style));
+            message.appendText("\n\n")
+                    .appendSibling(new TextComponentString("• ")
+                            .appendSibling(new FiguraText("docs.text.description"))
+                            .appendText(":")
+                            .setStyle(ColorUtils.Colors.PURPLE.style));
 
-            MutableComponent descText = TextComponent.EMPTY.copy().withStyle(ColorUtils.Colors.BLUE.style);
-            for (Component component : TextUtils.splitText(new FiguraText("docs." + description), "\n"))
-                descText.append("\n\t").append("• ").append(component);
-            message.append(descText);
+            ITextComponent descText = new TextComponentString("").createCopy().setStyle(ColorUtils.Colors.BLUE.style);
+            for (ITextComponent component : TextUtils.splitText(new FiguraText("docs." + description), "\n"))
+                descText.appendText("\n\t").appendText("• ").appendSibling(component);
+            message.appendSibling(descText);
 
             FiguraMod.sendChatMessage(message);
             return 1;
         }
 
         @Override
-        public LiteralArgumentBuilder<FiguraClientCommandSource> getCommand() {
-            // this
-            LiteralArgumentBuilder<FiguraClientCommandSource> command = super.getCommand();
+        public FiguraDocSubCommand getCommand() {
+            return new FiguraClassDocSubCommand(name);
+        }
 
-            // methods
-            for (FiguraDoc.MethodDoc methodDoc : documentedMethods)
-                command.then(methodDoc.getCommand());
+        public class FiguraClassDocSubCommand extends FiguraDocSubCommand {
 
-            // fields
-            for (FiguraDoc.FieldDoc fieldDoc : documentedFields)
-                command.then(fieldDoc.getCommand());
+            public FiguraClassDocSubCommand(String name) {
+                // this
+                super(name);
 
-            return command;
+                // methods
+                for (FiguraDoc.MethodDoc methodDoc : documentedMethods)
+                    children.put(methodDoc.name, methodDoc.getCommand());
+
+                // fields
+                for (FiguraDoc.FieldDoc fieldDoc : documentedFields)
+                    children.put(fieldDoc.name, fieldDoc.getCommand());
+            }
+
+            Map<String, FiguraDocSubCommand> children = new HashMap<>();
+            @Override
+            public void execute(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] args) throws CommandException {
+                if (args.length > 0) {
+                    if (children.containsKey(args[0])) {
+                        children.get(args[0]).execute(minecraftServer, iCommandSender, args);
+                        return;
+                    }
+                }
+                super.execute(minecraftServer, iCommandSender, args);
+            }
+
+            @Override
+            public List<String> getTabCompletions(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] strings, @Nullable BlockPos targetPos) {
+                if (strings.length > 0 && children.containsKey(strings[0]))
+                    return children.get(strings[0]).getTabCompletions(minecraftServer, iCommandSender, Arrays.copyOfRange(strings, 1, strings.length), targetPos);
+
+                return CommandBase.getListOfStringsMatchingLastWord(strings, children.keySet());
+            }
         }
 
         @Override
@@ -234,91 +271,116 @@ public abstract class FiguraDoc {
         @Override
         public int print() {
             // header
-            MutableComponent message = HEADER.copy();
+            ITextComponent message = HEADER.createCopy();
 
             // type
-            message.append("\n\n")
-                    .append(new TextComponent("• ")
-                            .append(new FiguraText("docs.text.function"))
-                            .append(":")
-                            .withStyle(ColorUtils.Colors.PURPLE.style))
-                    .append("\n\t")
-                    .append(new TextComponent("• " + name).withStyle(ColorUtils.Colors.BLUE.style));
+            message.appendText("\n\n")
+                    .appendSibling(new TextComponentString("• ")
+                            .appendSibling(new FiguraText("docs.text.function"))
+                            .appendText(":")
+                            .setStyle(ColorUtils.Colors.PURPLE.style))
+                    .appendText("\n\t")
+                    .appendSibling(new TextComponentString("• " + name).setStyle(ColorUtils.Colors.BLUE.style));
 
             // aliases
             if (aliases.length > 0) {
-                message.append("\n\n")
-                        .append(new TextComponent("• ")
-                                .append(new FiguraText("docs.text.aliases"))
-                                .append(":")
-                                .withStyle(ColorUtils.Colors.PURPLE.style));
+                message.appendText("\n\n")
+                        .appendSibling(new TextComponentString("• ")
+                                .appendSibling(new FiguraText("docs.text.aliases"))
+                                .appendText(":")
+                                .setStyle(ColorUtils.Colors.PURPLE.style));
 
                 for (String alias : aliases) {
-                    message.append("\n\t")
-                            .append(new TextComponent("• ")
-                                    .append(alias)
-                                    .withStyle(ColorUtils.Colors.BLUE.style));
+                    message.appendText("\n\t")
+                            .appendSibling(new TextComponentString("• ")
+                                    .appendText(alias)
+                                    .setStyle(ColorUtils.Colors.BLUE.style));
                 }
             }
 
             // syntax
-            message.append("\n\n")
-                    .append(new TextComponent("• ")
-                            .append(new FiguraText("docs.text.syntax"))
-                            .append(":")
-                            .withStyle(ColorUtils.Colors.PURPLE.style));
+            message.appendText("\n\n")
+                    .appendSibling(new TextComponentString("• ")
+                            .appendSibling(new FiguraText("docs.text.syntax"))
+                            .appendText(":")
+                            .setStyle(ColorUtils.Colors.PURPLE.style));
 
             for (int i = 0; i < parameterTypes.length; i++) {
 
                 // name
-                message.append("\n\t")
-                        .append(new TextComponent("• ").withStyle(ColorUtils.Colors.BLUE.style))
-                        .append(new TextComponent("<" + typeName + ">").withStyle(ChatFormatting.YELLOW))
-                        .append(new TextComponent(isStatic ? "." : ":").withStyle(ChatFormatting.BOLD))
-                        .append(new TextComponent(name).withStyle(ColorUtils.Colors.BLUE.style))
-                        .append("(");
+                message.appendText("\n\t")
+                        .appendSibling(new TextComponentString("• ").setStyle(ColorUtils.Colors.BLUE.style))
+                        .appendSibling(new TextComponentString("<" + typeName + ">").setStyle(new Style().setColor(TextFormatting.YELLOW)))
+                        .appendSibling(new TextComponentString(isStatic ? "." : ":").setStyle(new Style().setBold(true)))
+                        .appendSibling(new TextComponentString(name).setStyle(ColorUtils.Colors.BLUE.style))
+                        .appendText("(");
 
                 for (int j = 0; j < parameterTypes[i].length; j++) {
                     // type and arg
-                    message.append(FiguraDocsManager.getClassText(parameterTypes[i][j]).withStyle(ChatFormatting.YELLOW))
-                            .append(" ")
-                            .append(new TextComponent(parameterNames[i][j]).withStyle(ChatFormatting.WHITE));
+                    message.appendSibling(FiguraDocsManager.getClassText(parameterTypes[i][j]).setStyle(new Style().setColor(TextFormatting.YELLOW)))
+                            .appendText(" ")
+                            .appendSibling(new TextComponentString(parameterNames[i][j]).setStyle(new Style().setColor(TextFormatting.WHITE)));
 
                     if (j != parameterTypes[i].length - 1)
-                        message.append(", ");
+                        message.appendText(", ");
                 }
 
                 // return
-                message.append(") → ")
-                        .append(new FiguraText("docs.text.returns").append(" ").withStyle(ColorUtils.Colors.BLUE.style))
-                        .append(FiguraDocsManager.getClassText(returnTypes[i]).withStyle(ChatFormatting.YELLOW));
+                message.appendText(") → ")
+                        .appendSibling(new FiguraText("docs.text.returns").appendText(" ").setStyle(ColorUtils.Colors.BLUE.style))
+                        .appendSibling(FiguraDocsManager.getClassText(returnTypes[i]).setStyle(new Style().setColor(TextFormatting.YELLOW)));
             }
 
             // description
-            message.append("\n\n")
-                    .append(new TextComponent("• ")
-                            .append(new FiguraText("docs.text.description"))
-                            .append(":")
-                            .withStyle(ColorUtils.Colors.PURPLE.style));
+            message.appendText("\n\n")
+                    .appendSibling(new TextComponentString("• ")
+                            .appendSibling(new FiguraText("docs.text.description"))
+                            .appendText(":")
+                            .setStyle(ColorUtils.Colors.PURPLE.style));
 
-            MutableComponent descText = TextComponent.EMPTY.copy().withStyle(ColorUtils.Colors.BLUE.style);
-            for (Component component : TextUtils.splitText(new FiguraText("docs." + description), "\n"))
-                descText.append("\n\t").append("• ").append(component);
-            message.append(descText);
+            ITextComponent descText = new TextComponentString("").createCopy().setStyle(ColorUtils.Colors.BLUE.style);
+            for (ITextComponent component : TextUtils.splitText(new FiguraText("docs." + description), "\n"))
+                descText.appendText("\n\t").appendText("• ").appendSibling(component);
+            message.appendSibling(descText);
 
             FiguraMod.sendChatMessage(message);
             return 1;
         }
 
         @Override
-        public LiteralArgumentBuilder<FiguraClientCommandSource> getCommand() {
-            LiteralArgumentBuilder<FiguraClientCommandSource> command = super.getCommand();
+        public FiguraDocSubCommand getCommand() {
+            return new FiguraMethodDocSubCommand(name);
+        }
 
-            if (children != null)
-                for (FiguraDoc child : children)
-                    command.then(child.getCommand());
+        public class FiguraMethodDocSubCommand extends FiguraDocSubCommand {
 
-            return command;
+            public Map<String, FiguraDocSubCommand> fieldCommands = new HashMap<>();
+            public FiguraMethodDocSubCommand(String name) {
+                super(name);
+                if (children != null) {
+                    for (FiguraDoc child : children)
+                        fieldCommands.put(child.name, child.getCommand());
+                }
+            }
+
+            @Override
+            public void execute(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] args) throws CommandException {
+                if (args.length > 0) {
+                    if (fieldCommands.containsKey(args[0])) {
+                        fieldCommands.get(args[0]).execute(minecraftServer, iCommandSender, args);
+                        return;
+                    }
+                }
+                super.execute(minecraftServer, iCommandSender, args);
+            }
+
+            @Override
+            public List<String> getTabCompletions(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] strings, @Nullable BlockPos targetPos) {
+                if (strings.length > 0 && fieldCommands.containsKey(strings[0]))
+                    return fieldCommands.get(strings[0]).getTabCompletions(minecraftServer, iCommandSender, Arrays.copyOfRange(strings, 1, strings.length), targetPos);
+
+                return CommandBase.getListOfStringsMatchingLastWord(strings, fieldCommands.keySet());
+            }
         }
 
         @Override
@@ -378,48 +440,73 @@ public abstract class FiguraDoc {
         @Override
         public int print() {
             // header
-            MutableComponent message = HEADER.copy()
+            ITextComponent message = HEADER.createCopy()
 
                     // type
-                    .append("\n\n")
-                    .append(new TextComponent("• ")
-                            .append(new FiguraText("docs.text.field"))
-                            .append(":")
-                            .withStyle(ColorUtils.Colors.PURPLE.style))
-                    .append("\n\t")
-                    .append(new TextComponent("• ").withStyle(ColorUtils.Colors.BLUE.style))
-                    .append(FiguraDocsManager.getClassText(type).withStyle(ChatFormatting.YELLOW))
-                    .append(new TextComponent(" " + name).withStyle(ColorUtils.Colors.BLUE.style))
-                    .append(new TextComponent(" (")
-                            .append(new FiguraText(editable ? "docs.text.editable" : "docs.text.not_editable"))
-                            .append(")")
-                            .withStyle(editable ? ChatFormatting.GREEN : ChatFormatting.DARK_RED));
+                    .appendText("\n\n")
+                    .appendSibling(new TextComponentString("• ")
+                            .appendSibling(new FiguraText("docs.text.field"))
+                            .appendText(":")
+                            .setStyle(ColorUtils.Colors.PURPLE.style))
+                    .appendText("\n\t")
+                    .appendSibling(new TextComponentString("• ").setStyle(ColorUtils.Colors.BLUE.style))
+                    .appendSibling(FiguraDocsManager.getClassText(type).setStyle(new Style().setColor(TextFormatting.YELLOW)))
+                    .appendSibling(new TextComponentString(" " + name).setStyle(ColorUtils.Colors.BLUE.style))
+                    .appendSibling(new TextComponentString(" (")
+                            .appendSibling(new FiguraText(editable ? "docs.text.editable" : "docs.text.not_editable"))
+                            .appendText(")")
+                            .setStyle(new Style().setColor(editable ? TextFormatting.GREEN : TextFormatting.DARK_RED)));
 
             // description
-            message.append("\n\n")
-                    .append(new TextComponent("• ")
-                            .append(new FiguraText("docs.text.description"))
-                            .append(":")
-                            .withStyle(ColorUtils.Colors.PURPLE.style));
+            message.appendText("\n\n")
+                    .appendSibling(new TextComponentString("• ")
+                            .appendSibling(new FiguraText("docs.text.description"))
+                            .appendText(":")
+                            .setStyle(ColorUtils.Colors.PURPLE.style));
 
-            MutableComponent descText = TextComponent.EMPTY.copy().withStyle(ColorUtils.Colors.BLUE.style);
-            for (Component component : TextUtils.splitText(new FiguraText("docs." + description), "\n"))
-                descText.append("\n\t").append("• ").append(component);
-            message.append(descText);
+            ITextComponent descText = new TextComponentString("").createCopy().setStyle(ColorUtils.Colors.BLUE.style);
+            for (ITextComponent component : TextUtils.splitText(new FiguraText("docs." + description), "\n"))
+                descText.appendText("\n\t").appendText("• ").appendSibling(component);
+            message.appendSibling(descText);
 
             FiguraMod.sendChatMessage(message);
             return 1;
         }
 
         @Override
-        public LiteralArgumentBuilder<FiguraClientCommandSource> getCommand() {
-            LiteralArgumentBuilder<FiguraClientCommandSource> command = super.getCommand();
+        public FiguraDocSubCommand getCommand() {
+            return new FiguraFieldDocSubCommand(name);
+        }
 
-            if (children != null)
-                for (FiguraDoc child : children)
-                    command.then(child.getCommand());
+        public class FiguraFieldDocSubCommand extends FiguraDocSubCommand {
 
-            return command;
+            public Map<String, FiguraDocSubCommand> childCommands = new HashMap<>();
+            public FiguraFieldDocSubCommand(String name) {
+                super(name);
+                if (children != null) {
+                    for (FiguraDoc child : children)
+                        childCommands.put(child.name, child.getCommand());
+                }
+            }
+
+            @Override
+            public void execute(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] args) throws CommandException {
+                if (args.length > 0) {
+                    if (childCommands.containsKey(args[0])) {
+                        childCommands.get(args[0]).execute(minecraftServer, iCommandSender, args);
+                        return;
+                    }
+                }
+                super.execute(minecraftServer, iCommandSender, args);
+            }
+
+            @Override
+            public List<String> getTabCompletions(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] strings, @Nullable BlockPos targetPos) {
+                if (strings.length > 0 && childCommands.containsKey(strings[0]))
+                    return childCommands.get(strings[0]).getTabCompletions(minecraftServer, iCommandSender, Arrays.copyOfRange(strings, 1, strings.length), targetPos);
+
+                return CommandBase.getListOfStringsMatchingLastWord(strings, childCommands.keySet());
+            }
         }
 
         @Override

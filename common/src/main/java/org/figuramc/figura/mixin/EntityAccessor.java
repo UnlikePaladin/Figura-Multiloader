@@ -14,7 +14,4 @@ public interface EntityAccessor {
     @Accessor
     World getWorld();
 
-    @Intrinsic
-    @Invoker("getPermissionLevel")
-    int getPermissionLevel();
 }

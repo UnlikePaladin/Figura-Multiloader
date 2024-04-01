@@ -10,6 +10,7 @@ import org.figuramc.figura.gui.FiguraToast;
 import org.figuramc.figura.parsers.AvatarMetadataParser;
 import org.figuramc.figura.parsers.BlockbenchModelParser;
 import org.figuramc.figura.parsers.LuaScriptParser;
+import org.figuramc.figura.platform.Services;
 import org.figuramc.figura.utils.FiguraResourceListener;
 import org.figuramc.figura.utils.FiguraText;
 import org.figuramc.figura.utils.IOUtils;
@@ -42,7 +43,7 @@ public class LocalAvatarLoader {
     private static WatchService watcher;
 
     public static final HashMap<ResourceLocation, NBTTagCompound> CEM_AVATARS = new HashMap<>();
-    public static final FiguraResourceListener AVATAR_LISTENER = FiguraResourceListener.createResourceListener("cem", manager -> {
+    public static final FiguraResourceListener AVATAR_LISTENER = Services.FIGURA_RESOURCE_LISTENER.createResourceListener("cem", manager -> {
         CEM_AVATARS.clear();
         AvatarManager.clearCEMAvatars();
         for (String space : manager.getResourceDomains()) {

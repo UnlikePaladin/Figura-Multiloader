@@ -11,6 +11,9 @@ import net.minecraftforge.event.AddReloadListenerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.client.registry.ClientRegistry;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.event.FMLInitializationEvent;
+import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.Avatar;
@@ -31,8 +34,8 @@ public class FiguraModClientForge extends FiguraMod {
     // keybinds stored here
     public static List<KeyMapping> KEYBINDS = new ArrayList<>();
 
-    @SubscribeEvent
-    public static void onInitializeClient(FMLClientSetupEvent event) {
+    @Mod.EventHandler
+    public static void onInitializeClient(FMLInitializationEvent event) {
         NetworkStuff.initializeHttpClient();
         onClientInit();
         ModConfig.registerConfigScreen();
@@ -74,5 +77,10 @@ public class FiguraModClientForge extends FiguraMod {
             if(value != null)
                 ClientRegistry.registerKeyBinding(value);
         }
+    }
+
+    @Mod.EventHandler
+    public void preInit(FMLPreInitializationEvent event){
+
     }
 }

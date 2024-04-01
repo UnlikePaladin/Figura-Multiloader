@@ -1,6 +1,6 @@
 package org.figuramc.figura.gui.screens;
 
-import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.GuiScreen;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.gui.FiguraToast;
 import org.figuramc.figura.gui.widgets.Button;
@@ -10,7 +10,7 @@ import org.figuramc.figura.wizards.AvatarWizard;
 
 public class AvatarWizardScreen extends AbstractPanelScreen {
 
-    private final Screen sourcePanel;
+    private final GuiScreen sourcePanel;
 
     private final AvatarWizard wizard = new AvatarWizard();
     private Button build;
@@ -21,18 +21,18 @@ public class AvatarWizardScreen extends AbstractPanelScreen {
     }
 
     @Override
-    public Class<? extends Screen> getSelectedPanel() {
+    public Class<? extends GuiScreen> getSelectedPanel() {
         return sourcePanel.getClass();
     }
 
     @Override
-    protected void init() {
-        super.init();
+    public void initGui() {
+        super.initGui();
 
         // -- bottom buttons -- //
 
         // cancel
-        this.addRenderableWidget(new Button(width / 2 - 122, height - 24, 120, 20, new FiguraText("gui.cancel"), null, button -> onClose()));
+        this.addRenderableWidget(new Button(width / 2 - 122, height - 24, 120, 20, new FiguraText("gui.cancel"), null, button -> onGuiClosed()));
 
         // done
         addRenderableWidget(build = new Button(width / 2 + 4, height - 24, 120, 20, new FiguraText("gui.create"), null, button -> {
@@ -44,7 +44,7 @@ public class AvatarWizardScreen extends AbstractPanelScreen {
                 FiguraMod.LOGGER.error("", e);
             }
 
-            onClose();
+            onGuiClosed();
         }));
 
         // -- wizard -- //
@@ -54,8 +54,8 @@ public class AvatarWizardScreen extends AbstractPanelScreen {
     }
 
     @Override
-    public void onClose() {
-        this.minecraft.setScreen(sourcePanel);
+    public void onGuiClosed() {
+        this.mc.displayGuiScreen(sourcePanel);
     }
 
     @Override

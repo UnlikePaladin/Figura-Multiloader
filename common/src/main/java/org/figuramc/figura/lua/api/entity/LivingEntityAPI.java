@@ -9,7 +9,7 @@ import org.figuramc.figura.lua.docs.LuaMethodDoc;
 import org.figuramc.figura.lua.docs.LuaMethodOverload;
 import org.figuramc.figura.lua.docs.LuaTypeDoc;
 import org.figuramc.figura.mixin.EntityPotionAccessor;
-import org.figuramc.figura.mixin.LivingEntityAccessor;
+import org.figuramc.figura.mixin.EntityLivingBaseAccessor;
 import org.figuramc.figura.utils.MathUtils;
 
 @LuaWhitelist
@@ -165,7 +165,7 @@ public class LivingEntityAPI<T extends EntityLivingBase> extends EntityAPI<T> {
     @LuaMethodDoc("living_entity.get_swing_duration")
     public int getSwingDuration() {
       checkEntity();
-      return ((LivingEntityAccessor) entity).getSwingDuration();
+      return ((EntityLivingBaseAccessor) entity).getSwingDuration();
     }
 
     @LuaWhitelist

@@ -1,20 +1,10 @@
 package org.figuramc.figura.gui;
 
-import com.mojang.blaze3d.platform.Window;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.datafixers.util.Pair;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.entity.Entity;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.network.chat.Style;
-import net.minecraft.network.chat.TextComponent;
-import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.Style;
 import net.minecraft.util.text.TextComponentString;
@@ -83,7 +73,7 @@ public class PopupMenu {
     private static Entity entity;
     private static UUID id;
 
-    public static void render(PoseStack stack) {
+    public static void render() {
         if (!isEnabled()) return;
 
         if (entity == null) {
@@ -117,7 +107,7 @@ public class PopupMenu {
         ScaledResolution window = new ScaledResolution(minecraft);
         double w = window.getScaledWidth_double();
         double h = window.getScaledHeight_double();
-        double s = Configs.POPUP_SCALE.value * Math.max(Math.min(minecraft.getFramebuffer().framebufferHeight * 0.035 / vec.w * ((double) 1 / window.getScaleFactor()), Configs.POPUP_MAX_SIZE.value), Configs.POPUP_MIN_SIZE.value);
+        double s = Configs.POPUP_SCALE.value * Math.max(Math.min(minecraft.displayHeight * 0.035 / vec.w * ((double) 1 / window.getScaleFactor()), Configs.POPUP_MAX_SIZE.value), Configs.POPUP_MIN_SIZE.value);
 
         GlStateManager.translate((vec.x + 1) / 2 * w, (vec.y + 1) / 2 * h, -100);
         GlStateManager.scale((float) (s * 0.5), (float) (s * 0.5), 1);
@@ -127,31 +117,31 @@ public class PopupMenu {
 
         UIHelper.setupTexture(BACKGROUND);
         int frame = Configs.REDUCED_MOTION.value ? 0 : (int) ((FiguraMod.ticks / 5f) % 4);
-        UIHelper.blit(stack, width / -2, -24, width, 26, 0, frame * 26, width, 26, width, 104);
+        UIHelper.blit(width / -2, -24, width, 26, 0, frame * 26, width, 26, width, 104);
 
         // icons
         GlStateManager.translate(0f, 0f, -2f);
         UIHelper.setupTexture(ICONS);
         for (int i = 0; i < LENGTH; i++)
-            UIHelper.blit(stack, width / -2 + (18 * i), -24, 18, 18, 18 * i, i == index ? 18 : 0, 18, 18, width, 36);
+            UIHelper.blit(width / -2 + (18 * i), -24, 18, 18, 18 * i, i == index ? 18 : 0, 18, 18, width, 36);
 
         // texts
-        Font font = minecraft.font;
+        FontRenderer font = minecraft.fontRenderer;
 
-        Component title = BUTTONS.get(index).getFirst();
+        ITextComponent title = BUTTONS.get(index).getFirst();
 
         PermissionPack tc = PermissionManager.get(id);
-        MutableComponent permissionName = tc.getCategoryName().append(tc.hasChanges() ? "*" : "");
+        ITextComponent permissionName = tc.getCategoryName().appendText(tc.hasChanges() ? "*" : "");
 
-        MutableComponent name = entity.getName().copy();
+        ITextComponent name = new TextComponentString(entity.getName());
 
         boolean error = false;
         boolean version = false;
         boolean noPermissions = false;
 
-        Component badges = Badges.fetchBadges(id);
-        if (!badges.getString().isEmpty())
-            name.append(" ").append(badges);
+        ITextComponent badges = Badges.fetchBadges(id);
+        if (!badges.getFormattedText().isEmpty())
+            name.appendText(" ").appendSibling(badges);
 
         Avatar avatar = AvatarManager.getAvatarForPlayer(id);
         if (avatar != null) {
@@ -161,23 +151,23 @@ public class PopupMenu {
         }
 
         // render texts
-        UIHelper.renderOutlineText(stack, font, name, -font.width(name) / 2, -36, 0xFFFFFF, 0x202020);
+        UIHelper.renderOutlineText(font, name, -font.getStringWidth(name.getFormattedText()) / 2, -36, 0xFFFFFF, 0x202020);
 
-        stack.scale(0.5f, 0.5f, 0.5f);
-        stack.translate(0f, 0f, -1f);
+        GlStateManager.scale(0.5f, 0.5f, 0.5f);
+        GlStateManager.translate(0f, 0f, -1f);
 
-        UIHelper.renderOutlineText(stack, font, permissionName, -font.width(permissionName) / 2, -54, 0xFFFFFF, 0x202020);
-        font.draw(stack, title, -width + 4, -12, 0xFFFFFF);
+        UIHelper.renderOutlineText(font, permissionName, -font.getStringWidth(permissionName.getFormattedText()) / 2, -54, 0xFFFFFF, 0x202020);
+        font.drawString(title.getFormattedText(), -width + 4, -12, 0xFFFFFF);
 
         if (error)
-            UIHelper.renderOutlineText(stack, font, ERROR_WARN, -font.width(ERROR_WARN) / 2, 0, 0xFFFFFF, 0x202020);
+            UIHelper.renderOutlineText(font, ERROR_WARN, -font.getStringWidth(ERROR_WARN.getFormattedText()) / 2, 0, 0xFFFFFF, 0x202020);
         if (version)
-            UIHelper.renderOutlineText(stack, font, VERSION_WARN, -font.width(VERSION_WARN) / 2, error ? font.lineHeight : 0, 0xFFFFFF, 0x202020);
+            UIHelper.renderOutlineText(font, VERSION_WARN, -font.getStringWidth(VERSION_WARN.getFormattedText()) / 2, error ? font.FONT_HEIGHT : 0, 0xFFFFFF, 0x202020);
         if (noPermissions)
-            UIHelper.renderOutlineText(stack, font, PERMISSION_WARN, -font.width(PERMISSION_WARN) / 2, (error ? font.lineHeight : 0) + (version ? font.lineHeight : 0), 0xFFFFFF, 0x202020);
+            UIHelper.renderOutlineText(font, PERMISSION_WARN, -font.getStringWidth(PERMISSION_WARN.getFormattedText()) / 2, (error ? font.FONT_HEIGHT : 0) + (version ? font.FONT_HEIGHT : 0), 0xFFFFFF, 0x202020);
 
         // finish rendering
-        stack.popPose();
+        GlStateManager.popMatrix();
     }
 
 

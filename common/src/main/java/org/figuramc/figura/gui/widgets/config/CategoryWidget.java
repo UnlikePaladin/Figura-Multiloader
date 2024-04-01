@@ -1,8 +1,7 @@
 package org.figuramc.figura.gui.widgets.config;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TextComponent;
+import net.minecraft.client.Minecraft;
+import net.minecraft.util.text.TextComponentString;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.config.ConfigType;
 import org.figuramc.figura.config.Configs;
@@ -27,7 +26,7 @@ public class CategoryWidget extends AbstractContainerElement {
         this.config = config;
         this.parent = parent;
 
-        this.parentConfig = new ContainerButton(parent, 0, 0, width, 20, config == null ? TextComponent.EMPTY.copy() : config.name, config == null ? null : config.tooltip, button -> {
+        this.parentConfig = new ContainerButton(parent, 0,0, width, 20, config == null ? new TextComponentString("") : config.name, config == null ? null : config.tooltip, button -> {
             boolean toggled = this.parentConfig.isToggled();
             setShowChildren(toggled);
             ConfigScreen.CATEGORY_DATA.put(config, toggled);
@@ -41,23 +40,23 @@ public class CategoryWidget extends AbstractContainerElement {
     }
 
     @Override
-    public void render(PoseStack poseStack, int mouseX, int mouseY, float delta) {
+    public void draw(Minecraft mc, int mouseX, int mouseY, float delta) {
         if (!isVisible())
             return;
 
         // children background
         if (parentConfig.isToggled() && entries.size() > 0)
-            UIHelper.fill(poseStack, getX(), getY() + 21, getX() + getWidth(), getY() + getHeight(), 0x11FFFFFF);
+            UIHelper.fill(getX(), getY() + 21, getX() + getWidth(), getY() + getHeight(), 0x11FFFFFF);
 
         if (config == Configs.PAPERDOLL)
-            parent.parentScreen.renderPaperdoll = parentConfig.isToggled() && parent.isMouseOver(mouseX, mouseY) && isMouseOver(mouseX, mouseY);
+            parent.parentScreen.renderPaperdoll = parentConfig.isToggled() && parent.mouseOver(mouseX, mouseY) && mouseOver(mouseX, mouseY);
 
         // children
-        super.render(poseStack, mouseX, mouseY, delta);
+        super.draw(mc, mouseX, mouseY, delta);
     }
 
     @Override
-    public boolean isMouseOver(double mouseX, double mouseY) {
+    public boolean mouseOver(double mouseX, double mouseY) {
         return UIHelper.isMouseOver(getX(), getY(), getWidth(), getHeight(), mouseX, mouseY);
     }
 

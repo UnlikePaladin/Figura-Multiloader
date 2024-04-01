@@ -1,11 +1,15 @@
 package org.figuramc.figura.commands;
 
-import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import net.minecraft.ChatFormatting;
-import net.minecraft.network.chat.*;
+import net.minecraft.command.CommandException;
+import net.minecraft.command.ICommandSender;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.Style;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.event.ClickEvent;
+import net.minecraft.util.text.event.HoverEvent;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.utils.ColorUtils;
-import org.figuramc.figura.utils.FiguraClientCommandSource;
 import org.figuramc.figura.utils.FiguraText;
 
 import java.util.ArrayList;
@@ -25,34 +29,35 @@ class LinkCommand {
             add(FiguraMod.Links.Curseforge);
     }};
 
-    public static LiteralArgumentBuilder<FiguraClientCommandSource> getCommand() {
+    public static class LinkSubCommand extends FiguraCommands.FiguraSubCommand {
         // get links
-        LiteralArgumentBuilder<FiguraClientCommandSource> links = LiteralArgumentBuilder.literal("links");
-        links.executes(context -> {
+        public LinkSubCommand() {
+            super("links");
+        }
+
+        @Override
+        public void execute(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] args) throws CommandException {
             // header
-            MutableComponent message = TextComponent.EMPTY.copy().withStyle(ColorUtils.Colors.AWESOME_BLUE.style)
-                    .append(new TextComponent("•*+•* ")
-                            .append(new FiguraText())
-                            .append(" Links *•+*•").withStyle(ChatFormatting.UNDERLINE))
-                    .append("\n");
+            ITextComponent message = new TextComponentString("").setStyle(ColorUtils.Colors.AWESOME_BLUE.style)
+                    .appendSibling(new TextComponentString("•*+•* ")
+                            .appendSibling(new FiguraText())
+                            .appendText(" Links *•+*•").setStyle(new Style().setUnderlined(true)))
+                    .appendText("\n");
 
             // add links
             for (FiguraMod.Links link : LINKS) {
-                message.append("\n");
+                message.appendText("\n");
 
                 if (link == null)
                     continue;
 
-                message.append(new TextComponent("• [" + link.name() + "]")
-                        .withStyle(link.style)
-                        .withStyle(Style.EMPTY.withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, link.url)))
-                        .withStyle(Style.EMPTY.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new TextComponent(link.url)))));
+                message.appendSibling(new TextComponentString("• [" + link.name() + "]")
+                        .setStyle(link.style)
+                        .setStyle(new Style().setClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, link.url)))
+                        .setStyle(new Style().setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new TextComponentString(link.url)))));
             }
 
             FiguraMod.sendChatMessage(message);
-            return 1;
-        });
-
-        return links;
+        }
     }
 }

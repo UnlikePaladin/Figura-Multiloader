@@ -1,14 +1,9 @@
 package org.figuramc.figura.lua.api.sound;
 
-import com.mojang.blaze3d.audio.SoundBuffer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.audio.Sound;
 import net.minecraft.client.audio.SoundEventAccessor;
 import net.minecraft.client.audio.SoundHandler;
-import net.minecraft.client.resources.sounds.Sound;
-import net.minecraft.client.sounds.SoundManager;
-import net.minecraft.client.sounds.WeighedSoundEvents;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.ResourceLocation;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.ducks.SoundManagerAccessor;
@@ -18,6 +13,7 @@ import org.figuramc.figura.lua.docs.LuaMethodDoc;
 import org.figuramc.figura.lua.docs.LuaMethodOverload;
 import org.figuramc.figura.lua.docs.LuaTypeDoc;
 import org.figuramc.figura.math.vector.FiguraVec3;
+import org.figuramc.figura.mixin.sound.SoundHandlerAccessor;
 import org.figuramc.figura.permissions.Permissions;
 import org.figuramc.figura.utils.LuaUtils;
 import org.luaj.vm2.LuaError;
@@ -40,7 +36,7 @@ public class SoundAPI {
     }
 
     public static SoundManagerAccessor getSoundEngine() {
-        return (SoundManagerAccessor) ((org.figuramc.figura.mixin.sound.SoundManagerAccessor) Minecraft.getMinecraft().getSoundHandler()).getSoundEngine();
+        return (SoundManagerAccessor) ((SoundHandlerAccessor) Minecraft.getMinecraft().getSoundHandler()).getSoundEngine();
     }
 
     @LuaWhitelist
@@ -181,7 +177,7 @@ public class SoundAPI {
 
     @LuaWhitelist
     public LuaSound __index(String id) {
-        SoundBuffer buffer = owner.customSounds.get(id);
+        byte[] buffer = owner.customSounds.get(id);
         if (buffer != null) {
             if (owner.permissions.get(Permissions.CUSTOM_SOUNDS) == 1) {
                 return new LuaSound(buffer, id, owner);

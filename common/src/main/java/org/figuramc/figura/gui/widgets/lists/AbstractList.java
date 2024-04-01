@@ -1,10 +1,7 @@
 package org.figuramc.figura.gui.widgets.lists;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.client.gui.components.Widget;
-import net.minecraft.client.gui.components.events.GuiEventListener;
-import org.figuramc.figura.gui.widgets.AbstractContainerElement;
-import org.figuramc.figura.gui.widgets.ScrollBarWidget;
+import net.minecraft.client.Minecraft;
+import org.figuramc.figura.gui.widgets.*;
 import org.figuramc.figura.utils.ui.UIHelper;
 
 import java.util.Collections;
@@ -38,21 +35,24 @@ public abstract class AbstractList extends AbstractContainerElement {
     }
 
     @Override
-    public void render(PoseStack stack, int mouseX, int mouseY, float delta) {
-        for (GuiEventListener child : children) {
-            if (child instanceof Widget && !contents().contains(child)) {
-                Widget widget = (Widget) child;
-                widget.render(stack, mouseX, mouseY, delta);
+    public void draw(Minecraft mc, int mouseX, int mouseY, float delta) {
+        for (FiguraGuiEventListener child : children) {
+            if (child instanceof AbstractFiguraWidget && !contents().contains(child)) {
+                AbstractFiguraWidget widget = (AbstractFiguraWidget) child;
+                widget.draw(mc, mouseX, mouseY, delta);
+            } else if (child instanceof FiguraRenderable && !contents().contains(child)) {
+                FiguraRenderable widget = (FiguraRenderable) child;
+                widget.draw(mc, mouseX, mouseY, delta);
             }
         }
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
-        return scrollBar.mouseScrolled(mouseX, mouseY, amount) || super.mouseScrolled(mouseX, mouseY, amount);
+    public boolean mouseScroll(double mouseX, double mouseY, double amount) {
+        return scrollBar.mouseScroll(mouseX, mouseY, amount) || super.mouseScroll(mouseX, mouseY, amount);
     }
 
-    public List<? extends GuiEventListener> contents() {
+    public List<? extends FiguraGuiEventListener> contents() {
         return Collections.emptyList();
     }
 }

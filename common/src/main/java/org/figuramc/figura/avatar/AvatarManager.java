@@ -1,21 +1,24 @@
 package org.figuramc.figura.avatar;
 
-import com.mojang.brigadier.arguments.StringArgumentType;
-import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import net.minecraft.client.Minecraft;
-import net.minecraft.entity.EntityList;
-import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.util.ResourceLocation;
+import net.minecraft.command.CommandException;
+import net.minecraft.command.ICommandSender;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityList;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.text.TextComponentString;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.local.LocalAvatarLoader;
 import org.figuramc.figura.backend2.NetworkStuff;
+import org.figuramc.figura.commands.FiguraCommands;
 import org.figuramc.figura.gui.FiguraToast;
 import org.figuramc.figura.gui.widgets.lists.AvatarList;
 import org.figuramc.figura.lua.api.particle.ParticleAPI;
 import org.figuramc.figura.lua.api.sound.SoundAPI;
+import org.figuramc.figura.platform.Services;
 import org.figuramc.figura.utils.*;
 
 import java.nio.file.Path;
@@ -35,7 +38,7 @@ public class AvatarManager {
 
     private static final Map<Entity, Avatar> LOADED_CEM = new ConcurrentHashMap<>();
 
-    public static final FiguraResourceListener RESOURCE_RELOAD_EVENT = FiguraResourceListener.createResourceListener("resource_reload_event", manager -> executeAll("resourceReloadEvent", Avatar::resourceReloadEvent));
+    public static final FiguraResourceListener RESOURCE_RELOAD_EVENT = Services.FIGURA_RESOURCE_LISTENER.createResourceListener("resource_reload_event", manager -> executeAll("resourceReloadEvent", Avatar::resourceReloadEvent));
 
     public static boolean localUploaded = true; // init as true :3
     public static boolean panic = false;
@@ -290,55 +293,48 @@ public class AvatarManager {
     }
 
     // -- command -- //
+    public static class SetAvatarCommand extends FiguraCommands.FiguraSubCommand {
 
-    public static LiteralArgumentBuilder<FiguraClientCommandSource> getCommand() {
-        // root
-        LiteralArgumentBuilder<FiguraClientCommandSource> root = LiteralArgumentBuilder.literal("set_avatar");
+        public SetAvatarCommand() {
+            super("set_avatar");
+        }
 
-        // source
-        RequiredArgumentBuilder<FiguraClientCommandSource, String> target = RequiredArgumentBuilder.argument("target", StringArgumentType.word());
+        @Override
+        public void execute(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] args) throws CommandException {
+            if (args.length == 2) {
+                String t = args[1];
+                String s = args[0];
 
-        // target
-        RequiredArgumentBuilder<FiguraClientCommandSource, String> source = RequiredArgumentBuilder.argument("source", StringArgumentType.word());
-        source.executes(context -> {
-            String s = StringArgumentType.getString(context, "source");
-            String t = StringArgumentType.getString(context, "target");
+                UUID sourceUUID, targetUUID;
+                try {
+                    sourceUUID = UUID.fromString(s);
+                    targetUUID = UUID.fromString(t);
+                } catch (Exception e) {
+                    ((FiguraClientCommandSource) iCommandSender).figura$sendError(new TextComponentString("Failed to parse uuids"));
+                    return;
+                }
 
-            UUID sourceUUID, targetUUID;
-            try {
-                sourceUUID = UUID.fromString(s);
-                targetUUID = UUID.fromString(t);
-            } catch (Exception e) {
-                context.getSource().figura$sendError(new TextComponent("Failed to parse uuids"));
-                return 0;
+                UserData user = LOADED_USERS.get(sourceUUID);
+                Avatar avatar = user == null ? null : user.getMainAvatar();
+                if (avatar == null || avatar.nbt == null) {
+                    ((FiguraClientCommandSource) iCommandSender).figura$sendError(new TextComponentString("No source Avatar found"));
+                    return;
+                }
+
+                if (LOADED_USERS.get(targetUUID) != null) {
+                    setAvatar(targetUUID, avatar.nbt);
+                    ((FiguraClientCommandSource) iCommandSender).figura$sendError(new TextComponentString("Set avatar for " + t));
+                    return;
+                }
+
+                Entity targetEntity = EntityUtils.getEntityByUUID(targetUUID);
+                if (targetEntity == null) {
+                    ((FiguraClientCommandSource) iCommandSender).figura$sendError(new TextComponentString("Target entity not found"));
+                    return;
+                }
+
+                loadEntityAvatar(targetEntity, avatar.nbt);
             }
-
-            UserData user = LOADED_USERS.get(sourceUUID);
-            Avatar avatar = user == null ? null : user.getMainAvatar();
-            if (avatar == null || avatar.nbt == null) {
-                context.getSource().figura$sendError(new TextComponent("No source Avatar found"));
-                return 0;
-            }
-
-            if (LOADED_USERS.get(targetUUID) != null) {
-                setAvatar(targetUUID, avatar.nbt);
-                context.getSource().figura$sendError(new TextComponent("Set avatar for " + t));
-                return 1;
-            }
-
-            Entity targetEntity = EntityUtils.getEntityByUUID(targetUUID);
-            if (targetEntity == null) {
-                context.getSource().figura$sendError(new TextComponent("Target entity not found"));
-                return 0;
-            }
-
-            loadEntityAvatar(targetEntity, avatar.nbt);
-            return 1;
-        });
-        target.then(source);
-
-        // build root
-        root.then(target);
-        return root;
+        }
     }
 }

@@ -1,22 +1,14 @@
 package org.figuramc.figura.model.rendertasks;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.math.Matrix4f;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.font.FontSet;
-import net.minecraft.client.gui.font.glyphs.BakedGlyph;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.Style;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.FastColor;
+import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.client.renderer.BufferBuilder;
+import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.text.ITextComponent;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.avatar.Badges;
-import org.figuramc.figura.ducks.BakedGlyphAccessor;
 import org.figuramc.figura.ducks.extensions.FontExtension;
 import org.figuramc.figura.font.Emojis;
 import org.figuramc.figura.lua.LuaNotNil;
@@ -26,8 +18,8 @@ import org.figuramc.figura.lua.docs.LuaMethodOverload;
 import org.figuramc.figura.lua.docs.LuaTypeDoc;
 import org.figuramc.figura.math.vector.FiguraVec3;
 import org.figuramc.figura.math.vector.FiguraVec4;
-import org.figuramc.figura.mixin.font.FontAccessor;
 import org.figuramc.figura.model.FiguraModelPart;
+import org.figuramc.figura.model.rendering.texture.RenderTypes;
 import org.figuramc.figura.utils.ColorUtils;
 import org.figuramc.figura.utils.LuaUtils;
 import org.figuramc.figura.utils.RenderUtils;
@@ -44,7 +36,7 @@ import java.util.List;
 public class TextTask extends RenderTask {
 
     private String textCached;
-    private List<Component> text;
+    private List<ITextComponent> text;
     private TextUtils.Alignment alignment = TextUtils.Alignment.LEFT;
     private boolean shadow = false, outline = false;
     private boolean background = false, seeThrough = false;
@@ -60,17 +52,17 @@ public class TextTask extends RenderTask {
     }
 
     @Override
-    public void renderTask(PoseStack poseStack, MultiBufferSource buffer, int light, int overlay) {
+    public void renderTask(RenderTypes.FiguraBufferSource buffer, int light, int overlay) {
         if (opacity == 0) return; // lol
 
         // prepare matrices
-        Matrix4f matrix = poseStack.last().pose();
-        matrix.multiply(Matrix4f.createScaleMatrix(-1, -1, -1));
+        GlStateManager.scale(-1, -1, -1);
 
         // prepare variables
-        Font font = Minecraft.getInstance().font;
+        FontRenderer font = Minecraft.getMinecraft().fontRenderer;
         int l = this.customization.light != null ? this.customization.light : light;
-        int bg = backgroundColor != null ? ColorUtils.intRGBAToIntARGB(backgroundColor) : background ? (int) (Minecraft.getInstance().options.getBackgroundOpacity(0.25f) * 0xFF) << 24 : 0;
+        // TODO make this 0.25 an opacity option again
+        int bg = backgroundColor != null ? ColorUtils.intRGBAToIntARGB(backgroundColor) : background ? (int) (0.25f * 0xFF) << 24 : 0;
         int out = outlineColor != null ? outlineColor : 0x202020;
         int op = opacity << 24 | 0xFFFFFF;
         float vertexOffset = outline ? FiguraMod.VERTEX_OFFSET : 0f;
@@ -80,32 +72,37 @@ public class TextTask extends RenderTask {
             int offset = alignment.apply(cacheWidth);
             float x1 = -1 - offset;
             float x2 = cacheWidth - offset;
-            BakedGlyph glyph = ((FontAccessor)font).invokeGetFontSet(Style.DEFAULT_FONT).whiteGlyph();
-            ResourceLocation fontLoc = new ResourceLocation("minecraft:default/0");
-            RenderType renderType = seeThrough ? RenderUtils.TextRenderType.TEXT_BACKGROUND_SEE_THROUGH.apply(fontLoc) : RenderUtils.TextRenderType.TEXT_BACKGROUND.apply(fontLoc);
-            VertexConsumer vertexConsumer = buffer.getBuffer(renderType);
-            int r = FastColor.ARGB32.red(bg);
-            int g = FastColor.ARGB32.green(bg);
-            int b = FastColor.ARGB32.blue(bg);
-            int a = FastColor.ARGB32.alpha(bg);
-            vertexConsumer.vertex(matrix, x1, -1f, vertexOffset).color(r, g, b, a).uv(((BakedGlyphAccessor)glyph).figura$getU0(),((BakedGlyphAccessor)glyph).figura$getV0()).uv2(l).endVertex();
-            vertexConsumer.vertex(matrix, x1, cacheHeight, vertexOffset).color(r, g, b, a).uv(((BakedGlyphAccessor)glyph).figura$getU0(),((BakedGlyphAccessor)glyph).figura$getV1()).uv2(l).endVertex();
-            vertexConsumer.vertex(matrix, x2, cacheHeight, vertexOffset).color(r, g, b, a).uv(((BakedGlyphAccessor)glyph).figura$getU1(),((BakedGlyphAccessor)glyph).figura$getV1()).uv2(l).endVertex();
-            vertexConsumer.vertex(matrix, x2, -1f, vertexOffset).color(r, g, b, a).uv(((BakedGlyphAccessor)glyph).figura$getU1(),((BakedGlyphAccessor)glyph).figura$getV0()).uv2(l).endVertex();
+            float h;
+            ResourceLocation fontLoc = new ResourceLocation("textures/font/ascii.png");
+            RenderTypes.FiguraRenderType renderType = seeThrough ? RenderUtils.TextRenderType.TEXT_BACKGROUND_SEE_THROUGH.apply(fontLoc) : RenderUtils.TextRenderType.TEXT_BACKGROUND.apply(fontLoc);
+            BufferBuilder vertexConsumer = buffer.getBuffer(renderType);
+            int r = bg >> 16 & 0xFF;
+            int g = bg >> 8 & 0xFF;
+            int b = bg & 0xFF;
+            int a = bg >>> 24;
+            GlStateManager.disableTexture2D();
+            vertexConsumer.pos(x1, -1f, vertexOffset).color(r, g, b, a).lightmap(l & 0xFFFF, l >> 16 & 0xFFFF).endVertex();
+            vertexConsumer.pos(x1, cacheHeight, vertexOffset).color(r, g, b, a).lightmap(l & 0xFFFF, l >> 16 & 0xFFFF).endVertex();
+            vertexConsumer.pos(x2, cacheHeight, vertexOffset).color(r, g, b, a).lightmap(l & 0xFFFF, l >> 16 & 0xFFFF).endVertex();
+            vertexConsumer.pos(x2, -1f, vertexOffset).color(r, g, b, a).lightmap(l & 0xFFFF, l >> 16 & 0xFFFF).endVertex();
+            renderType.clearState.run();
+            GlStateManager.enableTexture2D();
         }
 
         // text
-        for (int i = 0, j = 0; i < text.size(); i++, j += (font.lineHeight + 1)) {
-            Component text = this.text.get(i);
+        for (int i = 0, j = 0; i < text.size(); i++, j += (font.FONT_HEIGHT + 1)) {
+            ITextComponent text = this.text.get(i);
             int x = -alignment.apply(font, text);
 
             if (outline) {
-                ((FontExtension)font).figura$drawInBatch8xOutline(text.getVisualOrderText(), x, j, -1, out, matrix, buffer, l);
+                ((FontExtension)font).figura$drawInBatch8xOutline(text, x, j, -1, out);
                 if (seeThrough)
-                    font.drawInBatch(text, x, j, op, shadow, matrix, buffer, true, 0, l);
+                    font.drawString(text.getFormattedText(), x, j, 0, shadow);
             } else {
-                font.drawInBatch(text, x, j, op, shadow, matrix, buffer, seeThrough, 0, l);
+                font.drawString(text.getFormattedText(), x, j, 0, shadow);
+               // font.drawInBatch(text, x, j, op, shadow, matrix, buffer, seeThrough, 0, l);
             }
+            // TODO: Figure out how to bring back text opacity, i think i need to include it in the alpha
         }
     }
 
@@ -125,13 +122,13 @@ public class TextTask extends RenderTask {
             return;
         }
 
-        Component component = TextUtils.tryParseJson(this.textCached);
+        ITextComponent component = TextUtils.tryParseJson(this.textCached);
         component = Badges.noBadges4U(component);
         component = Emojis.applyEmojis(component);
         component = Emojis.removeBlacklistedEmojis(component);
-        this.text = TextUtils.formatInBounds(component, Minecraft.getInstance().font, width, wrap);
+        this.text = TextUtils.formatInBounds(component, Minecraft.getMinecraft().fontRenderer, width, wrap);
 
-        Font font = Minecraft.getInstance().font;
+        FontRenderer font = Minecraft.getMinecraft().fontRenderer;
         cacheWidth = TextUtils.getWidth(this.text, font);
         cacheHeight = TextUtils.getHeight(this.text, font);
     }
@@ -402,7 +399,8 @@ public class TextTask extends RenderTask {
             value = "text_task.set_background_color"
     )
     public TextTask setBackgroundColor(Object r, Double g, Double b, Double a) {
-        FiguraVec4 vec = LuaUtils.parseVec4("setBackgroundColor", r, g, b, a, 0, 0, 0,  Minecraft.getInstance().options.getBackgroundOpacity(0.25f));
+        // TODO: same here, opacity as an option
+        FiguraVec4 vec = LuaUtils.parseVec4("setBackgroundColor", r, g, b, a, 0, 0, 0,  0.25f);
         this.backgroundColor = ColorUtils.rgbaToInt(vec);
         return this;
     }

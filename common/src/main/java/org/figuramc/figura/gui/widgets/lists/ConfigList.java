@@ -1,18 +1,17 @@
 package org.figuramc.figura.gui.widgets.lists;
 
-import com.mojang.blaze3d.platform.InputConstants;
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.client.KeyMapping;
-import net.minecraft.client.gui.components.events.GuiEventListener;
-import net.minecraft.util.Mth;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.settings.KeyBinding;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.config.ConfigKeyBinding;
 import org.figuramc.figura.config.ConfigManager;
 import org.figuramc.figura.config.ConfigType;
 import org.figuramc.figura.gui.screens.ConfigScreen;
+import org.figuramc.figura.gui.widgets.FiguraGuiEventListener;
 import org.figuramc.figura.gui.widgets.TextField;
 import org.figuramc.figura.gui.widgets.config.CategoryWidget;
 import org.figuramc.figura.gui.widgets.config.InputElement;
+import org.figuramc.figura.utils.MathUtils;
 import org.figuramc.figura.utils.ui.UIHelper;
 
 import java.util.ArrayList;
@@ -22,7 +21,7 @@ public class ConfigList extends AbstractList {
 
     private final List<CategoryWidget> configs = new ArrayList<>();
     public final ConfigScreen parentScreen;
-    public KeyMapping focusedBinding;
+    public KeyBinding focusedBinding;
 
     private int totalHeight = 0;
 
@@ -33,14 +32,14 @@ public class ConfigList extends AbstractList {
     }
 
     @Override
-    public void render(PoseStack stack, int mouseX, int mouseY, float delta) {
+    public void draw(Minecraft mc, int mouseX, int mouseY, float delta) {
         int x = getX();
         int y = getY();
         int width = getWidth();
         int height = getHeight();
 
         // background and scissors
-        UIHelper.renderSliced(stack, x, y, width, height, UIHelper.OUTLINE_FILL);
+        UIHelper.renderSliced(x, y, width, height, UIHelper.OUTLINE_FILL);
         UIHelper.setupScissor(x + scissorsX, y + scissorsY, width + scissorsWidth, height + scissorsHeight);
 
         // scrollbar
@@ -59,7 +58,7 @@ public class ConfigList extends AbstractList {
 
         // render list
         int xOffset = scrollBar.isVisible() ? 4 : 11;
-        int yOffset = scrollBar.isVisible() ? (int) -(Mth.lerp(scrollBar.getScrollProgress(), -4, totalHeight - height)) : 4;
+        int yOffset = scrollBar.isVisible() ? (int) -(MathUtils.lerp(scrollBar.getScrollProgress(), -4, totalHeight - height)) : 4;
         for (CategoryWidget config : configs) {
             if (!config.isVisible())
                 continue;
@@ -70,26 +69,26 @@ public class ConfigList extends AbstractList {
         }
 
         // children
-        super.render(stack, mouseX, mouseY, delta);
+        super.draw(mc, mouseX, mouseY, delta);
 
         // reset scissor
         UIHelper.disableScissor();
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseButtonClicked(int mouseX, int mouseY, int button) {
         // fix mojang focusing for text fields
         for (CategoryWidget categoryWidget : configs) {
-            for (GuiEventListener children : categoryWidget.children()) {
+            for (FiguraGuiEventListener children : categoryWidget.children()) {
                 if (children instanceof InputElement) {
                     InputElement inputElement = (InputElement) children;
                     TextField field = inputElement.getTextField();
-                    field.getField().setFocus(field.isEnabled() && field.isMouseOver(mouseX, mouseY));
+                    field.getField().setFocused(field.isEnabled() && field.mouseOver(mouseX, mouseY));
                 }
             }
         }
 
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseButtonClicked(mouseX, mouseY, button);
     }
 
     public void updateList() {
@@ -135,11 +134,11 @@ public class ConfigList extends AbstractList {
         return false;
     }
 
-    public boolean updateKey(InputConstants.Key key) {
+    public boolean updateKey(int keyCode) {
         if (focusedBinding == null)
             return false;
 
-        focusedBinding.setKey(key);
+        focusedBinding.setKeyCode(keyCode);
         if (focusedBinding instanceof ConfigKeyBinding)
             ((ConfigKeyBinding)focusedBinding).saveConfigChanges();
 

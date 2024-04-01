@@ -1,25 +1,26 @@
 package org.figuramc.figura.commands;
 
-import com.mojang.brigadier.arguments.StringArgumentType;
-import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import com.mojang.brigadier.builder.RequiredArgumentBuilder;
-import com.mojang.brigadier.context.CommandContext;
+import net.minecraft.command.CommandBase;
+import net.minecraft.command.CommandException;
+import net.minecraft.command.ICommandSender;
+import net.minecraft.server.MinecraftServer;
 import org.figuramc.figura.lua.FiguraLuaPrinter;
 import org.figuramc.figura.lua.FiguraLuaRuntime;
-import org.figuramc.figura.utils.FiguraClientCommandSource;
 
 class RunCommand {
+    public static class RunSubCommand extends FiguraCommands.FiguraSubCommand {
 
-    public static LiteralArgumentBuilder<FiguraClientCommandSource> getCommand() {
-        LiteralArgumentBuilder<FiguraClientCommandSource> run = LiteralArgumentBuilder.literal("run");
-        RequiredArgumentBuilder<FiguraClientCommandSource, String> arg = RequiredArgumentBuilder.argument("code", StringArgumentType.greedyString());
-        arg.executes(RunCommand::executeCode);
-        run.then(arg);
-        return run;
+        public RunSubCommand() {
+            super("run");
+        }
+
+        @Override
+        public void execute(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] args) throws CommandException {
+            executeCode(iCommandSender, CommandBase.buildString(args, 0));
+        }
     }
 
-    private static int executeCode(CommandContext<FiguraClientCommandSource> context) {
-        String lua = StringArgumentType.getString(context, "code");
+    private static int executeCode(ICommandSender context, String lua) {
         FiguraLuaRuntime luaRuntime = FiguraCommands.getRuntime(context);
         if (luaRuntime == null)
             return 0;

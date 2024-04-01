@@ -1,6 +1,6 @@
 package org.figuramc.figura.compat;
 
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.item.ItemStack;
 import org.figuramc.figura.compat.wrappers.ClassWrapper;
 import org.figuramc.figura.compat.wrappers.FieldWrapper;
 import org.figuramc.figura.compat.wrappers.MethodWrapper;

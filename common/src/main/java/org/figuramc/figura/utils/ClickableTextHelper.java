@@ -1,24 +1,27 @@
 package org.figuramc.figura.utils;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.math.Vector4f;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
-import net.minecraft.network.chat.*;
+import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.Style;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.event.ClickEvent;
+import net.minecraft.util.text.event.HoverEvent;
 import org.figuramc.figura.utils.ui.UIHelper;
 import org.jetbrains.annotations.Nullable;
+import org.lwjgl.util.vector.Vector4f;
 
 import java.util.*;
 
 public class ClickableTextHelper {
     protected TextLine[] lines;
     protected HashMap<Vector4f, String> clickUrls = new HashMap<>();
-    protected HashMap<Vector4f, Component> hoverText = new HashMap<>();
+    protected HashMap<Vector4f, ITextComponent> hoverText = new HashMap<>();
 
     protected boolean dirty = true;
-    protected Component message;
+    protected ITextComponent message;
 
-    public void setMessage(@Nullable Component message) {
+    public void setMessage(@Nullable ITextComponent message) {
         if (this.message == message) return;
         this.message = message;
         if (message == null) {
@@ -28,32 +31,31 @@ public class ClickableTextHelper {
         dirty = true;
     }
 
-    public void renderDebug(PoseStack poseStack, int x, int y, int mouseX, int mouseY) {
+    public void renderDebug(Minecraft mc, int x, int y, int mouseX, int mouseY) {
         for (Vector4f area : hoverText.keySet()) {
-            UIHelper.renderOutline(poseStack, (int) (x + area.x()), (int) (y + area.y()), (int) (area.z() - area.x()), (int) (area.w() - area.y()), isPointWithinBounds(area, x, y, mouseX, mouseY) ? 0xFF00FF00 : 0xFFFF00FF);
+            UIHelper.renderOutline((int) (x + area.x), (int) (y + area.y), (int) (area.z - area.x), (int) (area.w - area.y), isPointWithinBounds(area, x, y, mouseX, mouseY) ? 0xFF00FF00 : 0xFFFF00FF);
         }
         for (Vector4f area : clickUrls.keySet()) {
-            UIHelper.renderOutline(poseStack, (int) (x + area.x()), (int) (y + area.y()), (int) (area.z() - area.x()), (int) (area.w() - area.y()), isPointWithinBounds(area, x, y, mouseX, mouseY) ? 0xFF00FF00 : 0xFFFF00FF);
+            UIHelper.renderOutline((int) (x + area.x), (int) (y + area.y), (int) (area.z - area.x), (int) (area.w - area.y), isPointWithinBounds(area, x, y, mouseX, mouseY) ? 0xFF00FF00 : 0xFFFF00FF);
         }
-        UIHelper.renderOutline(poseStack, mouseX-1, mouseY-1, 3, 3, 0xFF00FFFF);
+        UIHelper.renderOutline( mouseX-1, mouseY-1, 3, 3, 0xFF00FFFF);
     }
 
-    public void update(Font font, int lineWidth) {
+    public void update(FontRenderer font, int lineWidth) {
         if (!dirty || message == null) return;
         dirty = false;
 
         clear();
 
         List<TextLine> lines = new ArrayList<>();
-        List<FormattedText> split = font.getSplitter().splitLines(message, lineWidth, Style.EMPTY);
-        for (FormattedText curLine : split) {
+        List<String> split = font.listFormattedStringToWidth(message.getFormattedText(), lineWidth);
+        for (String curLine : split) {
             List<TextNode> nodes = new ArrayList<>();
 
             // Convert the Text into a list
-            TextUtils.formattedTextToText(curLine).visit((style, string) -> {
-                nodes.add(new TextNode(string, style));
-                return Optional.empty();
-            }, Style.EMPTY);
+            for (ITextComponent component : TextUtils.formattedTextToText(curLine)) {
+                nodes.add(new TextNode(component.getUnformattedComponentText(), component.getStyle()));
+            }
 
             lines.add(new TextLine(nodes.toArray(new TextNode[0])));
         }
@@ -76,16 +78,16 @@ public class ClickableTextHelper {
             }
 
             if (hoverEvent != null) {
-                Object value = hoverEvent.getValue(hoverEvent.getAction());
-                if (value instanceof Component) {
-                    Component component = (Component) value;
+                Object value = hoverEvent.getValue();
+                if (value instanceof ITextComponent) {
+                    ITextComponent component = (ITextComponent) value;
                     hoverText.put(rect, component);
                 }
             }
         });
     }
 
-    public @Nullable Component getHoverTooltip(int cx, int cy, int mouseX, int mouseY) {
+    public @Nullable ITextComponent getHoverTooltip(int cx, int cy, int mouseX, int mouseY) {
         for (Vector4f area : hoverText.keySet()) {
             if (isPointWithinBounds(area, cx, cy, mouseX, mouseY)) {
                 return hoverText.get(area);
@@ -108,26 +110,26 @@ public class ClickableTextHelper {
     }
 
     private static boolean isPointWithinBounds(Vector4f area, int xOffset, int yOffset, int x, int y) {
-        final int x1 = (int) (area.x() + xOffset);
-        final int y1 = (int) (area.y() + yOffset);
-        final int x2 = (int) (area.z() + xOffset);
-        final int y2 = (int) (area.w() + yOffset);
+        final int x1 = (int) (area.x + xOffset);
+        final int y1 = (int) (area.y + yOffset);
+        final int x2 = (int) (area.z + xOffset);
+        final int y2 = (int) (area.w + yOffset);
 
         return x > x1 && x < x2 && y > y1 && y < y2;
     }
 
     public void visit(MultilineTextVisitor visitor) {
         if (lines == null) return;
-        Font font = Minecraft.getInstance().font;
+        FontRenderer font = Minecraft.getMinecraft().fontRenderer;
         int y = 0;
         for (TextLine line : lines) {
             int x = 0;
             for (TextNode node : line.nodes) {
                 int width = node.getWidth(font);
-                visitor.visit(node.text, node.style, x, y, width, font.lineHeight);
+                visitor.visit(node.text, node.style, x, y, width, font.FONT_HEIGHT);
                 x += width;
             }
-            y += font.lineHeight;
+            y += font.FONT_HEIGHT;
         }
     }
 
@@ -186,12 +188,12 @@ public class ClickableTextHelper {
             this.style = style;
         }
 
-        public int getWidth(Font font) {
-            return font.width(asText());
+        public int getWidth(FontRenderer font) {
+            return font.getStringWidth(asText().getFormattedText());
         }
 
-        public Component asText() {
-            return new TextComponent(text).withStyle(style);
+        public ITextComponent asText() {
+            return new TextComponentString(text).setStyle(style);
         }
 
         public String text() {

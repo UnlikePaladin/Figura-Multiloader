@@ -1,7 +1,7 @@
 package org.figuramc.figura.permissions;
 
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.util.text.ITextComponent;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -25,31 +25,31 @@ public abstract class PermissionPack {
 
     // functions // 
 
-    public abstract MutableComponent getCategoryName();
+    public abstract ITextComponent getCategoryName();
     public abstract int getColor();
     public abstract Permissions.Category getCategory();
     public abstract void setCategory(CategoryPermissionPack newParent);
 
     // read nbt
-    public void loadNbt(CompoundTag nbt) {
+    public void loadNbt(NBTTagCompound nbt) {
         // default permissions
-        CompoundTag perms = nbt.getCompound("permissions");
+        NBTTagCompound perms = nbt.getCompoundTag("permissions");
         for (Permissions setting : Permissions.DEFAULT) {
-            if (perms.contains(setting.name))
-                permissions.put(setting, perms.getInt(setting.name));
+            if (perms.hasKey(setting.name))
+                permissions.put(setting, perms.getInteger(setting.name));
         }
 
         // custom permissions
-        CompoundTag custom = nbt.getCompound("custom");
+        NBTTagCompound custom = nbt.getCompoundTag("custom");
         for (Map.Entry<String, Collection<Permissions>> entry : PermissionManager.CUSTOM_PERMISSIONS.entrySet()) {
             String key = entry.getKey();
 
             Map<Permissions, Integer> map = new HashMap<>();
-            CompoundTag customNbt = custom.getCompound(key);
+            NBTTagCompound customNbt = custom.getCompoundTag(key);
 
             for (Permissions setting : entry.getValue()) {
-                if (customNbt.contains(setting.name))
-                    map.put(setting, customNbt.getInt(setting.name));
+                if (customNbt.hasKey(setting.name))
+                    map.put(setting, customNbt.getInteger(setting.name));
             }
 
             customPermissions.put(key, map);
@@ -57,29 +57,29 @@ public abstract class PermissionPack {
     }
 
     // write nbt
-    public void writeNbt(CompoundTag nbt) {
+    public void writeNbt(NBTTagCompound nbt) {
         // name
-        nbt.putString("name", this.name);
+        nbt.setString("name", this.name);
 
         // default permissions
-        CompoundTag perms = new CompoundTag();
+        NBTTagCompound perms = new NBTTagCompound();
         for (Map.Entry<Permissions, Integer> entry : this.permissions.entrySet())
-            perms.putInt(entry.getKey().name, entry.getValue());
+            perms.setInteger(entry.getKey().name, entry.getValue());
 
-        nbt.put("permissions", perms);
+        nbt.setTag("permissions", perms);
 
         // custom permissions
-        CompoundTag custom = new CompoundTag();
+        NBTTagCompound custom = new NBTTagCompound();
         for (Map.Entry<String, Map<Permissions, Integer>> entry : this.customPermissions.entrySet()) {
-            CompoundTag customNbt = new CompoundTag();
+            NBTTagCompound customNbt = new NBTTagCompound();
 
             for (Map.Entry<Permissions, Integer> entry2 : entry.getValue().entrySet())
-                customNbt.putInt(entry2.getKey().name, entry2.getValue());
+                customNbt.setInteger(entry2.getKey().name, entry2.getValue());
 
-            custom.put(entry.getKey(), customNbt);
+            custom.setTag(entry.getKey(), customNbt);
         }
 
-        nbt.put("custom", custom);
+        nbt.setTag("custom", custom);
     }
 
     // get value from permission
@@ -175,8 +175,8 @@ public abstract class PermissionPack {
         }
 
         @Override
-        public MutableComponent getCategoryName() {
-            return category.text.copy();
+        public ITextComponent getCategoryName() {
+            return category.text.createCopy();
         }
 
         @Override
@@ -211,7 +211,7 @@ public abstract class PermissionPack {
         }
 
         @Override
-        public MutableComponent getCategoryName() {
+        public ITextComponent getCategoryName() {
             return category.getCategoryName();
         }
 
@@ -231,15 +231,15 @@ public abstract class PermissionPack {
         }
 
         @Override
-        public void writeNbt(CompoundTag nbt) {
+        public void writeNbt(NBTTagCompound nbt) {
             if (this.getCategory() != Permissions.Category.BLOCKED) {
                 super.writeNbt(nbt);
             } else {
-                nbt.putString("name", this.name);
+                nbt.setString("name", this.name);
             }
 
             // category
-            nbt.putString("category", category.name);
+            nbt.setString("category", category.name);
         }
 
         @Override

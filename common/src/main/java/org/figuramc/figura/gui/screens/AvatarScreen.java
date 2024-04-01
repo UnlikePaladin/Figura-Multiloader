@@ -1,9 +1,8 @@
 package org.figuramc.figura.gui.screens;
 
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.entity.EntityLivingBase;
 import org.figuramc.figura.gui.widgets.EntityPreview;
-import org.figuramc.figura.gui.widgets.PanelSelectorWidget;
 import org.figuramc.figura.utils.FiguraText;
 
 public class AvatarScreen extends AbstractPanelScreen {
@@ -11,9 +10,9 @@ public class AvatarScreen extends AbstractPanelScreen {
     private final float scale;
     private final float pitch;
     private final float yaw;
-    private final LivingEntity entity;
+    private final EntityLivingBase entity;
 
-    public AvatarScreen(float scale, float pitch, float yaw, LivingEntity entity, Screen parentScreen) {
+    public AvatarScreen(float scale, float pitch, float yaw, EntityLivingBase entity, GuiScreen parentScreen) {
         super(parentScreen, new FiguraText("gui.panels.title.avatar"));
         this.scale = scale;
         this.pitch = pitch;
@@ -22,13 +21,13 @@ public class AvatarScreen extends AbstractPanelScreen {
     }
 
     @Override
-    public Class<? extends Screen> getSelectedPanel() {
+    public Class<? extends GuiScreen> getSelectedPanel() {
         return parentScreen.getClass();
     }
 
     @Override
-    protected void init() {
-        super.init();
+    public void initGui() {
+        super.initGui();
         removeWidget(panels); // no panels :p
 
         // entity

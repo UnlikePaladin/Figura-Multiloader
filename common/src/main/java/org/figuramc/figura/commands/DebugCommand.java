@@ -1,19 +1,14 @@
 package org.figuramc.figura.commands;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonPrimitive;
-import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import com.mojang.brigadier.context.CommandContext;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtIo;
-import net.minecraft.nbt.Tag;
-import net.minecraft.network.chat.ClickEvent;
-import net.minecraft.network.chat.Style;
+import com.google.gson.*;
+import net.minecraft.command.CommandException;
+import net.minecraft.command.ICommandSender;
+import net.minecraft.nbt.NBTBase;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.util.text.Style;
+import net.minecraft.util.text.event.ClickEvent;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.animation.Animation;
 import org.figuramc.figura.avatar.Avatar;
@@ -25,7 +20,7 @@ import org.figuramc.figura.backend2.NetworkStuff;
 import org.figuramc.figura.config.ConfigManager;
 import org.figuramc.figura.config.ConfigType;
 import org.figuramc.figura.lua.api.ConfigAPI;
-import org.figuramc.figura.mixin.NbtIoAccessor;
+import org.figuramc.figura.mixin.CompressedStreamToolsAccessor;
 import org.figuramc.figura.permissions.PermissionManager;
 import org.figuramc.figura.permissions.PermissionPack;
 import org.figuramc.figura.permissions.Permissions;
@@ -49,13 +44,19 @@ class DebugCommand {
 
     private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().serializeNulls().setPrettyPrinting().create();
 
-    public static LiteralArgumentBuilder<FiguraClientCommandSource> getCommand() {
-        LiteralArgumentBuilder<FiguraClientCommandSource> debug = LiteralArgumentBuilder.literal("debug");
-        debug.executes(DebugCommand::commandAction);
-        return debug;
+    public static class DebugSubCommand extends FiguraCommands.FiguraSubCommand {
+
+        public DebugSubCommand() {
+            super("debug");
+        }
+
+        @Override
+        public void execute(MinecraftServer minecraftServer, ICommandSender iCommandSender, String[] args) throws CommandException {
+            commandAction(iCommandSender);
+        }
     }
 
-    private static int commandAction(CommandContext<FiguraClientCommandSource> context) {
+    private static int commandAction(ICommandSender context) {
         try {
             // get path
             Path targetPath = FiguraMod.getFiguraDirectory().resolve("debug_data.json");
@@ -70,16 +71,16 @@ class DebugCommand {
             fs.close();
 
             // feedback
-            context.getSource().figura$sendFeedback(
+            ((FiguraClientCommandSource)context).figura$sendFeedback(
                     new FiguraText("command.debug.success")
-                            .append(" ")
-                            .append(new FiguraText("command.click_to_open")
-                                    .setStyle(Style.EMPTY.withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_FILE, targetPath.toString())).withUnderlined(true))
+                            .appendText(" ")
+                            .appendSibling(new FiguraText("command.click_to_open")
+                                    .setStyle(new Style().setClickEvent(new ClickEvent(ClickEvent.Action.OPEN_FILE, targetPath.toString())).setUnderlined(true))
                             )
             );
             return 1;
         } catch (Exception e) {
-            context.getSource().figura$sendError(new FiguraText("command.debug.error"));
+            ((FiguraClientCommandSource)context).figura$sendError(new FiguraText("command.debug.error"));
             FiguraMod.LOGGER.error("Failed to save " + FiguraMod.MOD_NAME + " debug data!", e);
             return 0;
         }
@@ -269,40 +270,40 @@ class DebugCommand {
         return avatar;
     }
 
-    private static JsonObject parseNbtSizes(CompoundTag nbt) {
+    private static JsonObject parseNbtSizes(NBTTagCompound nbt) {
         JsonObject sizes = new JsonObject();
 
         // metadata
-        sizes.addProperty("metadata", parseSize(getBytesFromNbt(nbt.getCompound("metadata"))));
+        sizes.addProperty("metadata", parseSize(getBytesFromNbt(nbt.getCompoundTag("metadata"))));
 
         // models
-        CompoundTag modelsNbt = nbt.getCompound("models");
-        ListTag childrenNbt = modelsNbt.getList("chld", NbtType.COMPOUND.getValue());
+        NBTTagCompound modelsNbt = nbt.getCompoundTag("models");
+        NBTTagList childrenNbt = modelsNbt.getTagList("chld", NbtType.COMPOUND.getValue());
         JsonObject models = parseListSize(childrenNbt, tag -> tag.getString("name"));
         sizes.add("models", models);
         sizes.addProperty("models_total", parseSize(getBytesFromNbt(modelsNbt)));
 
         // animations
-        ListTag animationsNbt = nbt.getList("animations", NbtType.COMPOUND.getValue());
+        NBTTagList animationsNbt = nbt.getTagList("animations", NbtType.COMPOUND.getValue());
         JsonObject animations = parseListSize(animationsNbt, tag -> tag.getString("mdl") + "." + tag.getString("name"));
         sizes.add("animations", animations);
         sizes.addProperty("animations_total", parseSize(getBytesFromNbt(animationsNbt)));
 
         // textures
-        CompoundTag texturesNbt = nbt.getCompound("textures");
-        CompoundTag textureSrc = texturesNbt.getCompound("src");
+        NBTTagCompound texturesNbt = nbt.getCompoundTag("textures");
+        NBTTagCompound textureSrc = texturesNbt.getCompoundTag("src");
         JsonObject textures = parseCompoundSize(textureSrc);
         sizes.add("textures", textures);
         sizes.addProperty("textures_total", parseSize(getBytesFromNbt(texturesNbt)));
 
         // scripts
-        CompoundTag scriptsNbt = nbt.getCompound("scripts");
+        NBTTagCompound scriptsNbt = nbt.getCompoundTag("scripts");
         JsonElement scripts = parseCompoundSize(scriptsNbt);
         sizes.add("scripts", scripts);
         sizes.addProperty("scripts_total", parseSize(getBytesFromNbt(scriptsNbt)));
 
         // sounds
-        CompoundTag soundsNbt = nbt.getCompound("sounds");
+        NBTTagCompound soundsNbt = nbt.getCompoundTag("sounds");
         JsonObject sounds = parseCompoundSize(soundsNbt);
         sizes.add("sounds", sounds);
         sizes.addProperty("sounds_total", parseSize(getBytesFromNbt(soundsNbt)));
@@ -312,11 +313,11 @@ class DebugCommand {
         return sizes;
     }
 
-    private static int getBytesFromNbt(Tag nbt) {
+    private static int getBytesFromNbt(NBTBase nbt) {
         try {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             DataOutputStream dos = new DataOutputStream(new BufferedOutputStream(new GZIPOutputStream(baos)));
-            NbtIoAccessor.figura$invokeWriteUnnamedTag(nbt, dos);
+            CompressedStreamToolsAccessor.figura$invokeWriteUnnamedTag(nbt, dos);
             dos.close();
 
             int size = baos.size();
@@ -332,12 +333,12 @@ class DebugCommand {
         return size < 1000 ? size + "b" : MathUtils.asFileSize(size) + " (" + size + "b)";
     }
 
-    private static JsonObject parseListSize(ListTag listNbt, Function<CompoundTag, String> function) {
+    private static JsonObject parseListSize(NBTTagList listNbt, Function<NBTTagCompound, String> function) {
         JsonObject target = new JsonObject();
         HashMap<String, Integer> sizesMap = new HashMap<>();
 
-        for (Tag tag : listNbt) {
-            CompoundTag compound = (CompoundTag) tag;
+        for (int i = 0; i < listNbt.tagCount(); i++) {
+            NBTTagCompound compound = listNbt.getCompoundTagAt(i);
             sizesMap.put(function.apply(compound), getBytesFromNbt(compound));
         }
         insertJsonSortedData(sizesMap, target);
@@ -345,24 +346,24 @@ class DebugCommand {
         return target;
     }
 
-    private static JsonObject parseCompoundSize(CompoundTag compoundNbt) {
+    private static JsonObject parseCompoundSize(NBTTagCompound compoundNbt) {
         JsonObject target = new JsonObject();
         HashMap<String, Integer> sizesMap = new HashMap<>();
 
-        for (String key : compoundNbt.getAllKeys())
-            sizesMap.put(key, getBytesFromNbt(compoundNbt.get(key)));
+        for (String key : compoundNbt.getKeySet())
+            sizesMap.put(key, getBytesFromNbt(compoundNbt.getTag(key)));
         insertJsonSortedData(sizesMap, target);
 
         return target;
     }
 
-    private static JsonElement parseTagRecursive(Tag tag) {
-        if (tag instanceof CompoundTag) {
-            CompoundTag compoundTag = (CompoundTag) tag;
+    private static JsonElement parseTagRecursive(NBTBase tag) {
+        if (tag instanceof NBTTagCompound) {
+            NBTTagCompound compoundTag = (NBTTagCompound) tag;
             JsonObject obj = new JsonObject();
             HashMap<String, Integer> sizesMap = new HashMap<>();
-            for (String key : compoundTag.getAllKeys()) {
-                JsonElement value = parseTagRecursive(compoundTag.get(key));
+            for (String key : compoundTag.getKeySet()) {
+                JsonElement value = parseTagRecursive(compoundTag.getTag(key));
                 if (value instanceof JsonPrimitive && ((JsonPrimitive) value).isNumber()) {
                     JsonPrimitive size = (JsonPrimitive) value;
                     sizesMap.put(key, size.getAsInt());
