@@ -1,79 +1,79 @@
 package org.figuramc.figura.mixin.render.layers;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.math.Vector3f;
-import net.minecraft.client.model.HumanoidModel;
-import net.minecraft.client.model.geom.ModelPart;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.Sheets;
-import net.minecraft.client.renderer.entity.RenderLayerParent;
-import net.minecraft.client.renderer.entity.layers.HumanoidArmorLayer;
-import net.minecraft.client.renderer.entity.layers.RenderLayer;
-import net.minecraft.client.renderer.texture.OverlayTexture;
-import net.minecraft.client.renderer.texture.TextureAtlas;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.item.ArmorItem;
-import net.minecraft.world.item.DyeableArmorItem;
-import net.minecraft.world.item.ItemStack;
-import org.figuramc.figura.FiguraMod;
+import net.minecraft.client.model.ModelBase;
+import net.minecraft.client.model.ModelBiped;
+import net.minecraft.client.model.ModelRenderer;
+import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.client.renderer.entity.RenderLivingBase;
+import net.minecraft.client.renderer.entity.layers.LayerArmorBase;
+import net.minecraft.client.renderer.entity.layers.LayerRenderer;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.item.ItemArmor;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.ResourceLocation;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.avatar.AvatarManager;
 import org.figuramc.figura.compat.GeckoLibCompat;
 import org.figuramc.figura.lua.api.vanilla_model.VanillaPart;
 import org.figuramc.figura.model.ParentType;
+import org.figuramc.figura.model.rendering.texture.RenderTypes;
 import org.figuramc.figura.permissions.Permissions;
 import org.figuramc.figura.utils.FiguraArmorPartRenderer;
 import org.figuramc.figura.utils.PlatformUtils;
 import org.figuramc.figura.utils.RenderUtils;
-import org.spongepowered.asm.mixin.*;
+import org.spongepowered.asm.mixin.Final;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import org.spongepowered.asm.mixin.injection.callback.LocalCapture;
 
-@Mixin(value = HumanoidArmorLayer.class, priority = 900)
-public abstract class HumanoidArmorLayerMixin<T extends LivingEntity, M extends HumanoidModel<T>, A extends HumanoidModel<T>> extends RenderLayer<T, M> implements HumanoidArmorLayerAccessor<T, M, A> {
-
-    @Shadow
-    protected abstract A getArmorModel(EquipmentSlot slot);
+@Mixin(value = LayerArmorBase.class, priority = 900)
+public abstract class HumanoidArmorLayerMixin<T extends ModelBase> implements LayerRenderer<EntityLivingBase>, HumanoidArmorLayerAccessor {
 
     @Shadow
-    protected abstract void renderArmorPiece(PoseStack matrices, MultiBufferSource vertexConsumers, T entity, EquipmentSlot armorSlot, int light, A model);
+    public abstract T getModelFromSlot(EntityEquipmentSlot slot);
 
-    @Shadow @Final private A innerModel;
-    @Shadow @Final private A outerModel;
+    @Shadow protected abstract void renderArmorLayer(EntityLivingBase entityLivingBase, float f, float g, float h, float i, float j, float k, float l, EntityEquipmentSlot slotIn);
+
+    @Shadow protected T modelArmor;
+
+    @Shadow protected abstract ResourceLocation getArmorResource(ItemArmor armor, boolean bl);
+
+    @Shadow private float colorR;
+    @Shadow private float colorG;
+    @Shadow private float colorB;
+    @Shadow private float alpha;
+    @Shadow @Final private RenderLivingBase<?> renderer;
+
+    @Shadow protected abstract ResourceLocation getArmorResource(ItemArmor armor, boolean bl, String string);
+    @Shadow @Final protected static ResourceLocation ENCHANTED_ITEM_GLINT_RES;
     @Unique
     private boolean figura$renderingVanillaArmor;
 
     @Unique
     private Avatar figura$avatar;
 
-    public HumanoidArmorLayerMixin(RenderLayerParent<T, M> context) {
-        super(context);
-    }
-
-    @Inject(at = @At(value = "HEAD"), method = "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;ILnet/minecraft/world/entity/LivingEntity;FFFFFF)V")
-    public void setAvatar(PoseStack poseStack, MultiBufferSource multiBufferSource, int i, T livingEntity, float f, float g, float h, float j, float k, float l, CallbackInfo ci) {
+    @Inject(at = @At(value = "HEAD"), method = "doRenderLayer") 
+    public void setAvatar(EntityLivingBase livingEntity, float limbSwing, float limbSwingAmount, float tickDelta, float ageInTicks, float netHeadYaw, float headPitch, float scale, CallbackInfo ci) {
         figura$avatar = AvatarManager.getAvatar(livingEntity);
     }
 
-    @Inject(at = @At(value = "INVOKE", shift = At.Shift.AFTER, ordinal = 3, target = "Lnet/minecraft/client/renderer/entity/layers/HumanoidArmorLayer;renderArmorPiece(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;Lnet/minecraft/world/entity/LivingEntity;Lnet/minecraft/world/entity/EquipmentSlot;ILnet/minecraft/client/model/HumanoidModel;)V"), method = "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;ILnet/minecraft/world/entity/LivingEntity;FFFFFF)V")
-    public void onRenderEnd(PoseStack poseStack, MultiBufferSource multiBufferSource, int i, T livingEntity, float f, float g, float h, float j, float k, float l, CallbackInfo ci) {
+    @Inject(at = @At(value = "INVOKE", shift = At.Shift.AFTER, ordinal = 3, target = "Lnet/minecraft/client/renderer/entity/layers/LayerArmorBase;renderArmorLayer(Lnet/minecraft/entity/EntityLivingBase;FFFFFFFLnet/minecraft/inventory/EntityEquipmentSlot;)V"), method = "doRenderLayer")
+    public void onRenderEnd(EntityLivingBase livingEntity, float limbSwing, float limbSwingAmount, float tickDelta, float ageInTicks, float netHeadYaw, float headPitch, float scale, CallbackInfo ci) {
         if (figura$avatar == null) return;
 
-        figura$tryRenderArmorPart(EquipmentSlot.HEAD,  this::figura$helmetRenderer, poseStack, livingEntity, multiBufferSource, i, ParentType.HelmetPivot);
-        figura$tryRenderArmorPart(EquipmentSlot.CHEST, this::figura$chestplateRenderer, poseStack, livingEntity, multiBufferSource, i, ParentType.LeftShoulderPivot, ParentType.ChestplatePivot, ParentType.RightShoulderPivot);
-        figura$tryRenderArmorPart(EquipmentSlot.LEGS,  this::figura$leggingsRenderer, poseStack, livingEntity, multiBufferSource, i, ParentType.LeftLeggingPivot, ParentType.RightLeggingPivot, ParentType.LeggingsPivot);
-        figura$tryRenderArmorPart(EquipmentSlot.FEET,  this::figura$bootsRenderer, poseStack, livingEntity, multiBufferSource, i, ParentType.LeftBootPivot, ParentType.RightBootPivot);
+        figura$tryRenderArmorPart(EntityEquipmentSlot.HEAD, limbSwing, limbSwingAmount, tickDelta, ageInTicks, netHeadYaw, headPitch, scale, this::figura$helmetRenderer, livingEntity, ParentType.HelmetPivot);
+        figura$tryRenderArmorPart(EntityEquipmentSlot.CHEST, limbSwing, limbSwingAmount, tickDelta, ageInTicks, netHeadYaw, headPitch, scale, this::figura$chestplateRenderer, livingEntity, ParentType.LeftShoulderPivot, ParentType.ChestplatePivot, ParentType.RightShoulderPivot);
+        figura$tryRenderArmorPart(EntityEquipmentSlot.LEGS,  limbSwing, limbSwingAmount, tickDelta, ageInTicks, netHeadYaw, headPitch, scale, this::figura$leggingsRenderer, livingEntity, ParentType.LeftLeggingPivot, ParentType.RightLeggingPivot, ParentType.LeggingsPivot);
+        figura$tryRenderArmorPart(EntityEquipmentSlot.FEET,  limbSwing, limbSwingAmount, tickDelta, ageInTicks, netHeadYaw, headPitch, scale, this::figura$bootsRenderer, livingEntity, ParentType.LeftBootPivot, ParentType.RightBootPivot);
     }
 
-    @Inject(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/entity/layers/HumanoidArmorLayer;usesInnerModel(Lnet/minecraft/world/entity/EquipmentSlot;)Z"), method = "renderArmorPiece")
-    public void onRenderArmorPiece(PoseStack poseStack, MultiBufferSource multiBufferSource, T livingEntity, EquipmentSlot equipmentSlot, int i, A humanoidModel, CallbackInfo ci) {
+    @Inject(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/entity/layers/LayerArmorBase;isLegSlot(Lnet/minecraft/inventory/EntityEquipmentSlot;)Z"), method = "renderArmorLayer", locals = LocalCapture.CAPTURE_FAILHARD)
+    public void onRenderArmorPiece(EntityLivingBase entityLivingBase, float f, float g, float h, float i, float j, float k, float l, EntityEquipmentSlot equipmentSlot, CallbackInfo ci, ItemStack b, ItemArmor a, T humanoidModel) {
         if (figura$avatar == null) return;
 
         VanillaPart part = RenderUtils.partFromSlot(figura$avatar, equipmentSlot);
@@ -85,8 +85,8 @@ public abstract class HumanoidArmorLayerMixin<T extends LivingEntity, M extends 
     }
 
 
-    @Inject(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/entity/layers/HumanoidArmorLayer;setPartVisibility(Lnet/minecraft/client/model/HumanoidModel;Lnet/minecraft/world/entity/EquipmentSlot;)V", shift = At.Shift.AFTER), method = "renderArmorPiece", cancellable = true)
-    public void renderArmorPieceHijack(PoseStack poseStack, MultiBufferSource multiBufferSource, T livingEntity, EquipmentSlot equipmentSlot, int i, A humanoidModel, CallbackInfo ci) {
+    @Inject(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/entity/layers/LayerArmorBase;setModelSlotVisible(Lnet/minecraft/client/model/ModelBase;Lnet/minecraft/inventory/EntityEquipmentSlot;)V", shift = At.Shift.AFTER), method = "renderArmorLayer", cancellable = true)
+    public void renderArmorPieceHijack(EntityLivingBase entityLivingBase, float f, float g, float h, float i, float j, float k, float l, EntityEquipmentSlot slotIn, CallbackInfo ci) {
         if (figura$avatar == null) return;
 
         if (!figura$renderingVanillaArmor) {
@@ -95,42 +95,42 @@ public abstract class HumanoidArmorLayerMixin<T extends LivingEntity, M extends 
     }
 
 
-    @Inject(at = @At("RETURN"), method = "renderArmorPiece")
-    public void postRenderArmorPiece(PoseStack poseStack, MultiBufferSource multiBufferSource, T livingEntity, EquipmentSlot equipmentSlot, int i, A humanoidModel, CallbackInfo ci) {
+    @Inject(at = @At("RETURN"), method = "renderArmorLayer")
+    public void postRenderArmorPiece(EntityLivingBase entityLivingBase, float f, float g, float h, float i, float j, float k, float l, EntityEquipmentSlot slotIn, CallbackInfo ci) {
         if (figura$avatar == null) return;
 
-        VanillaPart part = RenderUtils.partFromSlot(figura$avatar, equipmentSlot);
+        VanillaPart part = RenderUtils.partFromSlot(figura$avatar, slotIn);
         if (part != null)
-            part.restore(humanoidModel);
+            part.restore(getModelFromSlot(slotIn));
     }
 
     @Unique
-    private void figura$tryRenderArmorPart(EquipmentSlot slot, FiguraArmorPartRenderer<T, M, A> renderer, PoseStack vanillaPoseStack, T entity, MultiBufferSource vertexConsumers, int light, ParentType... parentTypes) {
+    private void figura$tryRenderArmorPart(EntityEquipmentSlot slot, float limbSwing, float limbSwingAmount, float tickDelta, float ageInTicks, float netHeadYaw, float headPitch, float scale, FiguraArmorPartRenderer<T> renderer, EntityLivingBase entity, ParentType... parentTypes) {
         if (slot == null) return; // ?
         VanillaPart part = RenderUtils.partFromSlot(figura$avatar, slot);
         if (figura$avatar.permissions.get(Permissions.VANILLA_MODEL_EDIT) == 1 && part != null && !part.checkVisible()) return;
 
-        ItemStack itemStack = entity.getItemBySlot(slot);
+        ItemStack itemStack = entity.getItemStackFromSlot(slot);
+        T model = getModelFromSlot(slot);
 
         // Make sure the item in the equipment slot is actually a piece of armor
-        if ((itemStack.getItem() instanceof ArmorItem && ((ArmorItem) itemStack.getItem()).getSlot() == slot)) {
-            ArmorItem armorItem = (ArmorItem) itemStack.getItem();
-            A armorModel = getArmorModel(slot);
-
+        if ((itemStack.getItem() instanceof ItemArmor && ((ItemArmor) itemStack.getItem()).getEquipmentSlot() == slot) && model instanceof ModelBiped) {
+            ItemArmor armorItem = (ItemArmor) itemStack.getItem();
+            ModelBiped armorModel = (ModelBiped) model;
             // Bones have to be their defaults to prevent issues with clipping
-            armorModel.body.xRot = 0.0f;
-            armorModel.rightLeg.z = 0.0f;
-            armorModel.leftLeg.z = 0.0f;
-            armorModel.rightLeg.y = 12.0f;
-            armorModel.leftLeg.y = 12.0f;
-            armorModel.head.y = 0.0f;
-            armorModel.body.y = 0.0f;
-            armorModel.leftArm.y = 2.0f;
-            armorModel.rightArm.y = 2.0f;
-            armorModel.leftArm.x = 5.0f;
-            armorModel.rightArm.x = -5.0f;
-            armorModel.leftArm.z = 0.0f;
-            armorModel.rightArm.z = 0.0f;
+            armorModel.bipedBody.rotateAngleX = 0.0f;
+            armorModel.bipedRightLeg.offsetZ = 0.0f;
+            armorModel.bipedLeftLeg.offsetZ = 0.0f;
+            armorModel.bipedRightLeg.offsetY = 12.0f;
+            armorModel.bipedLeftLeg.offsetY = 12.0f;
+            armorModel.bipedHead.offsetY = 0.0f;
+            armorModel.bipedBody.offsetY = 0.0f;
+            armorModel.bipedLeftArm.offsetY = 2.0f;
+            armorModel.bipedRightArm.offsetY = 2.0f;
+            armorModel.bipedLeftArm.offsetX = 5.0f;
+            armorModel.bipedRightArm.offsetX = -5.0f;
+            armorModel.bipedLeftArm.offsetZ = 0.0f;
+            armorModel.bipedRightArm.offsetZ = 0.0f;
 
             boolean allFailed = true;
 
@@ -139,22 +139,22 @@ public abstract class HumanoidArmorLayerMixin<T extends LivingEntity, M extends 
                 // Go through each parent type needed to render the current piece of armor
                 for (ParentType parentType : parentTypes) {
                             // Try to render the pivot part
+                        GlStateManager.pushMatrix();
                         boolean renderedPivot = figura$avatar.pivotPartRender(parentType, stack -> {
-                                stack.pushPose();
-                                figura$prepareArmorRender(stack);
-                                renderer.renderArmorPart(stack, vertexConsumers, light, armorModel, entity, itemStack, slot, armorItem, parentType);
-                                stack.popPose();
+                                figura$prepareArmorRender(); // TODO: check if needed probably no
+                                renderer.renderArmorPart(model, entity, itemStack, slot, armorItem, parentType);
                             });
 
                             if (renderedPivot) {
                                 allFailed = false;
                             }
                         }
+                        GlStateManager.popMatrix();
             }
             // As a fallback, render armor the vanilla way, but avoid rendering if it's a geckolib armor as it would render twice on fabric, funky
             if (allFailed && (!GeckoLibCompat.armorHasCustomModel(itemStack) || PlatformUtils.getModLoader().equals(PlatformUtils.ModLoader.FORGE))) {
                 figura$renderingVanillaArmor = true;
-                renderArmorPiece(vanillaPoseStack, vertexConsumers, entity, slot, light, armorModel);
+                renderArmorLayer(entity,limbSwing,limbSwingAmount, tickDelta, ageInTicks, netHeadYaw, headPitch, scale, slot);
                 figura$renderingVanillaArmor = false;
             }
         }
@@ -163,79 +163,79 @@ public abstract class HumanoidArmorLayerMixin<T extends LivingEntity, M extends 
 
     // Prepare the transformations for rendering armor on the avatar
     @Unique
-    private void figura$prepareArmorRender(PoseStack stack) {
-        stack.scale(16, 16, 16);
-        stack.mulPose(Vector3f.XP.rotationDegrees(180f));
-        stack.mulPose(Vector3f.YP.rotationDegrees(180f));
+    private void figura$prepareArmorRender() { // TODO: check if this is necessary because we use the global pose stack
+        GlStateManager.scale(16, 16, 16);
+        GlStateManager.rotate(180.0f, 1.0f, 1.0f, 0.0f);
+        //stack.mulPose(Vector3f.XP.rotationDegrees(180f)); stack.mulPose(Vector3f.YP.rotationDegrees(180f));
     }
 
     @Unique
-    private void figura$helmetRenderer(PoseStack poseStack, MultiBufferSource vertexConsumers, int light, A model, T entity, ItemStack itemStack, EquipmentSlot armorSlot, ArmorItem armorItem, ParentType parentType) {
-        if (parentType == ParentType.HelmetPivot) {
-            figura$renderArmorPart(model.head, poseStack, vertexConsumers, light, entity, itemStack, armorSlot, armorItem);
-            figura$renderArmorPart(model.hat, poseStack, vertexConsumers, light, entity, itemStack, armorSlot, armorItem);
-        }
-    }
-
-    @Unique
-    private void figura$chestplateRenderer(PoseStack poseStack, MultiBufferSource vertexConsumers, int light, A model, T entity, ItemStack itemStack, EquipmentSlot armorSlot, ArmorItem armorItem, ParentType parentType) {
-        if (parentType == ParentType.ChestplatePivot) {
-            figura$renderArmorPart(model.body, poseStack, vertexConsumers, light, entity, itemStack, armorSlot, armorItem);
-        }
-
-        if (parentType == ParentType.LeftShoulderPivot) {
-            poseStack.pushPose();
-            poseStack.translate(-6 / 16f, 0f, 0f);
-            figura$renderArmorPart(model.leftArm, poseStack, vertexConsumers, light, entity, itemStack, armorSlot, armorItem);
-            poseStack.popPose();
-        }
-
-        if (parentType == ParentType.RightShoulderPivot) {
-            poseStack.pushPose();
-            poseStack.translate(6 / 16f, 0f, 0f);
-            figura$renderArmorPart(model.rightArm, poseStack, vertexConsumers, light, entity, itemStack, armorSlot, armorItem);
-            poseStack.popPose();
+    private void figura$helmetRenderer(T model, EntityLivingBase entity, ItemStack itemStack, EntityEquipmentSlot armorSlot, ItemArmor armorItem, ParentType parentType) {
+        if (parentType == ParentType.HelmetPivot && model instanceof ModelBiped) {
+            figura$renderArmorPart(((ModelBiped)model).bipedHead, entity, itemStack, armorSlot, armorItem);
+            figura$renderArmorPart(((ModelBiped)model).bipedHeadwear, entity, itemStack, armorSlot, armorItem);
         }
     }
 
     @Unique
-    private void figura$leggingsRenderer(PoseStack poseStack, MultiBufferSource vertexConsumers, int light, A model, T entity, ItemStack itemStack, EquipmentSlot armorSlot, ArmorItem armorItem, ParentType parentType) {
-        if (parentType == ParentType.LeggingsPivot) {
-            poseStack.pushPose();
-            poseStack.translate(0, -12 / 16f, 0);
-            figura$renderArmorPart(model.body, poseStack, vertexConsumers, light, entity, itemStack, armorSlot, armorItem);
-            poseStack.popPose();
+    private void figura$chestplateRenderer(T model, EntityLivingBase entity, ItemStack itemStack, EntityEquipmentSlot armorSlot, ItemArmor armorItem, ParentType parentType) {
+        if (parentType == ParentType.ChestplatePivot && model instanceof ModelBiped) {
+            figura$renderArmorPart(((ModelBiped)model).bipedBody, entity, itemStack, armorSlot, armorItem);
         }
 
-        if (parentType == ParentType.LeftLeggingPivot) {
-            poseStack.pushPose();
-            poseStack.translate(-2 / 16f, -12 / 16f, 0);
-            figura$renderArmorPart(model.leftLeg, poseStack, vertexConsumers, light, entity, itemStack, armorSlot, armorItem);
-            poseStack.popPose();
+        if (parentType == ParentType.LeftShoulderPivot && model instanceof ModelBiped) {
+            GlStateManager.pushMatrix();
+            GlStateManager.translate(-6 / 16f, 0f, 0f);
+            figura$renderArmorPart(((ModelBiped)model).bipedLeftArm, entity, itemStack, armorSlot, armorItem);
+            GlStateManager.popMatrix();
         }
 
-        if (parentType == ParentType.RightLeggingPivot) {
-            poseStack.pushPose();
-            poseStack.translate(2 / 16f, -12 / 16f, 0);
-            figura$renderArmorPart(model.rightLeg, poseStack, vertexConsumers, light, entity, itemStack, armorSlot, armorItem);
-            poseStack.popPose();
+        if (parentType == ParentType.RightShoulderPivot && model instanceof ModelBiped) {
+            GlStateManager.pushMatrix();
+            GlStateManager.translate(6 / 16f, 0f, 0f);
+            figura$renderArmorPart(((ModelBiped)model).bipedRightArm, entity, itemStack, armorSlot, armorItem);
+            GlStateManager.popMatrix();
         }
     }
 
     @Unique
-    private void figura$bootsRenderer(PoseStack poseStack, MultiBufferSource vertexConsumers, int light, A model, T entity, ItemStack itemStack, EquipmentSlot armorSlot, ArmorItem armorItem, ParentType parentType) {
-        if (parentType == ParentType.LeftBootPivot) {
-            poseStack.pushPose();
-            poseStack.translate(-2 / 16f, -24 / 16f, 0);
-            figura$renderArmorPart(model.leftLeg, poseStack, vertexConsumers, light, entity, itemStack, armorSlot, armorItem);
-            poseStack.popPose();
+    private void figura$leggingsRenderer(T model, EntityLivingBase entity, ItemStack itemStack, EntityEquipmentSlot armorSlot, ItemArmor armorItem, ParentType parentType) {
+        if (parentType == ParentType.LeggingsPivot && model instanceof ModelBiped) {
+            GlStateManager.pushMatrix();
+            GlStateManager.translate(0, -12 / 16f, 0);
+            figura$renderArmorPart(((ModelBiped)model).bipedBody, entity, itemStack, armorSlot, armorItem);
+            GlStateManager.popMatrix();
         }
 
-        if (parentType == ParentType.RightBootPivot) {
-            poseStack.pushPose();
-            poseStack.translate(2 / 16f, -24 / 16f, 0);
-            figura$renderArmorPart(model.rightLeg, poseStack, vertexConsumers, light, entity, itemStack, armorSlot, armorItem);
-            poseStack.popPose();
+        if (parentType == ParentType.LeftLeggingPivot && model instanceof ModelBiped) {
+            GlStateManager.pushMatrix();
+            GlStateManager.translate(-2 / 16f, -12 / 16f, 0);
+            figura$renderArmorPart(((ModelBiped)model).bipedLeftArm, entity, itemStack, armorSlot, armorItem);
+            GlStateManager.popMatrix();
+        }
+
+        if (parentType == ParentType.RightLeggingPivot && model instanceof ModelBiped) {
+            GlStateManager.pushMatrix();
+            GlStateManager.translate(2 / 16f, -12 / 16f, 0);
+            figura$renderArmorPart(((ModelBiped)model).bipedRightArm, entity, itemStack, armorSlot, armorItem);
+            GlStateManager.popMatrix();
+        }
+    }
+
+    @Unique
+    private void figura$bootsRenderer(T model, EntityLivingBase entity, ItemStack itemStack, EntityEquipmentSlot armorSlot, ItemArmor armorItem, ParentType parentType) {
+        if (parentType == ParentType.LeftBootPivot && model instanceof ModelBiped) {
+            GlStateManager.pushMatrix();
+            GlStateManager.translate(-2 / 16f, -24 / 16f, 0);
+            figura$renderArmorPart(((ModelBiped)model).bipedLeftLeg, entity, itemStack, armorSlot, armorItem);
+            GlStateManager.popMatrix();
+        }
+
+        if (parentType == ParentType.RightBootPivot && model instanceof ModelBiped) {
+            GlStateManager.pushMatrix();
+            GlStateManager.translate(2 / 16f, -24 / 16f, 0);
+            figura$renderArmorPart(((ModelBiped)model).bipedRightLeg, entity, itemStack, armorSlot, armorItem);
+            GlStateManager.popMatrix();
         }
     }
 
@@ -243,40 +243,44 @@ public abstract class HumanoidArmorLayerMixin<T extends LivingEntity, M extends 
     // Similar to vanilla's renderArmorModel, but it renders each part individually, instead of the whole model at once.
     // Could be optimized by calculating the tint, overlays, and trims beforehand instead of re-calculating for each ModelPart, but it's not super important.
     @Unique
-    private void figura$renderArmorPart(ModelPart modelPart, PoseStack poseStack, MultiBufferSource vertexConsumers, int light, T entity, ItemStack itemStack, EquipmentSlot armorSlot, ArmorItem armorItem) {
+    private void figura$renderArmorPart(ModelRenderer modelPart, EntityLivingBase entity, ItemStack itemStack, EntityEquipmentSlot armorSlot, ItemArmor armorItem) {
         boolean bl = this.usesInnerModel(armorSlot);
         boolean hasOverlay = false;
-        boolean hasGlint = itemStack.hasFoil();
+        boolean hasGlint = itemStack.isItemEnchanted();
 
-        modelPart.visible = true;
-        modelPart.xRot = 0;
-        modelPart.yRot = 0;
-        modelPart.zRot = 0;
+        modelPart.showModel = true;
+        modelPart.rotateAngleX = 0;
+        modelPart.rotateAngleY = 0;
+        modelPart.rotateAngleZ = 0;
 
         float tintR = 1;
         float tintG = 1;
         float tintB = 1;
 
-        if (armorItem instanceof DyeableArmorItem) {
-            DyeableArmorItem dyeableArmorItem = (DyeableArmorItem) armorItem;
-            int i = dyeableArmorItem.getColor(itemStack);
+        if (armorItem.getArmorMaterial() == ItemArmor.ArmorMaterial.LEATHER) {
+            int i = armorItem.getColor(itemStack);
             tintR = (float) (i >> 16 & 255) / 255.0F;
             tintG = (float) (i >> 8 & 255) / 255.0F;
             tintB = (float) (i & 255) / 255.0F;
             hasOverlay = true;
         }
 
-        ResourceLocation normalArmorResource = RenderUtils.getArmorResource((HumanoidArmorLayer<T, M, A>)(Object)this, entity, itemStack, armorItem, armorSlot, bl, null);
-        VertexConsumer regularArmorConsumer = vertexConsumers.getBuffer(RenderType.armorCutoutNoCull(normalArmorResource));
-        modelPart.render(poseStack, regularArmorConsumer, light, OverlayTexture.NO_OVERLAY, tintR, tintG, tintB, 1f);
+        ResourceLocation normalArmorResource = getArmorResource(armorItem, bl);
+        this.renderer.bindTexture(normalArmorResource);
+        GlStateManager.color(this.colorR * tintR, this.colorG * tintG, this.colorB * tintB, this.alpha);
+        modelPart.render(1f);
 
         if (hasOverlay) {
-            VertexConsumer overlaidArmorConsumer = vertexConsumers.getBuffer(RenderType.armorCutoutNoCull(RenderUtils.getArmorResource((HumanoidArmorLayer<T, M, A>)(Object)this, entity, itemStack, armorItem, armorSlot, bl, "overlay")));
-            modelPart.render(poseStack, overlaidArmorConsumer, light, OverlayTexture.NO_OVERLAY, 1f, 1f, 1f, 1f);
+            GlStateManager.color(this.colorR, this.colorG, this.colorB, this.alpha);
+            this.renderer.bindTexture(getArmorResource(armorItem, bl, "overlay"));
+            modelPart.render(1f);
         }
 
         if (hasGlint) {
-            modelPart.render(poseStack, vertexConsumers.getBuffer(RenderType.armorEntityGlint()), light, OverlayTexture.NO_OVERLAY, 1.0f, 1.0f, 1.0f, 1.0f);
+            RenderTypes.FiguraRenderType renderType = RenderTypes.GLINT.get(ENCHANTED_ITEM_GLINT_RES);
+            renderType.setupState.run();
+            modelPart.render(1.0f);
+            renderType.clearState.run();
         }
     }
 }

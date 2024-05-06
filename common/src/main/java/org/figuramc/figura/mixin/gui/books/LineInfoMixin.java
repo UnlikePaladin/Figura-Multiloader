@@ -1,20 +1,23 @@
 package org.figuramc.figura.mixin.gui.books;
 
-import net.minecraft.client.gui.screens.inventory.BookEditScreen;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.network.chat.Style;
-import net.minecraft.network.chat.TextComponent;
+import net.minecraft.client.gui.GuiScreenBook;
+import net.minecraft.util.text.TextComponentString;
 import org.figuramc.figura.font.Emojis;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
 
-@Mixin(BookEditScreen.LineInfo.class)
+@Mixin(GuiScreenBook.class)
 public class LineInfoMixin {
 
-    @Redirect(method = "<init>", at = @At(value = "INVOKE", target = "Lnet/minecraft/network/chat/TextComponent;setStyle(Lnet/minecraft/network/chat/Style;)Lnet/minecraft/network/chat/MutableComponent;"))
-    public MutableComponent test(TextComponent instance, Style style) {
-        return Emojis.applyEmojis(instance.setStyle(style));
+    @ModifyArg(method = "drawScreen", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/FontRenderer;drawString(Ljava/lang/String;III)I"), index = 0)
+    public String test(String string) {
+        return Emojis.applyEmojis(new TextComponentString(string)).getUnformattedText();
+    }
+
+    @ModifyArg(method = "drawScreen", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/FontRenderer;drawSplitString(Ljava/lang/String;IIII)V"), index = 0)
+    public String testM(String string) {
+        return Emojis.applyEmojis(new TextComponentString(string)).getUnformattedText();
     }
 
 }

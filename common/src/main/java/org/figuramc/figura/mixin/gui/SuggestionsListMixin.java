@@ -1,5 +1,5 @@
 package org.figuramc.figura.mixin.gui;
-
+/*
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -17,8 +17,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(CommandSuggestions.SuggestionsList.class)
 public class SuggestionsListMixin implements SuggestionsListAccessor {
-
-    @Shadow @Final private Rect2i rect;
 
     @Unique private boolean figuraList;
 
@@ -49,3 +47,5 @@ public class SuggestionsListMixin implements SuggestionsListAccessor {
         if (bool) ((Rect2iAccessor)this.rect).setWidth(this.rect.getWidth() + 8 + Minecraft.getInstance().font.width(" "));
     }
 }
+*/
+//TODO: FIX ME

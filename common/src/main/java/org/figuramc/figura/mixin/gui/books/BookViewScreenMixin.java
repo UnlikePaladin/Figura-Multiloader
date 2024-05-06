@@ -1,19 +1,22 @@
 package org.figuramc.figura.mixin.gui.books;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.screens.inventory.BookViewScreen;
-import net.minecraft.util.FormattedCharSequence;
+import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.client.gui.GuiScreenBook;
+import net.minecraft.util.text.TextComponentString;
 import org.figuramc.figura.font.Emojis;
-import org.figuramc.figura.utils.TextUtils;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
-@Mixin(BookViewScreen.class)
+@Mixin(GuiScreenBook.class)
 public class BookViewScreenMixin {
-    @Redirect(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/Font;draw(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/util/FormattedCharSequence;FFI)I"))
-    public int render(Font font, PoseStack poseStack, FormattedCharSequence formattedCharSequence, float x, float y, int color) {
-        return font.draw(poseStack, Emojis.applyEmojis(TextUtils.charSequenceToText(formattedCharSequence)), x, y, color);
+    @Redirect(method = "drawScreen", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/FontRenderer;drawString(Ljava/lang/String;III)I"))
+    public int render(FontRenderer font, String string, int i, int j, int color) {
+        return font.drawString(Emojis.applyEmojis(new TextComponentString(string)).getUnformattedText(), i, j, color);
+    }
+
+    @Redirect(method = "drawScreen", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/FontRenderer;drawSplitString(Ljava/lang/String;IIII)V"))
+    public void render(FontRenderer font, String string, int i, int j, int k, int color) {
+        font.drawSplitString(Emojis.applyEmojis(new TextComponentString(string)).getUnformattedText(), i, j, k, color);
     }
 }

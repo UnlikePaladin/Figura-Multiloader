@@ -1,14 +1,15 @@
 package org.figuramc.figura.mixin.gui;
 
-import net.minecraft.ChatFormatting;
-import net.minecraft.client.resources.SplashManager;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.Style;
-import net.minecraft.network.chat.TextColor;
-import net.minecraft.network.chat.TextComponent;
+import net.minecraft.client.gui.GuiMainMenu;
+import net.minecraft.client.resources.IResource;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.Style;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextFormatting;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.Badges;
 import org.figuramc.figura.config.Configs;
+import org.figuramc.figura.ducks.extensions.StyleExtension;
 import org.figuramc.figura.utils.ColorUtils;
 import org.figuramc.figura.utils.ui.UIHelper;
 import org.spongepowered.asm.mixin.Final;
@@ -17,25 +18,25 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.LocalCapture;
 
 import java.util.*;
 
-@Mixin(SplashManager.class)
+@Mixin(GuiMainMenu.class)
 public class SplashManagerMixin {
 
     @Shadow @Final private static Random RANDOM;
-    @Shadow @Final private List<String> splashes;
 
     @Unique
-    private static final List<Component> FIGURA_SPLASHES = Collections.singletonList(
-            new TextComponent("Also try ears ")
-                    .append(new TextComponent("\uD83D\uDC3E").withStyle(Style.EMPTY.withFont(UIHelper.SPECIAL_FONT).withColor(ChatFormatting.WHITE)))
-                    .append("!")
+    private static final List<ITextComponent> FIGURA_SPLASHES = Collections.singletonList(
+            new TextComponentString("Also try ears ")
+                    .appendSibling(new TextComponentString("\uD83D\uDC3E").setStyle(((StyleExtension)new Style()).setFont(UIHelper.SPECIAL_FONT).setColor(TextFormatting.WHITE)))
+                    .appendText("!")
     );
 
-    @Inject(at = @At("RETURN"), method = "getSplash")
-    private void init(CallbackInfoReturnable<String> cir) {
+    @Inject(at = @At(value = "INVOKE", target = "Ljava/util/List;get(I)Ljava/lang/Object;"), method = "<init>", locals = LocalCapture.CAPTURE_FAILHARD)
+    private void init(CallbackInfo ci, IResource e, List<String> list) {
         FiguraMod.splashText = null;
         if (!Configs.EASTER_EGGS.value)
             return;
@@ -56,11 +57,11 @@ public class SplashManagerMixin {
         }
 
         if (who != null) {
-            FiguraMod.splashText = new TextComponent("Happy birthday " + who + " ")
-                    .append(Badges.System.DEFAULT.badge.copy().withStyle(Style.EMPTY.withFont(Badges.FONT).withColor(TextColor.fromRgb(ColorUtils.Colors.DEFAULT.hex))))
-                    .append("!");
+            FiguraMod.splashText = new TextComponentString("Happy birthday " + who + " ")
+                    .appendSibling(Badges.System.DEFAULT.badge.createCopy().setStyle(((StyleExtension)((StyleExtension)new Style()).setFont(Badges.FONT)).setRGBColor(ColorUtils.Colors.DEFAULT.hex)))
+                    .appendText("!");
         } else {
-            int size = this.splashes.size();
+            int size = list.size();
             int random = RANDOM.nextInt(size + FIGURA_SPLASHES.size());
             if (random >= size)
                 FiguraMod.splashText = FIGURA_SPLASHES.get(random - size);

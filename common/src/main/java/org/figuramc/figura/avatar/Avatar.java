@@ -6,6 +6,8 @@ import net.minecraft.client.model.ModelRenderer;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.Matrix4f;
 import net.minecraft.client.renderer.RenderHelper;
+import net.minecraft.client.renderer.culling.Frustum;
+import net.minecraft.client.renderer.culling.ICamera;
 import net.minecraft.client.renderer.entity.RenderLivingBase;
 import net.minecraft.client.renderer.entity.RenderManager;
 import net.minecraft.client.renderer.entity.RenderPlayer;
@@ -38,6 +40,7 @@ import org.figuramc.figura.lua.api.world.ItemStackAPI;
 import org.figuramc.figura.math.matrix.FiguraMat3;
 import org.figuramc.figura.math.matrix.FiguraMat4;
 import org.figuramc.figura.math.vector.FiguraVec3;
+import org.figuramc.figura.mixin.render.FrustumAccessor;
 import org.figuramc.figura.mixin.sound.SoundHandlerAccessor;
 import org.figuramc.figura.model.FiguraModelPart;
 import org.figuramc.figura.model.ParentType;
@@ -573,7 +576,7 @@ public class Avatar {
         FiguraMod.popProfiler(4);
     }
 
-    public void firstPersonWorldRender(Entity watcher, RenderTypes.FiguraBufferSource bufferSource, RenderManager camera, float tickDelta) {
+    public void firstPersonWorldRender(Entity watcher, RenderTypes.FiguraBufferSource bufferSource, ICamera camera, float tickDelta) {
         if (renderer == null || !loaded)
             return;
 
@@ -581,8 +584,8 @@ public class Avatar {
         FiguraMod.pushProfiler(this);
         FiguraMod.pushProfiler("firstPersonWorldRender");
 
-        int light = camera.world.getCombinedLight(watcher.getPosition(), 0);
-        Vec3d camPos = new Vec3d(camera.viewerPosX, camera.viewerPosY, camera.viewerPosZ);
+        int light = watcher.world.getCombinedLight(watcher.getPosition(), 0);
+        Vec3d camPos = camera instanceof Frustum ? new Vec3d(((FrustumAccessor)camera).cameraPosX(), ((FrustumAccessor)camera).cameraPosY(), ((FrustumAccessor)camera).cameraPosZ()) : new Vec3d(0,0,0);
 
         worldRender(watcher, camPos.x, camPos.y, camPos.z, bufferSource, light, tickDelta, EntityRenderMode.FIRST_PERSON_WORLD);
 
@@ -608,7 +611,9 @@ public class Avatar {
 
         GlStateManager.pushMatrix();
         if (!config) {
-            // GlStateManager.rotate(arm.rotateAngleZ, 0,0,1); //TODO: Remove quaternions here
+            // GlStateManager.rotate(arm.rotateAngleZ, 0,0,1);
+            // TODO: Remove quaternions here
+            //TODO: See if these rotations are necessary
             GlStateManager.rotate(((Vector3fExtension)UIHelper.ZP).figura$rotation(arm.rotateAngleZ));
          //   stack.mulPose(Vector3f.YP.rotation(arm.yRot));
             GlStateManager.rotate(((Vector3fExtension)UIHelper.YP).figura$rotation(arm.rotateAngleY));

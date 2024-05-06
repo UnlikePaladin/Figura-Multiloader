@@ -9,6 +9,7 @@ import net.minecraft.client.gui.font.FontTexture;
 import net.minecraft.client.gui.font.glyphs.BakedGlyph;
 import net.minecraft.client.gui.font.providers.BitmapProvider;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.ResourceLocation;
 import org.figuramc.figura.ducks.BakedGlyphAccessor;
 import org.figuramc.figura.ducks.BitmapProviderGlyphAccessor;
 import org.figuramc.figura.font.Emojis;

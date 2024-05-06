@@ -2,6 +2,7 @@ package org.figuramc.figura.mixin.font;
 
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Matrix4f;
+import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.font.glyphs.BakedGlyph;
 import org.figuramc.figura.compat.ImmediatelyFastCompat;
 import org.figuramc.figura.ducks.BakedGlyphAccessor;
@@ -17,27 +18,12 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.lang.reflect.Field;
 
-@Mixin(BakedGlyph.class)
+@Mixin(FontRenderer.class)
 public abstract class BakedGlyphMixin implements BakedGlyphAccessor {
-    @Shadow
-    @Final
-    private float up;
-    @Shadow
-    @Final
-    private float down;
-    @Shadow
-    @Final
-    private float u0;
-    @Shadow
-    @Final
-    private float v0;
-    @Shadow
-    @Final
-    private float v1;
-    @Shadow @Final private float u1;
     @Unique
     EmojiMetadata figura$metadata;
 
@@ -48,9 +34,13 @@ public abstract class BakedGlyphMixin implements BakedGlyphAccessor {
         }
     }
 
-    @Inject(method = "render", at = @At("HEAD"), cancellable = true)
-    public void render(boolean italic, float x, float y, Matrix4f matrix, VertexConsumer vertexConsumer, float red, float green, float blue, float alpha, int light, CallbackInfo ci) {
+    @Inject(method = "renderChar", at = @At("HEAD"), cancellable = true)
+    public void render(char c, boolean italic, CallbackInfoReturnable<Float> cir) {
         if (figura$metadata == null) return;
+        int j = i % 16 * 8;
+        int k = i / 16 * 8;
+        int l = italic ? 1 : 0;
+
 
         float h = this.up - 3.0f;
         float j = this.down - 3.0f;

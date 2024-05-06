@@ -1,33 +1,13 @@
 package org.figuramc.figura.utils;
 
-import com.mojang.blaze3d.platform.GlStateManager;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.VertexFormat;
-import com.mojang.math.Vector3f;
-import com.mojang.math.Vector4f;
-import dev.architectury.injectables.annotations.ExpectPlatform;
-import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.renderer.GlStateManager;
-import net.minecraft.client.renderer.RenderStateShard;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.entity.layers.HumanoidArmorLayer;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.client.renderer.texture.TextureUtil;
-import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.client.renderer.vertex.VertexFormat;
 import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.ResourceLocation;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.inventory.InventoryMenu;
-import net.minecraft.world.item.ArmorItem;
-import net.minecraft.world.item.ItemStack;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.lua.api.vanilla_model.VanillaPart;
 import org.figuramc.figura.model.ParentType;
@@ -155,10 +135,7 @@ public class RenderUtils {
         return true;
     }
 
-    @ExpectPlatform
-    public static <T extends LivingEntity, M extends HumanoidModel<T>, A extends HumanoidModel<T>> ResourceLocation getArmorResource(HumanoidArmorLayer<T, M, A> armorLayer, Entity entity, ItemStack stack, ArmorItem item, EquipmentSlot slot, boolean isInner, String type) {
-        throw new AssertionError();
-    }
+
 
     public static class TextRenderType extends RenderTypes.FiguraRenderType {
         public static Function<ResourceLocation, RenderTypes.FiguraRenderType> TEXT_BACKGROUND_SEE_THROUGH = ResourceUtils.memoize((texture) -> {
@@ -186,7 +163,7 @@ public class RenderUtils {
             });
         });
         public static Function<ResourceLocation, RenderTypes.FiguraRenderType> TEXT_BACKGROUND = ResourceUtils.memoize((texture) -> {
-            return create("text_background", RenderTypes.FiguraRenderType.POSITION_COLOR_TEX_LIGHTMAP, VertexFormatMode.QUADS.asGLMode, 256, false, true, () -> {
+            return create("text_background", RenderTypes.FiguraRenderType.POSITION_COLOR_TEX_LIGHTMAP, VertexFormatMode.QUADS, 256, false, true, () -> {
                 // Equivalent to enabling TextureState
                 GlStateManager.enableTexture2D();
                 TextureManager textureManager = Minecraft.getMinecraft().getTextureManager();

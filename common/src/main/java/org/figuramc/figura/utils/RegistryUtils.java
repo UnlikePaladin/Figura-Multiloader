@@ -15,10 +15,6 @@ public class RegistryUtils {
 
     }
 
-    public static <T> T getRegistryObjFromLocation(Class<T> clas, ResourceLocation location) {
-
-    }
-
     public static IRegistry<ResourceLocation,?> getRegistry(ResourceLocation resourceLocation) {
 
     }

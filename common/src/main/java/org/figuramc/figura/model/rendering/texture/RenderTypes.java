@@ -82,15 +82,16 @@ public enum RenderTypes {
 
     public static class FiguraBufferSource {
         public static FiguraBufferSource INSTANCE = new FiguraBufferSource();
-
+        static FiguraRenderType current;
         public BufferBuilder getBuffer(FiguraRenderType type) {
             Tessellator tessellator = Tessellator.getInstance();
             type.setupState.run();
+            current = type;
             return tessellator.getBuffer();
         }
 
         public void endBatch() {
-
+            current.clearState.run();
             Tessellator.getInstance().draw();
         }
     }

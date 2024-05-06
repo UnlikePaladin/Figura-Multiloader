@@ -1,9 +1,9 @@
 package org.figuramc.figura.mixin.render;
 
-import net.minecraft.client.Camera;
 import net.minecraft.client.renderer.ActiveRenderInfo;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.level.BlockGetter;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.avatar.AvatarManager;
 import org.figuramc.figura.math.vector.FiguraVec3;
@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.ModifyArg;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
@@ -22,25 +22,30 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class CameraMixin {
 
 
-    @Shadow private float yRot;
-
-    @Unique private Avatar avatar;
-
-    @Shadow protected abstract void setRotation(float yaw, float pitch);
-    @Shadow protected abstract void move(double x, double y, double z);
+    @Unique private static Avatar avatar;
 
     @Shadow private static float rotationX;
 
-    @Inject(method = "setup", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Camera;setRotation(FF)V", shift = At.Shift.AFTER))
-    private void setupRot(BlockGetter area, Entity focusedEntity, boolean thirdPerson, boolean inverseView, float tickDelta, CallbackInfo ci) {
+    @Shadow private static float rotationZ;
+
+    @Shadow private static float rotationYZ;
+
+    @Shadow private static float rotationXY;
+
+    @Shadow private static float rotationXZ;
+
+    @Shadow private static Vec3d position;
+
+    @Inject(method = "updateRenderInfo", at = @At(value = "RETURN"))
+    private static void setupRot(EntityPlayer focusedEntity, boolean bl, CallbackInfo ci) {
         avatar = AvatarManager.getAvatar(focusedEntity);
         if (!RenderUtils.vanillaModelAndScript(avatar)) {
             avatar = null;
             return;
         }
 
-        float x = rotationX;
-        float y = yRot;
+        float x = focusedEntity.rotationPitch;
+        float y  = focusedEntity.rotationYaw;
 
         FiguraVec3 rot = avatar.luaRuntime.renderer.cameraRot;
         if (rot != null && rot.notNaN()) {
@@ -53,12 +58,16 @@ public abstract class CameraMixin {
             x += (float) offset.x;
             y += (float) offset.y;
         }
-
-        setRotation(y, x);
+        int i = bl ? 1 : 0;
+        rotationX = MathHelper.cos(y * (float) (Math.PI / 180.0)) * (float)(1 - i * 2);
+        rotationZ = MathHelper.sin(y * (float) (Math.PI / 180.0)) * (float)(1 - i * 2);
+        rotationYZ = -rotationZ * MathHelper.sin(x * (float) (Math.PI / 180.0)) * (float)(1 - i * 2);
+        rotationXY = rotationX * MathHelper.sin(x * (float) (Math.PI / 180.0)) * (float)(1 - i * 2);
+        rotationXZ = MathHelper.cos(x * (float) (Math.PI / 180.0));
     }
 
-    @ModifyArg(method = "setup", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Camera;setPosition(DDD)V"), index = 0)
-    private double setupPivotX(double originalX) {
+    @ModifyVariable(method = "projectViewFromEntity", at = @At(value = "STORE"), ordinal = 3)
+    private static double setupPivotX(double originalX) {
         if (avatar != null) {
             double x = originalX;
 
@@ -76,8 +85,8 @@ public abstract class CameraMixin {
         return originalX;
     }
 
-    @ModifyArg(method = "setup", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Camera;setPosition(DDD)V"), index = 1)
-    private double setupPivotY(double originalY) {
+    @ModifyVariable(method = "projectViewFromEntity", at = @At(value = "STORE"), ordinal = 4)
+    private static double setupPivotY(double originalY) {
         if (avatar != null) {
             double y = originalY;
 
@@ -95,8 +104,8 @@ public abstract class CameraMixin {
         return originalY;
     }
 
-    @ModifyArg(method = "setup", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Camera;setPosition(DDD)V"), index = 2)
-    private double setupPivotZ(double originalZ) {
+    @ModifyVariable(method = "projectViewFromEntity", at = @At(value = "STORE"), ordinal = 5)
+    private static double setupPivotZ(double originalZ) {
         if (avatar != null) {
             double z = originalZ;
 
@@ -115,25 +124,46 @@ public abstract class CameraMixin {
     }
 
 
-    @Inject(method = "setup", at = @At(value = "RETURN"))
-    private void setupPos(BlockGetter area, Entity focusedEntity, boolean thirdPerson, boolean inverseView, float tickDelta, CallbackInfo ci) {
+    @Inject(method = "updateRenderInfo", at = @At(value = "RETURN"))
+    private static void setupPos(EntityPlayer entityplayerIn, boolean bl, CallbackInfo ci) {
         if (avatar != null) {
             FiguraVec3 pos = avatar.luaRuntime.renderer.cameraPos;
-            if (pos != null && pos.notNaN())
-                move(-pos.z, pos.y, -pos.x);
-
+            if (pos != null && pos.notNaN()) {
+                double x = position.x - pos.x;
+                double y = position.y + pos.y;
+                double z = position.z - pos.z;
+                position = new Vec3d(x, y, z);
+            }
             avatar = null;
         }
     }
 
-    @Inject(method = "getXRot", at = @At("HEAD"), cancellable = true)
-    private void getXRot(CallbackInfoReturnable<Float> cir) {
+    @Inject(method = "getRotationX", at = @At("HEAD"), cancellable = true)
+    private static void getXRot(CallbackInfoReturnable<Float> cir) {
         if (UIHelper.paperdoll)
             cir.setReturnValue(0f);
     }
 
-    @Inject(method = "getYRot", at = @At("HEAD"), cancellable = true)
-    private void getYRot(CallbackInfoReturnable<Float> cir) {
+    @Inject(method = "getRotationZ", at = @At("HEAD"), cancellable = true)
+    private static void getZRot(CallbackInfoReturnable<Float> cir) {
+        if (UIHelper.paperdoll)
+            cir.setReturnValue(0f);
+    }
+
+    @Inject(method = "getRotationYZ", at = @At("HEAD"), cancellable = true)
+    private static void getYZRot(CallbackInfoReturnable<Float> cir) {
+        if (UIHelper.paperdoll)
+            cir.setReturnValue(0f);
+    }
+
+    @Inject(method = "getRotationXY", at = @At("HEAD"), cancellable = true)
+    private static void getXYRot(CallbackInfoReturnable<Float> cir) {
+        if (UIHelper.paperdoll)
+            cir.setReturnValue(0f);
+    }
+
+    @Inject(method = "getRotationXZ", at = @At("HEAD"), cancellable = true)
+    private static void getXZRot(CallbackInfoReturnable<Float> cir) {
         if (UIHelper.paperdoll)
             cir.setReturnValue(0f);
     }

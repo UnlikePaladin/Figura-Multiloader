@@ -1,18 +1,18 @@
 package org.figuramc.figura.mixin.render.renderers;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.client.player.AbstractClientPlayer;
-import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.client.renderer.ItemInHandRenderer;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.block.model.ItemTransforms;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.entity.HumanoidArm;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.level.block.AbstractSkullBlock;
+import net.minecraft.block.BlockSkull;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.entity.AbstractClientPlayer;
+import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.client.renderer.ItemRenderer;
+import net.minecraft.client.renderer.Matrix4f;
+import net.minecraft.client.renderer.block.model.ItemCameraTransforms;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.init.Items;
+import net.minecraft.item.ItemBlock;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.EnumHand;
+import net.minecraft.util.EnumHandSide;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.avatar.AvatarManager;
@@ -20,6 +20,9 @@ import org.figuramc.figura.ducks.SkullBlockRendererAccessor;
 import org.figuramc.figura.lua.api.vanilla_model.VanillaModelPart;
 import org.figuramc.figura.math.matrix.FiguraMat4;
 import org.figuramc.figura.model.rendering.EntityRenderMode;
+import org.lwjgl.BufferUtils;
+import org.lwjgl.opengl.GL11;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
@@ -27,18 +30,27 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(ItemInHandRenderer.class)
+import java.nio.FloatBuffer;
+
+@Mixin(ItemRenderer.class)
 public abstract class ItemInHandRendererMixin {
 
-    @Shadow protected abstract void renderPlayerArm(PoseStack matrices, MultiBufferSource vertexConsumers, int light, float equipProgress, float swingProgress, HumanoidArm arm);
 
-    @Shadow private ItemStack mainHandItem;
+    @Shadow private ItemStack itemStackMainHand;
+
+    @Shadow @Final private Minecraft mc;
+
+    @Shadow protected abstract void renderArmFirstPerson(float f, float g, EnumHandSide enumHandSide);
 
     @Unique Avatar avatar;
 
-    @Inject(method = "renderHandsWithItems", at = @At("HEAD"))
-    private void onRenderHandsWithItems(float tickDelta, PoseStack matrices, MultiBufferSource.BufferSource vertexConsumers, LocalPlayer player, int light, CallbackInfo ci) {
-        avatar = AvatarManager.getAvatarForPlayer(player.getUUID());
+    @Unique
+    private final FloatBuffer modelBuff = BufferUtils.createFloatBuffer(16);
+
+    @Inject(method = "renderItemInFirstPerson(F)V", at = @At("HEAD"))
+    private void onRenderHandsWithItems(float tickDelta, CallbackInfo ci) {
+        AbstractClientPlayer player = this.mc.player;
+        avatar = AvatarManager.getAvatarForPlayer(player.getUniqueID());
         if (avatar == null)
             return;
 
@@ -46,34 +58,40 @@ public abstract class ItemInHandRendererMixin {
         FiguraMod.pushProfiler(avatar);
         FiguraMod.pushProfiler("renderEvent");
         avatar.renderMode = EntityRenderMode.FIRST_PERSON;
-        avatar.renderEvent(tickDelta, new FiguraMat4().set(matrices.last().pose()));
+        GlStateManager.getFloat(GL11.GL_MODELVIEW_MATRIX, modelBuff);
+        Matrix4f matrix4f = new Matrix4f();
+        matrix4f.load(modelBuff);
+        avatar.renderEvent(tickDelta, new FiguraMat4().set(matrix4f));
         FiguraMod.popProfiler(3);
     }
 
-    @Inject(method = "renderHandsWithItems", at = @At("RETURN"))
-    private void afterRenderHandsWithItems(float tickDelta, PoseStack matrices, MultiBufferSource.BufferSource vertexConsumers, LocalPlayer player, int light, CallbackInfo ci) {
+    @Inject(method = "renderItemInFirstPerson(F)V", at = @At("RETURN"))
+    private void afterRenderHandsWithItems(float tickDelta, CallbackInfo ci) {
         if (avatar == null)
             return;
 
         FiguraMod.pushProfiler(FiguraMod.MOD_ID);
         FiguraMod.pushProfiler(avatar);
         FiguraMod.pushProfiler("postRenderEvent");
-        avatar.postRenderEvent(tickDelta, new FiguraMat4().set(matrices.last().pose()));
+        GlStateManager.getFloat(GL11.GL_MODELVIEW_MATRIX, modelBuff);
+        Matrix4f matrix4f = new Matrix4f();
+        matrix4f.load(modelBuff);
+        avatar.postRenderEvent(tickDelta, new FiguraMat4().set(matrix4f));
         avatar = null;
         FiguraMod.popProfiler(3);
     }
 
-    @Inject(method = "renderArmWithItem", at = @At("HEAD"), cancellable = true)
-    private void renderArmWithItem(AbstractClientPlayer player, float tickDelta, float pitch, InteractionHand hand, float swingProgress, ItemStack item, float equipProgress, PoseStack matrices, MultiBufferSource vertexConsumers, int light, CallbackInfo ci) {
+    @Inject(method = "renderItemInFirstPerson(Lnet/minecraft/client/entity/AbstractClientPlayer;FFLnet/minecraft/util/EnumHand;FLnet/minecraft/item/ItemStack;F)V", at = @At("HEAD"), cancellable = true)
+    private void renderArmWithItem(AbstractClientPlayer player, float tickDelta, float pitch, EnumHand hand, float swingProgress, ItemStack item, float equipProgress, CallbackInfo ci) {
         if (avatar == null || avatar.luaRuntime == null)
             return;
 
-        boolean main = hand ==InteractionHand.MAIN_HAND;
-        HumanoidArm arm = main ? player.getMainArm() : player.getMainArm().getOpposite();
-        Boolean armVisible = arm == HumanoidArm.LEFT ? avatar.luaRuntime.renderer.renderLeftArm : avatar.luaRuntime.renderer.renderRightArm;
+        boolean main = hand == EnumHand.MAIN_HAND;
+        EnumHandSide arm = main ? player.getPrimaryHand() : player.getPrimaryHand().opposite();
+        Boolean armVisible = arm == EnumHandSide.LEFT ? avatar.luaRuntime.renderer.renderLeftArm : avatar.luaRuntime.renderer.renderRightArm;
 
         boolean willRenderItem = !item.isEmpty();
-        boolean willRenderArm = (!willRenderItem && main) || item.getItem() == Items.FILLED_MAP || (!willRenderItem && this.mainHandItem.getItem() == Items.FILLED_MAP);
+        boolean willRenderArm = (!willRenderItem && main) || item.getItem() == Items.FILLED_MAP || (!willRenderItem && this.itemStackMainHand.getItem() == Items.FILLED_MAP);
 
         // hide arm
         if (willRenderArm && !willRenderItem && armVisible != null && !armVisible) {
@@ -82,22 +100,22 @@ public abstract class ItemInHandRendererMixin {
         }
         // render arm
         if (!willRenderArm && !player.isInvisible() && armVisible != null && armVisible) {
-            matrices.pushPose();
-            this.renderPlayerArm(matrices, vertexConsumers, light, equipProgress, swingProgress, arm);
-            matrices.popPose();
+            GlStateManager.pushMatrix();
+            this.renderArmFirstPerson(equipProgress, swingProgress, arm);
+            GlStateManager.popMatrix();
         }
 
         // hide item
-        VanillaModelPart part = arm == HumanoidArm.LEFT ? avatar.luaRuntime.vanilla_model.LEFT_ITEM : avatar.luaRuntime.vanilla_model.RIGHT_ITEM;
+        VanillaModelPart part = arm == EnumHandSide.LEFT ? avatar.luaRuntime.vanilla_model.LEFT_ITEM : avatar.luaRuntime.vanilla_model.RIGHT_ITEM;
         if (willRenderItem && !part.checkVisible()) {
             ci.cancel();
         }
     }
 
-    @Inject(method = "renderItem", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/entity/ItemRenderer;renderStatic(Lnet/minecraft/world/entity/LivingEntity;Lnet/minecraft/world/item/ItemStack;Lnet/minecraft/client/renderer/block/model/ItemTransforms$TransformType;ZLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;Lnet/minecraft/world/level/Level;II)V"))
-    private void renderItem(LivingEntity entity, ItemStack stack, ItemTransforms.TransformType itemDisplayContext, boolean leftHanded, PoseStack matrices, MultiBufferSource vertexConsumers, int light, CallbackInfo ci) {
-        if (stack.getItem() instanceof BlockItem && ((BlockItem) stack.getItem()).getBlock() instanceof AbstractSkullBlock) {
-            BlockItem bl = (BlockItem) stack.getItem();
+    @Inject(method = "renderItemSide", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/RenderItem;renderItem(Lnet/minecraft/item/ItemStack;Lnet/minecraft/entity/EntityLivingBase;Lnet/minecraft/client/renderer/block/model/ItemCameraTransforms$TransformType;Z)V"))
+    private void renderItem(EntityLivingBase entity, ItemStack stack, ItemCameraTransforms.TransformType itemDisplayContext, boolean leftHanded, CallbackInfo ci) {
+        if (stack.getItem() instanceof ItemBlock && ((ItemBlock) stack.getItem()).getBlock() instanceof BlockSkull) {
+            ItemBlock bl = (ItemBlock) stack.getItem();
             SkullBlockRendererAccessor.setEntity(entity);
             switch (itemDisplayContext) {
                 case FIRST_PERSON_LEFT_HAND:

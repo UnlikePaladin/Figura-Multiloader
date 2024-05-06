@@ -1,16 +1,11 @@
 package org.figuramc.figura.mixin.gui;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.components.PlayerTabOverlay;
-import net.minecraft.client.multiplayer.PlayerInfo;
-import net.minecraft.client.renderer.entity.LivingEntityRenderer;
-import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.network.chat.TextComponent;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.player.Player;
-import org.figuramc.figura.lua.api.nameplate.NameplateCustomization;
+import net.minecraft.client.gui.GuiPlayerTabOverlay;
+import net.minecraft.client.network.NetworkPlayerInfo;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.TextComponentString;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.avatar.AvatarManager;
 import org.figuramc.figura.avatar.Badges;
@@ -31,29 +26,29 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
-@Mixin(PlayerTabOverlay.class)
+@Mixin(GuiPlayerTabOverlay.class)
 public class PlayerTabOverlayMixin {
 
-    @Shadow @Final private Minecraft minecraft;
+    @Shadow @Final private Minecraft mc;
     @Unique private UUID uuid;
 
-    @Inject(at = @At("RETURN"), method = "getNameForDisplay", cancellable = true)
-    private void getPlayerName(PlayerInfo playerInfo, CallbackInfoReturnable<Component> cir) {
+    @Inject(at = @At("RETURN"), method = "getPlayerName", cancellable = true)
+    private void getPlayerName(NetworkPlayerInfo playerInfo, CallbackInfoReturnable<String> cir) {
         // get config
         int config = Configs.LIST_NAMEPLATE.value;
         if (config == 0 || AvatarManager.panic)
             return;
 
         // apply customization
-        Component text = cir.getReturnValue();
-        Component name = new TextComponent(playerInfo.getProfile().getName());
+        ITextComponent text = new TextComponentString(cir.getReturnValue());
+        ITextComponent name = new TextComponentString(playerInfo.getGameProfile().getName());
 
-        UUID uuid = playerInfo.getProfile().getId();
+        UUID uuid = playerInfo.getGameProfile().getId();
         Avatar avatar = AvatarManager.getAvatarForPlayer(uuid);
         NameplateCustomization custom = avatar == null || avatar.luaRuntime == null ? null : avatar.luaRuntime.nameplate.LIST;
 
-        Component replacement = custom != null && custom.getJson() != null && avatar.permissions.get(Permissions.NAMEPLATE_EDIT) == 1 ?
-                TextUtils.replaceInText(custom.getJson().copy(), "\n|\\\\n", " ") : name;
+        ITextComponent replacement = custom != null && custom.getJson() != null && avatar.permissions.get(Permissions.NAMEPLATE_EDIT) == 1 ?
+                TextUtils.replaceInText(custom.getJson().createCopy(), "\n|\\\\n", " ") : name;
 
         // name
         replacement = TextUtils.replaceInText(replacement, "\\$\\{name\\}", name);
@@ -64,29 +59,29 @@ public class PlayerTabOverlayMixin {
         // trim
         replacement = TextUtils.trim(replacement);
 
-        text = TextUtils.replaceInText(text, "\\b" + Pattern.quote(playerInfo.getProfile().getName()) + "\\b", replacement);
+        text = TextUtils.replaceInText(text, "\\b" + Pattern.quote(playerInfo.getGameProfile().getName()) + "\\b", replacement);
 
-        cir.setReturnValue(text);
+        cir.setReturnValue(text.getUnformattedText());
     }
 
-    @ModifyArg(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/multiplayer/ClientLevel;getPlayerByUUID(Ljava/util/UUID;)Lnet/minecraft/world/entity/player/Player;"), method = "render")
+    @ModifyArg(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/multiplayer/WorldClient;getPlayerEntityByUUID(Ljava/util/UUID;)Lnet/minecraft/entity/player/EntityPlayer;"), method = "renderPlayerlist")
     private UUID getPlayerByUUID(UUID id) {
         uuid = id;
         return id;
     }
 
 
-    @ModifyArg(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/GuiComponent;blit(Lcom/mojang/blaze3d/vertex/PoseStack;IIIIFFIIII)V"), index = 3)
-    private int doNotDrawFace(PoseStack p_93161_, int p_93162_, int p_93163_, int p_93164_, int p_93165_, float p_93166_, float p_93167_, int p_93168_, int p_93169_, int p_93170_, int p_93171_) {
+    @ModifyArg(method = "renderPlayerlist", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/Gui;drawScaledCustomSizeModalRect(IIFFIIIIFF)V"), index = 0)
+    private int doNotDrawFace(int i, int j, float f, float g, int k, int l, int m, int n, float h, float tileHeight) {
         if (uuid != null) {
             Avatar avatar = AvatarManager.getAvatarForPlayer(uuid);
 
-            Player player = this.minecraft.level.getPlayerByUUID(uuid);
+            EntityPlayer player = this.mc.world.getPlayerEntityByUUID(uuid);
             boolean upsideDown = player != null && EntityUtils.isEntityUpsideDown(player);
 
-            if (avatar != null && avatar.renderPortrait(p_93161_, p_93162_, p_93163_, p_93164_, 16, upsideDown))
+            if (avatar != null && avatar.renderPortrait(i, j, m, 16, upsideDown))
                 return 0;
         }
-        return p_93164_;
+        return i;
     }
 }

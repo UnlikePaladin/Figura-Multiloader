@@ -3,6 +3,7 @@ package org.figuramc.figura.mixin.render;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.EntityRenderer;
 import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.client.renderer.Matrix4f;
 import net.minecraft.client.shader.ShaderGroup;
 import net.minecraft.entity.Entity;
 import net.minecraft.util.ResourceLocation;
@@ -129,4 +130,15 @@ public abstract class GameRendererMixin {
         FiguraMod.extendedPickEntity = EntityUtils.getViewedEntity(32);
         FiguraMod.popProfiler(2);
     }
+
+    @Inject(method = "renderWorld", at = @At("HEAD"))
+    private void onRenderLevel(float tickDelta, long limitTime, CallbackInfo ci) {
+        AvatarManager.executeAll("worldRender", avatar -> avatar.render(tickDelta));
+    }
+
+    @Inject(method = "renderWorld", at = @At("RETURN"))
+    private void afterRenderLevel(float tickDelta, long limitTime, CallbackInfo ci) {
+        AvatarManager.executeAll("postWorldRender", avatar -> avatar.postWorldRenderEvent(tickDelta));
+    }
+
 }

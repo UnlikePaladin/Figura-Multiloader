@@ -1,8 +1,8 @@
 package org.figuramc.figura.mixin.gui;
 
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.network.chat.ClickEvent;
-import net.minecraft.network.chat.Style;
+import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.event.ClickEvent;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.avatar.AvatarManager;
@@ -13,15 +13,15 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(Screen.class)
+@Mixin(GuiScreen.class)
 public class ScreenMixin {
 
-    @Inject(at = @At("HEAD"), method = "handleComponentClicked", cancellable = true)
-    private void handleComponentClicked(Style style, CallbackInfoReturnable<Boolean> cir) {
-        if (style == null)
+    @Inject(at = @At("HEAD"), method = "handleComponentClick", cancellable = true)
+    private void handleComponentClicked(ITextComponent component, CallbackInfoReturnable<Boolean> cir) {
+        if (component == null)
             return;
 
-        ClickEvent event = style.getClickEvent();
+        ClickEvent event = component.getStyle().getClickEvent();
         if (event == null)
             return;
 
@@ -29,7 +29,7 @@ public class ScreenMixin {
             TextUtils.FiguraClickEvent figuraEvent = (TextUtils.FiguraClickEvent) event;
             figuraEvent.onClick.run();
             cir.setReturnValue(true);
-        } else if (event.getAction() == ClickEvent.Action.getByName("figura_function")) {
+        } else if (event.getAction() == ClickEvent.Action.getValueByCanonicalName("figura_function")) {
             cir.setReturnValue(true);
 
             Avatar avatar = AvatarManager.getAvatarForPlayer(FiguraMod.getLocalPlayerUUID());

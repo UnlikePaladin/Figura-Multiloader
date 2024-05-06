@@ -13,6 +13,7 @@ import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Slice;
@@ -20,11 +21,16 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(Minecraft.class)
 public class Minecraft$KeyboardInputMixin {
-    int GLFW_MOD_SHIFT = 0x0001;
-    int GLFW_MOD_CONTROL = 0x0002;
-    int GLFW_MOD_ALT = 0x0004;
-    int GLFW_MOD_CAPS_LOCK = 0x0010;
- 	int GLFW_MOD_NUM_LOCK = 0x0020;
+    @Unique
+    static int GLFW_MOD_SHIFT = 0x0001;
+    @Unique
+    static int GLFW_MOD_CONTROL = 0x0002;
+    @Unique
+    static int GLFW_MOD_ALT = 0x0004;
+    @Unique
+    static int GLFW_MOD_CAPS_LOCK = 0x0010;
+    @Unique
+    static int GLFW_MOD_NUM_LOCK = 0x0020;
     @Shadow public boolean inGameHasFocus;
 
     @Shadow @Nullable public GuiScreen currentScreen;
