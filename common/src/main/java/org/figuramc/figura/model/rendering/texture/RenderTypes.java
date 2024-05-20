@@ -448,6 +448,54 @@ public enum RenderTypes {
                     Minecraft.getMinecraft().entityRenderer.disableLightmap();
                 }));
 
+        public static final Function<ResourceLocation, FiguraRenderType> TEXT = ResourceUtils.memoize(texture -> FiguraRenderType.create("text", POSITION_COLOR_TEX_LIGHTMAP, VertexFormatMode.QUADS, 256, false, true,
+                () -> {
+                    // Equivalent to enabling TextureState
+                    GlStateManager.enableTexture2D();
+                    TextureManager textureManager = Minecraft.getMinecraft().getTextureManager();
+                    textureManager.bindTexture(texture);
+                    textureManager.getTexture(texture).setBlurMipmap(false, false);
+                    // Equivalent to enabling Default Alpha
+                    GlStateManager.enableAlpha();
+                    GlStateManager.alphaFunc(516, 0.003921569f);
+                    // Equivalent to enabling TRANSLUCENT_TRANSPARENCY
+                    GlStateManager.enableBlend();
+                    GlStateManager.tryBlendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA, GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA);
+                    Minecraft.getMinecraft().entityRenderer.enableLightmap();
+                }, () -> {
+                    GlStateManager.disableAlpha();
+                    GlStateManager.alphaFunc(516, 0.1f);
+                    GlStateManager.disableBlend();
+                    GlStateManager.tryBlendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA, GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ZERO);
+                    Minecraft.getMinecraft().entityRenderer.disableLightmap();
+                }));
+
+        public static final Function<ResourceLocation, FiguraRenderType> TEXT_SEETHROUGH = ResourceUtils.memoize(texture -> FiguraRenderType.create("text_seethrough", POSITION_COLOR_TEX_LIGHTMAP, VertexFormatMode.QUADS, 256, false, true,
+                () -> {
+                    // Equivalent to enabling TextureState
+                    GlStateManager.enableTexture2D();
+                    TextureManager textureManager = Minecraft.getMinecraft().getTextureManager();
+                    textureManager.bindTexture(texture);
+                    textureManager.getTexture(texture).setBlurMipmap(false, false);
+                    // Equivalent to enabling Default Alpha
+                    GlStateManager.enableAlpha();
+                    GlStateManager.alphaFunc(516, 0.003921569f);
+                    // Equivalent to enabling TRANSLUCENT_TRANSPARENCY
+                    GlStateManager.enableBlend();
+                    GlStateManager.tryBlendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA, GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA);
+                    Minecraft.getMinecraft().entityRenderer.enableLightmap();
+                    GlStateManager.depthMask(false);
+                    GlStateManager.disableDepth();
+                }, () -> {
+                    GlStateManager.disableAlpha();
+                    GlStateManager.alphaFunc(516, 0.1f);
+                    GlStateManager.disableBlend();
+                    GlStateManager.tryBlendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA, GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ZERO);
+                    Minecraft.getMinecraft().entityRenderer.disableLightmap();
+                    GlStateManager.enableDepth();
+                    GlStateManager.depthMask(true);
+                }));
+
         public static FiguraRenderType entityCutoutNoCull(ResourceLocation texture) {
             return FiguraRenderType.create("entity_cutout_no_cull", ENTITY_FORMAT, VertexFormatMode.QUADS, 256, true, false, () -> {
                 // Equivalent to enabling TextureState

@@ -68,6 +68,6 @@ public abstract class FontSetMixin {
 
     @Unique
     private boolean figura$isEmojiFont() {
-        return name.getNamespace().equals("figura");
+        return name.getResourceDomain().equals("figura");
     }
 }
