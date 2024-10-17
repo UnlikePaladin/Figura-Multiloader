@@ -1,12 +1,10 @@
 package org.figuramc.figura.font;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.gson.Gson;
 import com.google.gson.JsonParseException;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.texture.SimpleTexture;
-import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.client.renderer.texture.TextureUtil;
 import net.minecraft.client.resources.IResource;
 import net.minecraft.client.resources.IResourceManager;
@@ -24,11 +22,18 @@ public class FiguraFontLoader implements IResourceManagerReloadListener {
 
     @Override
     public void onResourceManagerReload(IResourceManager resourceManager) {
+        HashMap<ResourceLocation, List<FiguraGlyphProvider>> map = Maps.newHashMap();
         for (String namespace : resourceManager.getResourceDomains()) {
             try {
                 resourceManager.getAllResources(new ResourceLocation(namespace, "font")).forEach(iResource -> {
                     ResourceLocation locationForResource = iResource.getResourceLocation();
                     if (locationForResource.getResourcePath().endsWith(".json")) {
+
+                        String resourcePath = locationForResource.getResourcePath();
+                        ResourceLocation fontLocation = new ResourceLocation(locationForResource.getResourceDomain(), resourcePath.substring("font/".length(), resourcePath.length() - ".json".length()));
+                        List<FiguraGlyphProvider> list = map.computeIfAbsent(fontLocation, resourceLocation -> Lists.newArrayList());
+
+
                         Reader reader = new InputStreamReader(iResource.getInputStream());
                         Font font = GSON.fromJson(reader, Font.class);
                         if (font != null && !font.providers.isEmpty()) {
@@ -60,12 +65,7 @@ public class FiguraFontLoader implements IResourceManagerReloadListener {
                                                int glyphHeight = height / codepoints.size();
                                                float glyphScale = (float) glyphHeight / provider.height;
 
-                                             //  SimpleTexture simpleTexture = new SimpleTexture(texturePath);
-                                              // simpleTexture.setBlurMipmap(false, false);
-                                               //Minecraft.getMinecraft().getTextureManager().loadTexture(texturePath, simpleTexture); // register the texture
-
-
-                                               Int2ObjectOpenHashMap<FiguraGlyph> figuraGlyphMap = new Int2ObjectOpenHashMap<>();
+                                               Int2ObjectOpenHashMap<FiguraGlyphProvider.FiguraGlyph> figuraGlyphMap = new Int2ObjectOpenHashMap<>();
                                                // TODO : map from the image coords to the actual glyphs and construct the font
                                                for (int rowIndex = 0; rowIndex < codepoints.size(); rowIndex++) {
                                                    int[] codepointList = codepoints.get(rowIndex);
@@ -79,7 +79,7 @@ public class FiguraFontLoader implements IResourceManagerReloadListener {
 
                                                        // Emoji advance is hardcoded to be 8.
                                                        int advance = isFiguraFont(locationForResource) ? 8 : findGlyphWidth(image, glyphWidth, glyphHeight, columnIndex, rowIndex);
-                                                       FiguraGlyph glyph = new FiguraGlyph(glyphScale, texturePath, glyphWidth * columnIndex, glyphHeight * rowIndex, glyphWidth, glyphHeight, advance, provider.ascent);
+                                                       FiguraGlyphProvider.FiguraGlyph glyph = new FiguraGlyphProvider.FiguraGlyph(glyphScale, image, glyphWidth * columnIndex, glyphHeight * rowIndex, glyphWidth, glyphHeight, advance, provider.ascent);
                                                        if (figuraGlyphMap.put(codePoint, glyph) != null)  {
                                                            FiguraMod.LOGGER.warn("Duplicate codepoint '{}' in {}", Integer.toHexString(codePoint), provider.file);
                                                            continue;
@@ -89,12 +89,11 @@ public class FiguraFontLoader implements IResourceManagerReloadListener {
                                                        }
                                                    }
                                                }
-
+                                               FiguraGlyphProvider figuraGlyphProvider = new FiguraGlyphProvider(image, figuraGlyphMap);
+                                               list.add(figuraGlyphProvider);
                                            }
                                            IOUtils.closeQuietly(texture);
                                        }
-
-
 
                                    } catch (Exception exception) {
                                        FiguraMod.LOGGER.warn("Found a problem while loading {} : {}", locationForResource.toString(), exception.getMessage());

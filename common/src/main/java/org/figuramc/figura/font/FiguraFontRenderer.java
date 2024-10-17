@@ -26,11 +26,10 @@ public class FiguraFontRenderer extends FontRenderer {
     }
 
 
-    @Override
     public int drawEmoji(String string, float f, float g, int i, boolean dropShadow) {
         for(int z = 0; z < string.length(); ++z) {
             int codePoint = string.codePointAt(z);
-            if ()
+            if (codePoint)
         }
         ((FontRendererAccessor)this).setRed((i >> 16 & 0xFF) / 255.0F);
         ((FontRendererAccessor)this).setBlue((i >> 8 & 0xFF) / 255.0F);
