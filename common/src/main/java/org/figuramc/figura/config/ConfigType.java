@@ -46,6 +46,7 @@ public abstract class ConfigType<T> {
 
         // values
         this.value = this.defaultValue = this.tempValue = value;
+        Configs.REGISTRY.put(id, value);
     }
 
     public abstract T parseValue(String newVal);
@@ -64,6 +65,7 @@ public abstract class ConfigType<T> {
         tempValue = value;
         if (change) {
             try {
+                Configs.REGISTRY.put(id, value);
                 onChange();
             } catch (Exception e) {
                 FiguraMod.LOGGER.warn("Failed to run onChange for config \"" + id + "\"", e);
@@ -81,6 +83,7 @@ public abstract class ConfigType<T> {
 
     public void setDefault() {
         value = defaultValue;
+        Configs.REGISTRY.put(id, defaultValue);
     }
 
     public void resetTemp() {
@@ -367,11 +370,9 @@ public abstract class ConfigType<T> {
                 if (!e.isJsonObject()) continue;
                 JsonObject o = e.getAsJsonObject();
                 JsonElement s = o.get("source");
-                JsonElement m = o.get("mode");
-                if (s == null || m == null || !s.isJsonPrimitive() || !m.isJsonPrimitive()) continue;
+                if (s == null || !s.isJsonPrimitive()) continue;
                 JsonPrimitive source = s.getAsJsonPrimitive();
-                JsonPrimitive mode = m.getAsJsonPrimitive();
-                if (!source.isString() || !mode.isNumber()) continue;
+                if (!source.isString()) continue;
                 filters.add(new NetworkingAPI.Filter(source.getAsString()));
             }
         }

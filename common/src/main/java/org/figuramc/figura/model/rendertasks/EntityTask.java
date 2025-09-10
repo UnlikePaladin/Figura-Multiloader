@@ -163,4 +163,18 @@ public class EntityTask extends RenderTask {
         }
         return this;
     }
+
+    @Override
+    public RenderTask copy() {
+        EntityTask copy = new EntityTask(name + "_copy", owner, parent);
+        assert Minecraft.getInstance().level != null;
+        if(entity != null) {
+            CompoundTag tag = new CompoundTag();
+            entity.save(tag);
+            copy.entity = EntityType.loadEntityRecursive(tag, Minecraft.getInstance().level, Function.identity());
+        }
+        copy.ticksSinceEntity = this.ticksSinceEntity;
+        this.customization.copyTo(copy.customization);
+        return copy;
+    }
 }

@@ -138,8 +138,18 @@ public class LuaTypeManager {
             @Override
             public Varargs invoke(Varargs args) {
 
-                if (!isStatic)
-                    caller = args.checkuserdata(1, clazz);
+                if (!isStatic) {
+                    try {
+                        caller = args.checkuserdata(1, clazz);
+                    } catch (LuaError e) {
+                        String methodName = method.getName();
+                        String targetType = getTypeName(clazz);
+                        throw new LuaError(String.format(
+                                "Use a colon (:) to call %s on a %s, instead of a dot.\nFor example, change .%s( to :%s(",
+                                methodName, targetType, methodName, methodName
+                        ));
+                    }
+                }
 
                 // dirty hack for QOL of ignoring the first argument if the method is static and the arg matches the class type
                 int offset = isStatic && argumentTypes.length > 0 && !argumentTypes[0].isAssignableFrom(clazz) && args.isuserdata(1) && clazz.isAssignableFrom(args.checkuserdata(1).getClass()) ? 1 : 0;

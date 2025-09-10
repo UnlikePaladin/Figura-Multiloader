@@ -5,10 +5,7 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.world.entity.Entity;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.Avatar;
-import org.figuramc.figura.lua.api.AvatarAPI;
-import org.figuramc.figura.lua.api.HostAPI;
-import org.figuramc.figura.lua.api.RendererAPI;
-import org.figuramc.figura.lua.api.TextureAPI;
+import org.figuramc.figura.lua.api.*;
 import org.figuramc.figura.lua.api.action_wheel.ActionWheelAPI;
 import org.figuramc.figura.lua.api.entity.EntityAPI;
 import org.figuramc.figura.lua.api.entity.NullEntity;
@@ -20,6 +17,7 @@ import org.figuramc.figura.lua.api.ping.PingAPI;
 import org.figuramc.figura.lua.api.vanilla_model.VanillaModelAPI;
 import org.figuramc.figura.permissions.Permissions;
 import org.figuramc.figura.utils.PathUtils;
+import net.minecraft.nbt.ByteArrayTag;
 import org.luaj.vm2.*;
 import org.luaj.vm2.compiler.LuaC;
 import org.luaj.vm2.lib.*;
@@ -54,6 +52,7 @@ public class FiguraLuaRuntime {
     public ActionWheelAPI action_wheel;
     public AvatarAPI avatar_meta;
     public PingAPI ping;
+    public ServerPacketsAPI serverPackets;
     public TextureAPI texture;
 
     //---------------------------------
@@ -148,6 +147,11 @@ public class FiguraLuaRuntime {
         LuaValue loadstring = loadstringConstructor.apply(this);
         this.setGlobal("load", loadstring);
         this.setGlobal("loadstring", loadstring);
+
+        // addScript & getScript
+        this.setGlobal("addScript", addScript);
+        this.setGlobal("getScripts", getScripts);
+        this.setGlobal("getScript", getScript);
 
         // load print functions
         FiguraLuaPrinter.loadPrintFunctions(this);
@@ -300,10 +304,19 @@ public class FiguraLuaRuntime {
 
                 // get environment in which will be used to get global values from, does not make extra lookups outside this table
                 val = args.arg(3);
-                LuaTable environment = val.istable() ? val.checktable() : runtime.userGlobals;
+                LuaTable environment = val.istable() ? val.checktable() : null;
 
                 // create the function from arguments
-                return runtime.userGlobals.load(ld, chunkName, "t", environment);
+                LuaValue chunk = runtime.userGlobals.load(ld, chunkName, "t", runtime.userGlobals);
+                // adjust the globals so that the debug hooks function correctly *and* the environment also works
+                if (environment != null && chunk instanceof LuaClosure) {
+                    UpValue[] upvalues = ((LuaClosure) chunk).upValues;
+                    if (upvalues.length > 0 && upvalues[0].getValue() == runtime.userGlobals) {
+                        upvalues[0].setValue(environment);
+                    }
+                }
+
+                return chunk;
             } catch (LuaError e) {
                 return varargsOf(NIL, e.getMessageObject());
             }
@@ -345,6 +358,83 @@ public class FiguraLuaRuntime {
         }
     };
 
+    private final OneArgFunction getScripts = new OneArgFunction() {
+        @Override
+        public LuaValue call(LuaValue path) {
+            // iterate over all script names and add them if their name starts with the path query
+
+            LuaTable table = new LuaTable();
+            String _path = path.isnil() ? "" : path.checkjstring();
+            if(_path.isEmpty()){
+                for (String s : scripts.keySet()) {
+                    table.set(s,scripts.get(s));
+                }
+            }else{
+                for (String s : scripts.keySet()) {
+                    if(!s.startsWith(_path)) continue;
+                    table.set(s,scripts.get(s));
+                }
+            }
+
+            return table;
+        }
+        @Override
+        public String tojstring() {
+            return "function: getScripts";
+        }
+    };
+
+
+	private final OneArgFunction getScript = new OneArgFunction() {
+		@Override
+		public LuaValue call(LuaValue arg) {
+			Path path = PathUtils.getPath(arg.checkstring(1));
+			String ret = scripts.get(PathUtils.computeSafeString(PathUtils.isAbsolute(path) ? path : PathUtils.getWorkingDirectory(getInfoFunction).resolve(path)));
+			return ret == null ? null : LuaValue.valueOf(ret);
+		}
+		@Override
+		public String tojstring() {
+			return "function: getScript";
+		}
+	};
+
+    // "both" "runtime" "nbt"
+	private final ThreeArgFunction addScript = new ThreeArgFunction() {
+		@Override
+		public LuaValue call(LuaValue arg,LuaValue contents,LuaValue side) {
+			Path path = PathUtils.getPath(arg.checkjstring());
+			Path dir = PathUtils.getWorkingDirectory(getInfoFunction);
+			String scriptName = PathUtils.computeSafeString(PathUtils.getPath(PathUtils.computeSafeString(
+				PathUtils.isAbsolute(path) ? path : dir.resolve(path)
+			)));
+			String scriptNameNbt = scriptName.replace('/','.');
+
+			String modifySide = side.isnil() ? "both" : side.checkjstring().toLowerCase();
+			if (!("both".equals(modifySide) || "runtime".equals(modifySide) || "nbt".equals(modifySide))) {
+				throw new LuaError("Argument \"side\" must be one of \"both\", \"nbt\", \"runtime\", or nil.");
+			}
+
+			if (!modifySide.equals("nbt")) loadedScripts.remove(scriptName);
+			if(contents.isnil()){
+				if (!modifySide.equals("runtime")) owner.nbt.getCompound("scripts").remove(scriptNameNbt);
+				if (!modifySide.equals("nbt")) scripts.remove(scriptName);
+				return LuaValue.NIL;
+			}
+			String scriptContent = contents.checkjstring();
+			var scriptNbt = owner.nbt.getCompound("scripts");
+
+			if (!modifySide.equals("nbt")) scripts.put(scriptName,scriptContent);
+			// if (loadingScripts.contains(scriptNauiime))
+			// 	throw new LuaError("Detected circular dependency in script " + loadingScripts.peek());
+
+			if (!modifySide.equals("runtime")) scriptNbt.put(scriptNameNbt,new ByteArrayTag(scriptContent.getBytes(StandardCharsets.UTF_8)));
+			return LuaValue.NIL;
+		}
+		@Override
+		public String tojstring() {
+			return "function: addScript";
+		}
+	};
     // init event //
 
     private Varargs initializeScript(String str){

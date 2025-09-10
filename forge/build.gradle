@@ -41,6 +41,9 @@ dependencies {
     include(forgeRuntimeLibrary("com.github.FiguraMC.luaj:luaj-jse:$luaj-figura"))
     include(forgeRuntimeLibrary("com.neovisionaries:nv-websocket-client:$nv_websocket"))
 
+    include(forgeRuntimeLibrary("org.chenliang.oggus:oggus:1.2.0"))
+    include(forgeRuntimeLibrary("org.concentus:Concentus:1.0-SNAPSHOT"))
+
     forge "net.minecraftforge:forge:${rootProject.forge_version}"
 
     if (rootProject.run_with_geckolib == "true") {
@@ -49,6 +52,9 @@ dependencies {
     }
     common(project(path: ":common", configuration: "namedElements")) { transitive false }
     shadowCommon(project(path: ":common", configuration: "transformProductionForge")) { transitive = false }
+
+    common(project(path: ":server-common")) { transitive false }
+    shadowCommon(project(path: ":server-common")) { transitive false }
 }
 
 processResources {

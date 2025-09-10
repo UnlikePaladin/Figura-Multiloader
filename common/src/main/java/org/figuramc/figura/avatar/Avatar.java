@@ -544,7 +544,7 @@ public class Avatar {
         renderer.setupRenderer(
                 PartFilterScheme.WORLD, bufferSource, stack,
                 tickDelta, lightFallback, 1f, OverlayTexture.NO_OVERLAY,
-                false, false,
+                false, false, true,
                 camX, camY, camZ
         );
 
@@ -983,7 +983,7 @@ public class Avatar {
 
     public void closeStreams() {
         for (FiguraInputStream stream :
-                openInputStreams) {
+                new ArrayList<>(openInputStreams)) {
             try {
                 stream.close();
             } catch (IOException ignored) {
@@ -992,7 +992,7 @@ public class Avatar {
         openInputStreams.clear();
 
         for (FiguraOutputStream stream :
-                openOutputStreams) {
+                new ArrayList<>(openOutputStreams)) {
             try {
                 stream.close();
             } catch (IOException ignored) {

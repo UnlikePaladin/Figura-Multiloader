@@ -128,4 +128,19 @@ public class ItemTask extends RenderTask {
     public String toString() {
         return name + " (Item Render Task)";
     }
+
+    public ItemStack getItem() {
+        return item;
+    }
+
+    @Override
+    public RenderTask copy() {
+        ItemTask copy = new ItemTask(name + "_copy", owner, parent);
+        copy.item = this.item.copy();
+        copy.displayMode = this.displayMode;
+        copy.left = this.left;
+        copy.cachedComplexity = this.cachedComplexity;
+        this.customization.copyTo(copy.customization);
+        return copy;
+    }
 }

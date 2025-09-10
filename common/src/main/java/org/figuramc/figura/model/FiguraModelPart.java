@@ -1,7 +1,9 @@
 package org.figuramc.figura.model;
 
+import com.mojang.datafixers.util.Either;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.core.UUIDUtil;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.lua.LuaNotNil;
 import org.figuramc.figura.lua.LuaWhitelist;
@@ -21,8 +23,11 @@ import org.figuramc.figura.model.rendering.texture.RenderTypes;
 import org.figuramc.figura.model.rendertasks.*;
 import org.figuramc.figura.utils.LuaUtils;
 import org.figuramc.figura.utils.ui.UIHelper;
+import org.jetbrains.annotations.Nullable;
 import org.luaj.vm2.*;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -36,6 +41,8 @@ public class FiguraModelPart implements Comparable<FiguraModelPart> {
     private final Avatar owner;
 
     public final String name;
+    @Nullable public final String uuid;
+    private int cloneSeed;
     public FiguraModelPart parent;
 
     public final PartCustomization customization;
@@ -44,7 +51,9 @@ public class FiguraModelPart implements Comparable<FiguraModelPart> {
     public PartCustomization playerCustomization;
 
     private final Map<String, FiguraModelPart> childCache = new HashMap<>();
+    private final Map<String, List<FiguraModelPart>> collections = new HashMap<>();
     public final List<FiguraModelPart> children;
+    private final byte[] collectionInfo;
 
     public List<Integer> facesByTexture;
 
@@ -71,12 +80,25 @@ public class FiguraModelPart implements Comparable<FiguraModelPart> {
     @LuaFieldDoc("model_part.post_render")
     public LuaFunction postRender; // after children
 
-    public FiguraModelPart(Avatar owner, String name, PartCustomization customization, Map<Integer, List<Vertex>> vertices, List<FiguraModelPart> children) {
+    public FiguraModelPart(Avatar owner, String name, @Nullable String uuid, PartCustomization customization, Map<Integer, List<Vertex>> vertices, List<FiguraModelPart> children, String @Nullable[] collections, byte[] collectionInfo) {
         this.owner = owner;
         this.name = name;
+        this.uuid = uuid;
         this.customization = customization;
         this.vertices = vertices;
         this.children = children;
+        this.collectionInfo = collectionInfo;
+        if (collections != null) {
+            for (String n: collections) this.collections.put(n, new ArrayList<>());
+            walkCollections(this.collections, collections);
+        }
+    }
+
+    private void walkCollections(Map<String, List<FiguraModelPart>> root, String names[]) {
+        if (collectionInfo != null)
+            for (byte b: collectionInfo)
+                root.get(names[b]).add(this);
+        for (var c: children) c.walkCollections(root, names);
     }
 
     public boolean pushVerticesImmediate(ImmediateAvatarRenderer avatarRenderer, int[] remainingComplexity) {
@@ -694,6 +716,47 @@ public class FiguraModelPart implements Comparable<FiguraModelPart> {
         } catch (Exception ignored) {
             throw new LuaError("Illegal RenderType: \"" + type + "\".");
         }
+    }
+
+    @LuaWhitelist
+    @LuaMethodDoc(
+            overloads = @LuaMethodOverload(
+                    argumentTypes = Boolean.class,
+                    argumentNames = "shade"
+            ),
+            aliases = "shade",
+            value = "model_part.shading"
+    )
+    public FiguraModelPart shading(boolean bool) {
+        this.customization.shade(bool);
+        return this;
+    }
+
+    @LuaWhitelist
+    public FiguraModelPart shade(boolean bool) {
+        return shading(bool);
+    }
+
+    @LuaWhitelist
+    @LuaMethodDoc(
+            value = "model_part.no_shading",
+            overloads = @LuaMethodOverload(
+                    argumentTypes = Boolean.class,
+                    argumentNames = "noShading"
+            ),
+            aliases = "noShade"
+    )
+    public FiguraModelPart noShading(boolean bool) {
+        return shading(!bool);
+    }
+
+    @LuaWhitelist
+    public FiguraModelPart noShade(boolean bool) { return noShading(bool); }
+
+    @LuaWhitelist
+    @LuaMethodDoc("model_part.is_shaded")
+    public Boolean isShaded() {
+        return this.customization.isShaded();
     }
 
     @LuaWhitelist
@@ -1397,6 +1460,12 @@ public class FiguraModelPart implements Comparable<FiguraModelPart> {
     }
 
     @LuaWhitelist
+    @LuaMethodDoc("model_part.get_uuid")
+    public @Nullable String getUUID() {
+        return uuid;
+    }
+
+    @LuaWhitelist
     @LuaMethodDoc(
             overloads = @LuaMethodOverload(
                     argumentTypes = FiguraModelPart.class,
@@ -1475,26 +1544,84 @@ public class FiguraModelPart implements Comparable<FiguraModelPart> {
 
     @LuaWhitelist
     @LuaMethodDoc(
-            overloads = @LuaMethodOverload(
+            overloads = {
+                @LuaMethodOverload(
                     argumentTypes = String.class,
                     argumentNames = "name"
-            ),
+                ),
+                @LuaMethodOverload(
+                        argumentTypes = {String.class, Boolean.class},
+                        argumentNames = {"name", "deepCopy"}
+                ),
+                @LuaMethodOverload(
+                        argumentTypes = {Boolean.class},
+                        argumentNames = {"deepCopy"}
+                )
+            },
             value = "model_part.copy"
     )
-    public FiguraModelPart copy(@LuaNotNil String name) {
+    public FiguraModelPart copy(Object obj, Boolean deepP) {
+        String name = obj instanceof String ? (String) obj : null;
+        Boolean deep = obj instanceof Boolean ? (Boolean) obj : deepP;
+        if (deep != null && deep) return deepCopy(name);
+		if (name == null) name = this.name;
         PartCustomization customization = new PartCustomization();
         this.customization.copyTo(customization);
-        FiguraModelPart result = new FiguraModelPart(owner, name, customization, copyVertices(), new ArrayList<>(children));
+        FiguraModelPart result = new FiguraModelPart(owner, name, uuid != null ? UUID.nameUUIDFromBytes((uuid + ":" + cloneSeed++).getBytes(StandardCharsets.UTF_8)).toString() : null, customization, copyVertices(), new ArrayList<>(children), null, null);
         result.facesByTexture = new ArrayList<>(facesByTexture);
         result.textures = new ArrayList<>(textures);
         result.parentType = parentType;
         result.textureHeight = textureHeight;
         result.textureWidth = textureWidth;
+        result.renderTasks.putAll(renderTasks);
 
         if (parentType.isSeparate)
             owner.renderer.sortParts();
 
         return result;
+    }
+
+
+    @LuaWhitelist
+    @LuaMethodDoc(
+            overloads = @LuaMethodOverload(
+                    argumentTypes = String.class,
+                    argumentNames = "name"
+            ),
+            value = "model_part.deep_copy"
+    )
+    public FiguraModelPart deepCopy(String name) {
+        if (name == null) name = this.name;
+        PartCustomization customization = new PartCustomization();
+        this.customization.copyTo(customization);
+        List<FiguraModelPart> figuraModelParts = new ArrayList<>();
+        for (FiguraModelPart child : children) {
+            figuraModelParts.add(child.deepCopy(child.name));
+        }
+        FiguraModelPart result = new FiguraModelPart(owner, name, uuid != null ? UUID.nameUUIDFromBytes((uuid + ":" + cloneSeed++).getBytes(StandardCharsets.UTF_8)).toString() : null, customization, copyVertices(), figuraModelParts, null, null);
+        result.facesByTexture = new ArrayList<>(facesByTexture);
+        result.textures = new ArrayList<>(textures);
+        result.parentType = parentType;
+        result.textureHeight = textureHeight;
+        result.textureWidth = textureWidth;
+        this.renderTasks.forEach((key, value) -> result.renderTasks.put(key, value.copy()));
+
+        if (parentType.isSeparate)
+            owner.renderer.sortParts();
+
+        return result;
+    }
+
+    @LuaWhitelist
+    @LuaMethodDoc("model_part.get_collection")
+    public List<FiguraModelPart> getCollection(String name) {
+        return collections.get(name);
+    }
+
+    @LuaWhitelist
+    @LuaMethodDoc("model_part.get_collections")
+    public Map<String, List<FiguraModelPart>> getCollections() {
+        return collections;
     }
 
     @LuaWhitelist
@@ -1512,7 +1639,7 @@ public class FiguraModelPart implements Comparable<FiguraModelPart> {
             value = "model_part.new_part"
     )
     public FiguraModelPart newPart(@LuaNotNil String name, String parentType) {
-        FiguraModelPart newer = new FiguraModelPart(owner, name, new PartCustomization(), new HashMap<>(), new ArrayList<>());
+        FiguraModelPart newer = new FiguraModelPart(owner, name, null, new PartCustomization(), new HashMap<>(), new ArrayList<>(), null, null);
         newer.facesByTexture = new ArrayList<>();
         newer.textures = new ArrayList<>();
 

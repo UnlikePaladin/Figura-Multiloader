@@ -30,7 +30,8 @@ public class Animation {
     // -- keyframes -- // 
 
     protected final List<Map.Entry<FiguraModelPart, List<Animation.AnimationChannel>>> animationParts = new ArrayList<>();
-    private final Map<Float, String> codeFrames = new HashMap<>();
+    private final Map<Float, LuaValue> codeFrames = new HashMap<>();
+    private final Map<Float, String> codeFrameQueue = new HashMap<>();
 
     // -- player variables -- // 
 
@@ -120,8 +121,23 @@ public class Animation {
             playCode(this.lastTime, this.frameTime);
     }
 
+    private void compileCode() {
+        Iterator<Map.Entry<Float, String>> iter = codeFrameQueue.entrySet().iterator();
+        while (iter.hasNext()) {
+            Map.Entry<Float, String> item = iter.next();
+            LuaValue chunk = owner.loadScript("animations." + modelName + "." + name, item.getValue());
+            if (chunk != null) {
+                codeFrames.put(item.getKey(), chunk);
+                iter.remove();
+            }
+        }
+    }
+
     public void playCode(float minTime, float maxTime) {
-        if (owner.luaRuntime == null || codeFrames.keySet().isEmpty())
+        if (owner.luaRuntime == null)
+            return;
+        compileCode();
+        if (codeFrames.isEmpty())
             return;
 
         if (maxTime < minTime) {
@@ -133,8 +149,7 @@ public class Animation {
         for (Float codeTime : codeFrames.keySet()) {
             if (codeTime >= minTime && codeTime < maxTime) {
                 try {
-                    LuaValue value = owner.loadScript("animations." + modelName + "." + name, codeFrames.get(codeTime));
-                    owner.run(value, owner.animation, this);
+                    owner.run(codeFrames.get(codeTime), owner.animation, this);
                 } catch (Exception e) {
                     owner.luaRuntime.error(e);
                 }
@@ -276,7 +291,7 @@ public class Animation {
             value = "animation.new_code"
     )
     public Animation newCode(float time, @LuaNotNil String data) {
-        codeFrames.put(Math.max(time, 0f), data);
+        codeFrameQueue.put(Math.max(time, 0f), data);
         return this;
     }
 

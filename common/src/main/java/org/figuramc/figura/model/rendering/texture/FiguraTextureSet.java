@@ -55,6 +55,15 @@ public class FiguraTextureSet {
         return -1;
     }
 
+    public FiguraTextureSet copy() {
+        return new FiguraTextureSet(name,
+                textures[0] == null ? null : textures[0].copyTexture(),
+                textures[1] == null ? null : textures[1].copyTexture(),
+                textures[2] == null ? null : textures[2].copyTexture(),
+                textures[3] == null ? null : textures[3].copyTexture()
+        );
+    }
+
     public ResourceLocation getOverrideTexture(UUID owner, TextureCustomization pair) {
         OverrideType type;
 

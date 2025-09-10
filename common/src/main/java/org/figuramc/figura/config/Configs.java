@@ -7,6 +7,7 @@ import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.avatar.AvatarManager;
 import org.figuramc.figura.avatar.local.CacheAvatarLoader;
 import org.figuramc.figura.avatar.local.LocalAvatarFetcher;
+import org.figuramc.figura.backend2.FSB;
 import org.figuramc.figura.backend2.NetworkStuff;
 import org.figuramc.figura.entries.EntryPointManager;
 import org.figuramc.figura.gui.FiguraToast;
@@ -32,6 +33,7 @@ public class Configs {
     // config update hashmap; <version number, <actual config, old config name>>
     public static final HashMap<Integer, HashMap<ConfigType<?>, String>> CONFIG_UPDATES = new HashMap<>();
 
+    public static HashMap<String, Object> REGISTRY = new HashMap<>();
     // code to run when the config is initialized
     public static void init() {
         // test for unused configs
@@ -302,6 +304,9 @@ public class Configs {
     public static final ConfigType.BoolConfig
             FORCE_SMOOTH_AVATAR = new ConfigType.BoolConfig("force_smooth_avatar", DEV, false),
             GUI_FPS = new ConfigType.BoolConfig("gui_fps", DEV, false);
+
+    public static final ConfigType.ButtonConfig REGENERATE_KEY =
+            new ConfigType.ButtonConfig("regen_key", DEV, () -> FSB.instance().regenerateKey());
 
     // -- NETWORKING -- //
     public static final ConfigType.BoolConfig ALLOW_NETWORKING =

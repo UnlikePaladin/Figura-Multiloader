@@ -25,6 +25,7 @@ public class ActionWheelAPI {
     public Page currentPage;
     private final HashMap<String, Page> pages = new HashMap<>();
     private final boolean isHost;
+    private final Avatar owner;
 
     @LuaWhitelist
     @LuaFieldDoc("action_wheel.left_click")
@@ -38,6 +39,7 @@ public class ActionWheelAPI {
 
     public ActionWheelAPI(Avatar owner) {
         this.isHost = owner.isHost;
+        this.owner = owner;
     }
 
     @LuaWhitelist
@@ -90,7 +92,7 @@ public class ActionWheelAPI {
     @LuaWhitelist
     @LuaMethodDoc("action_wheel.new_action")
     public Action newAction() {
-        return new Action();
+        return new Action(owner);
     }
 
     @LuaWhitelist
@@ -105,7 +107,7 @@ public class ActionWheelAPI {
             value = "action_wheel.new_page"
     )
     public Page newPage(String title) {
-        Page page = new Page(title);
+        Page page = new Page(owner, title);
         if (title != null) this.pages.put(title, page);
         return page;
     }

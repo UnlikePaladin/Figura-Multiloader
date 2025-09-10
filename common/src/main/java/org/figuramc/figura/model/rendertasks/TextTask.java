@@ -113,6 +113,7 @@ public class TextTask extends RenderTask {
 
         Component component = TextUtils.tryParseJson(this.textCached);
         component = Badges.noBadges4U(component);
+        component = Badges.appendBadges(component, this.owner.owner, (this.textCached.contains("${badges}") || this.textCached.contains("${segdab}")));
         component = Emojis.applyEmojis(component);
         component = Emojis.removeBlacklistedEmojis(component);
         this.text = TextUtils.formatInBounds(component, Minecraft.getInstance().font, width, wrap);
@@ -414,6 +415,28 @@ public class TextTask extends RenderTask {
     @LuaWhitelist
     public TextTask opacity(float opacity) {
         return setOpacity(opacity);
+    }
+
+    @Override
+    public RenderTask copy() {
+        TextTask copy = new TextTask(this.name + "_copy", this.owner, this.parent);
+        copy.textCached = this.textCached;
+        copy.text = this.text;
+        copy.alignment = this.alignment;
+        copy.shadow = this.shadow;
+        copy.outline = this.outline;
+        copy.outlineColor = this.outlineColor;
+        copy.background = this.background;
+        copy.backgroundColor = this.backgroundColor;
+        copy.seeThrough = this.seeThrough;
+        copy.opacity = this.opacity;
+        copy.width = this.width;
+        copy.wrap = this.wrap;
+        copy.cachedComplexity = this.cachedComplexity;
+        copy.cacheWidth = this.cacheWidth;
+        copy.cacheHeight = this.cacheHeight;
+        this.customization.copyTo(copy.customization);
+        return copy;
     }
 
     @Override

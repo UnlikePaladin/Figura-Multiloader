@@ -17,6 +17,7 @@ import org.figuramc.figura.math.matrix.FiguraMat3;
 import org.figuramc.figura.math.matrix.FiguraMat4;
 import org.figuramc.figura.model.FiguraModelPart;
 import org.figuramc.figura.model.ParentType;
+import org.figuramc.figura.model.PartCustomization;
 import org.figuramc.figura.model.VanillaModelData;
 import org.figuramc.figura.model.rendering.texture.FiguraTexture;
 import org.figuramc.figura.model.rendering.texture.FiguraTextureSet;
@@ -51,7 +52,7 @@ public abstract class AvatarRenderer {
     public int light;
     public int overlay;
     public float alpha;
-    public boolean translucent, glowing;
+    public boolean translucent, glowing, shade;
     public FiguraMat4 posMat = FiguraMat4.of();
     public FiguraMat3 normalMat = FiguraMat3.of();
 
@@ -205,16 +206,16 @@ public abstract class AvatarRenderer {
     }
 
     public void setupRenderer(PartFilterScheme currentFilterScheme, MultiBufferSource bufferSource, PoseStack matrices, float tickDelta, int light, float alpha, int overlay, boolean translucent, boolean glowing) {
-        this.setupRenderer(currentFilterScheme, bufferSource, tickDelta, light, alpha, overlay, translucent, glowing);
+        this.setupRenderer(currentFilterScheme, bufferSource, tickDelta, light, alpha, overlay, translucent, glowing, true);
         this.setMatrices(matrices);
     }
 
-    public void setupRenderer(PartFilterScheme currentFilterScheme, MultiBufferSource bufferSource, PoseStack matrices, float tickDelta, int light, float alpha, int overlay, boolean translucent, boolean glowing, double camX, double camY, double camZ) {
-        this.setupRenderer(currentFilterScheme, bufferSource, tickDelta, light, alpha, overlay, translucent, glowing);
+    public void setupRenderer(PartFilterScheme currentFilterScheme, MultiBufferSource bufferSource, PoseStack matrices, float tickDelta, int light, float alpha, int overlay, boolean translucent, boolean glowing, boolean shade, double camX, double camY, double camZ) {
+        this.setupRenderer(currentFilterScheme, bufferSource, tickDelta, light, alpha, overlay, translucent, glowing, shade);
         this.setMatrices(camX, camY, camZ, matrices);
     }
 
-    private void setupRenderer(PartFilterScheme currentFilterScheme, MultiBufferSource bufferSource, float tickDelta, int light, float alpha, int overlay, boolean translucent, boolean glowing) {
+    private void setupRenderer(PartFilterScheme currentFilterScheme, MultiBufferSource bufferSource, float tickDelta, int light, float alpha, int overlay, boolean translucent, boolean glowing, boolean shade) {
         this.currentFilterScheme = currentFilterScheme;
         this.bufferSource = bufferSource;
         this.tickDelta = tickDelta;
@@ -223,6 +224,7 @@ public abstract class AvatarRenderer {
         this.overlay = overlay;
         this.translucent = translucent;
         this.glowing = glowing;
+        this.shade = shade;
     }
 
     public void setMatrices(PoseStack matrices) {
@@ -245,4 +247,18 @@ public abstract class AvatarRenderer {
         normalMat.scale(-1, -1, 1);
         this.normalMat.set(normalMat);
     }
+
+    public void addTextureSet(FiguraTextureSet set) {
+        textureSets.add(set);
+    }
+
+    public abstract boolean renderPart(FiguraModelPart part, int[] remainingComplexity, boolean prevPredicate);
+
+    public abstract void pushToCustomizationStack(PartCustomization stack);
+
+    public abstract void popCustomizationStack();
+
+    public abstract void doSetupForPart();
+
+    public abstract void flushBuffers();
 }

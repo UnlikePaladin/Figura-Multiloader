@@ -1,13 +1,13 @@
 plugins {
 	id "architectury-plugin" version "3.4-SNAPSHOT"
-	id "dev.architectury.loom" version "1.5-SNAPSHOT" apply false
+	id "dev.architectury.loom" version "1.6-SNAPSHOT" apply false
 }
 
 architectury {
 	minecraft = rootProject.minecraft_version
 }
 
-subprojects {
+rootProject.mod_projects.split(",").each { project(":$it") {
 	apply plugin: "dev.architectury.loom"
 
 	loom {
@@ -26,6 +26,7 @@ subprojects {
 				includeGroup("com.eliotlash.mclib")
 			}
 		}
+		maven { url 'https://maven.maxhenkel.de/repository/public' }
 	}
 
 	dependencies {
@@ -36,8 +37,10 @@ subprojects {
 		modCompileOnly "maven.modrinth:iris:$iris"
 		modCompileOnly "maven.modrinth:immediatelyfast:$immediately_fast"
 		modCompileOnly "maven.modrinth:iris:$iris"
+		implementation("org.chenliang.oggus:oggus:1.2.0")
+		implementation("org.concentus:Concentus:1.0-SNAPSHOT")
 	}
-}
+}}
 
 allprojects {
 	apply plugin: "java"

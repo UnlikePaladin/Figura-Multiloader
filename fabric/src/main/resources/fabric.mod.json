@@ -16,13 +16,16 @@
     "issues": "https://github.com/FiguraMC/Figura/issues"
   },
 
-  "license": "LGPL-2.1",
+  "license": "Polyform-Noncommercial-1.0.0",
   "icon": "assets/figura/icon.png",
 
-  "environment": "client",
+  "environment": "*",
   "entrypoints": {
     "client": [
       "org.figuramc.figura.fabric.FiguraModFabric"
+    ],
+    "server": [
+      "org.figuramc.figura.fabric.FiguraServerFabric"
     ],
     "modmenu": [
       "org.figuramc.figura.config.fabric.ModMenuConfig"

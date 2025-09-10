@@ -1,6 +1,5 @@
 package org.figuramc.figura.lua.api.action_wheel;
 
-import net.minecraft.world.item.ItemStack;
 import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.lua.LuaNotNil;
 import org.figuramc.figura.lua.LuaWhitelist;
@@ -10,10 +9,16 @@ import org.figuramc.figura.lua.docs.LuaMethodDoc;
 import org.figuramc.figura.lua.docs.LuaMethodOverload;
 import org.figuramc.figura.lua.docs.LuaTypeDoc;
 import org.figuramc.figura.math.vector.FiguraVec3;
+import org.figuramc.figura.model.FiguraModelPart;
+import org.figuramc.figura.model.PartCustomization;
 import org.figuramc.figura.model.rendering.texture.FiguraTexture;
+import org.figuramc.figura.model.rendertasks.ItemTask;
 import org.figuramc.figura.utils.LuaUtils;
 import org.luaj.vm2.LuaError;
 import org.luaj.vm2.LuaFunction;
+
+import java.util.ArrayList;
+import java.util.HashMap;
 
 @LuaWhitelist
 @LuaTypeDoc(
@@ -26,11 +31,15 @@ public class Action {
     public static final FiguraVec3 TOGGLE_COLOR = FiguraVec3.of(0, 1, 0);
 
     protected String title, toggleTitle;
-    protected ItemStack item, hoverItem, toggleItem;
+    protected FiguraModelPart part, hoverPart, togglePart;
     protected FiguraVec3 color, hoverColor, toggleColor;
     protected TextureData texture, hoverTexture, toggleTexture;
     protected boolean toggled = false;
+    public Avatar owner;
 
+    public Action(Avatar owner) {
+        this.owner = owner;
+    }
 
     // -- function fields -- // 
 
@@ -80,14 +89,14 @@ public class Action {
             avatar.run(scroll, avatar.tick, delta, this);
     }
 
-    public ItemStack getItem(boolean selected) {
-        ItemStack ret = null;
+    public FiguraModelPart getPart(boolean selected) {
+        FiguraModelPart ret = null;
         if (selected)
-            ret = hoverItem;
+            ret = hoverPart;
         if (ret == null && toggled)
-            ret = toggleItem;
+            ret = togglePart;
         if (ret == null)
-            ret = item;
+            ret = part;
         return ret;
     }
 
@@ -221,7 +230,13 @@ public class Action {
             value = "wheel_action.set_item"
     )
     public Action setItem(Object item) {
-        this.item = LuaUtils.parseItemStack("item", item);
+        this.part = new FiguraModelPart(owner, title+"_part", null, new PartCustomization(), new HashMap<>(), new ArrayList<>(), null, null);
+        this.part.facesByTexture = new ArrayList<>();
+        this.part.textures = new ArrayList<>();
+
+        this.part.addTask(new ItemTask(title+"_task", owner, null)
+                .setItem(LuaUtils.parseItemStack("item", item))
+                .displayMode("gui").setLight(15d, 15d));
         return this;
     }
 
@@ -246,7 +261,13 @@ public class Action {
             value = "wheel_action.set_hover_item"
     )
     public Action setHoverItem(Object item) {
-        this.hoverItem = LuaUtils.parseItemStack("hoverItem", item);
+        this.hoverPart = new FiguraModelPart(owner, title+"_hover_part", null, new PartCustomization(), new HashMap<>(), new ArrayList<>(), null, null);
+        this.hoverPart.facesByTexture = new ArrayList<>();
+        this.hoverPart.textures = new ArrayList<>();
+
+        this.hoverPart.addTask(new ItemTask(title+"_hover_task", owner, null)
+                .setItem(LuaUtils.parseItemStack("hoverItem", item))
+                .displayMode("gui").setLight(15d, 15d));
         return this;
     }
 
@@ -254,6 +275,50 @@ public class Action {
     public Action hoverItem(Object item) {
         return setHoverItem(item);
     }
+
+
+    @LuaWhitelist
+    @LuaMethodDoc(
+            overloads = {
+                    @LuaMethodOverload(
+                            argumentTypes = FiguraModelPart.class,
+                            argumentNames = "part"
+                    )
+            },
+            aliases = "part",
+            value = "wheel_action.set_part"
+    )
+    public Action setPart(FiguraModelPart part) {
+        this.part = part;
+        return this;
+    }
+
+    @LuaWhitelist
+    public Action part(FiguraModelPart part) {
+        return setPart(part);
+    }
+
+    @LuaWhitelist
+    @LuaMethodDoc(
+            overloads = {
+                    @LuaMethodOverload(
+                            argumentTypes = FiguraModelPart.class,
+                            argumentNames = "part"
+                    )
+            },
+            aliases = "hoverPart",
+            value = "wheel_action.set_hover_part"
+    )
+    public Action setHoverPart(FiguraModelPart part) {
+        this.hoverPart = part;
+        return this;
+    }
+
+    @LuaWhitelist
+    public Action hoverPart(FiguraModelPart part) {
+        return setHoverPart(part);
+    }
+
 
     @LuaWhitelist
     @LuaMethodDoc(
@@ -496,13 +561,40 @@ public class Action {
             value = "wheel_action.set_toggle_item"
     )
     public Action setToggleItem(Object item) {
-        this.toggleItem = LuaUtils.parseItemStack("toggleItem", item);
+        this.togglePart = new FiguraModelPart(owner, title+"_toggle_part", null, new PartCustomization(), new HashMap<>(), new ArrayList<>(), null, null);
+        this.togglePart.facesByTexture = new ArrayList<>();
+        this.togglePart.textures = new ArrayList<>();
+
+        this.togglePart.addTask(new ItemTask(title+"_toggle_task", owner, null)
+                .setItem(LuaUtils.parseItemStack("hoverItem", item))
+                .displayMode("gui").setLight(15d, 15d));
         return this;
     }
 
     @LuaWhitelist
     public Action toggleItem(Object item) {
         return setToggleItem(item);
+    }
+
+    @LuaWhitelist
+    @LuaMethodDoc(
+            overloads = {
+                    @LuaMethodOverload(
+                            argumentTypes = FiguraModelPart.class,
+                            argumentNames = "part"
+                    )
+            },
+            aliases = "togglePart",
+            value = "wheel_action.set_toggle_part"
+    )
+    public Action setTogglePart(FiguraModelPart modelPart) {
+        this.togglePart = modelPart;
+        return this;
+    }
+
+    @LuaWhitelist
+    public Action togglePart(FiguraModelPart modelPart) {
+        return setTogglePart(modelPart);
     }
 
     @LuaWhitelist

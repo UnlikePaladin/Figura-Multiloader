@@ -14,6 +14,7 @@ import org.figuramc.figura.lua.docs.LuaMethodDoc;
 import org.figuramc.figura.lua.docs.LuaMethodOverload;
 import org.figuramc.figura.lua.docs.LuaTypeDoc;
 import org.figuramc.figura.model.FiguraModelPart;
+import org.figuramc.figura.model.PartCustomization;
 import org.figuramc.figura.utils.LuaUtils;
 
 @LuaWhitelist
@@ -84,6 +85,15 @@ public class BlockTask extends RenderTask {
     @LuaWhitelist
     public BlockTask block(Object block) {
         return setBlock(block);
+    }
+
+    @Override
+    public RenderTask copy() {
+        BlockTask copy = new BlockTask(name + "_copy", owner, parent);
+        copy.block = this.block;
+        copy.cachedComplexity = this.cachedComplexity;
+        this.customization.copyTo(copy.customization);
+        return copy;
     }
 
     @Override

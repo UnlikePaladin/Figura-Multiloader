@@ -31,6 +31,9 @@ public class FiguraCommands {
         // load
         root.then(LoadCommand.getCommand());
 
+        // upload
+        root.then(UploadCommand.getCommand());
+
         // reload
         root.then(ReloadCommand.getCommand());
 
@@ -39,6 +42,8 @@ public class FiguraCommands {
 
         // export
         root.then(ExportCommand.getCommand());
+
+        root.then(BadgeCommand.getCommand());
 
         if (FiguraMod.debugModeEnabled()) {
             // backend debug

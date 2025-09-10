@@ -1,5 +1,6 @@
 package org.figuramc.figura.lua.api.action_wheel;
 
+import org.figuramc.figura.avatar.Avatar;
 import org.figuramc.figura.lua.LuaNotNil;
 import org.figuramc.figura.lua.LuaWhitelist;
 import org.figuramc.figura.lua.docs.LuaFieldDoc;
@@ -18,7 +19,7 @@ import java.util.Map;
         value = "wheel_page"
 )
 public class Page {
-
+    private final Avatar owner;
     private final String title;
 
     private final HashMap<Integer, Action> actionsMap = new HashMap<>();
@@ -29,8 +30,9 @@ public class Page {
     @LuaFieldDoc("wheel_page.keep_slots")
     public boolean keepSlots = false;
 
-    public Page(String title) {
+    public Page(Avatar owner, String title) {
         this.title = title;
+        this.owner = owner;
     }
 
     public int getSize() {
@@ -123,7 +125,7 @@ public class Page {
     )
     public Action newAction(Integer index) {
         // set the action
-        Action action = new Action();
+        Action action = new Action(owner);
         this.actionsMap.put(checkIndex(index), action);
 
         // return the action

@@ -1,6 +1,10 @@
 package org.figuramc.figura.parsers;
 
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
 import com.google.gson.*;
+import net.minecraft.core.UUIDUtil;
 import net.minecraft.nbt.*;
 import org.figuramc.figura.FiguraMod;
 import org.figuramc.figura.math.vector.FiguraVec3;
@@ -28,6 +32,7 @@ public class BlockbenchModelParser {
     private int animationOffset = 0;
 
     //used during the parser
+    private final Multimap<String, Integer> collectionMap = HashMultimap.create();
     private final HashMap<String, CompoundTag> elementMap = new HashMap<>();
     private final HashMap<String, ListTag> animationMap = new HashMap<>();
     private final HashMap<String, TextureData> textureMap = new HashMap<>();
@@ -59,6 +64,16 @@ public class BlockbenchModelParser {
         //emissive textures are not put into the texture map, so we need to fix parts texture ids
         parseTextures(avatarFolder, sourceFile, folders, modelName, textures, model.textures, model.resolution);
 
+        //parse collection
+        ListTag cns = new ListTag();
+        if (model.collections != null)
+            for (int i = 0; i < model.collections.length; i++) {
+                var c = model.collections[i];
+                cns.add(StringTag.valueOf(c.name));
+                for (String u: c.children) collectionMap.put(u, i);
+            }
+        nbt.put("cn", cns);
+
         //parse elements into a map of UUID (String) -> NbtCompound (the element)
         //later when parsing the outliner, we fetch the elements from this map
         parseElements(model.elements);
@@ -72,6 +87,7 @@ public class BlockbenchModelParser {
         nbt.put("chld", parseOutliner(model.outliner, true));
 
         //clear variables used by the parser
+        collectionMap.clear();
         elementMap.clear();
         animationMap.clear();
         textureMap.clear();
@@ -251,6 +267,12 @@ public class BlockbenchModelParser {
 
             //parse fields
             nbt.putString("name", element.name);
+            //invalid UUIDs are still technically valid Blockbench models, so handle those
+            try {
+                nbt.putIntArray("nr", UUIDUtil.uuidToIntArray(UUID.fromString(element.uuid)));
+            } catch (IllegalArgumentException ignored) {
+                nbt.putString("nr", element.uuid);
+            }
 
             //parse transform data
             if (notZero(element.from))
@@ -276,6 +298,13 @@ public class BlockbenchModelParser {
                 nbt.put("mesh_data", data);
             }
 
+            //find collections
+            var prs = new ArrayList<>(collectionMap.get(element.uuid));
+            if (!prs.isEmpty()) {
+                byte pr[] = new byte[prs.size()];
+                for (int i = 0; i < prs.size(); i++) pr[i] = (byte) (int) prs.get(i);
+                nbt.put("pr", new ByteArrayTag(pr));
+            }
 
             elementMap.put(id, nbt);
         }
@@ -660,6 +689,14 @@ public class BlockbenchModelParser {
 
             //parent type
             parseParent(group.name, groupNbt);
+
+            //find collections
+            var prs = new ArrayList<>(collectionMap.get(group.uuid));
+            if (!prs.isEmpty()) {
+                byte pr[] = new byte[prs.size()];
+                for (int i = 0; i < prs.size(); i++) pr[i] = (byte) (int) prs.get(i);
+                groupNbt.put("pr", new ByteArrayTag(pr));
+            }
 
             //parse children
             if (!(group.children == null || group.children.isEmpty()))
